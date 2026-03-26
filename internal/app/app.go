@@ -19,7 +19,7 @@ func New(cfg config.Config) (*App, error) {
 
 	logger := logging.New()
 
-	localHost := install.NewLocalHost(logger)
+	localHost := install.NewLocalHost(logger, cfg.StateDir)
 
 	installer, err := install.New(logger, localHost)
 
@@ -41,6 +41,13 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 
-	a.logger.InfoContext(ctx, "install completed", "steps", result.Steps)
+	a.logger.InfoContext(
+		ctx,
+		"install completed",
+		"completed_steps", result.CompletedCount(),
+		"failed", result.Failed(),
+		"steps", result.Steps,
+	)
+
 	return nil
 }

@@ -23,3 +23,25 @@ type StepResult struct {
 type Result struct {
 	Steps []StepResult
 }
+
+func (r Result) CompletedCount() int {
+	count := 0
+
+	for _, step := range r.Steps {
+		if step.Status == StatusCompleted {
+			count++
+		}
+	}
+
+	return count
+}
+
+func (r Result) Failed() bool {
+	for _, step := range r.Steps {
+		if step.Status == StatusFailed {
+			return true
+		}
+	}
+
+	return false
+}

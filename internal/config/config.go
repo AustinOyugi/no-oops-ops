@@ -1,11 +1,13 @@
 package config
 
 type Config struct {
-	AppName string
+	AppName  string
+	StateDir string
 }
 
 func Load() (Config, error) {
 	return Config{
-		AppName: "noops",
+		AppName:  "noops",
+		StateDir: "/var/lib/noops",
 	}, nil
 }
