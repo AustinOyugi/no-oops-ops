@@ -36,5 +36,11 @@ func New(cfg config.Config) (*App, error) {
 
 func (a *App) Run(ctx context.Context) error {
 	a.logger.InfoContext(ctx, "starting noops", "app_name", a.config.AppName)
-	return a.installer.Run(ctx)
+	result, err := a.installer.Run(ctx)
+	if err != nil {
+		return err
+	}
+
+	a.logger.InfoContext(ctx, "install completed", "steps", result.Steps)
+	return nil
 }
