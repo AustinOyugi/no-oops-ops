@@ -5,22 +5,34 @@ import (
 	"log/slog"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
+	"github.com/AustinOyugi/no-oops-ops/internal/install"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/logging"
 )
 
 type App struct {
-	logger *slog.Logger
-	config config.Config
+	logger    *slog.Logger
+	config    config.Config
+	installer *install.Installer
 }
 
 func New(cfg config.Config) (*App, error) {
+
+	logger := logging.New()
+
+	installer, err := install.New(logger)
+
+	if err != nil {
+		return nil, err
+	}
+
 	return &App{
-		logger: logging.New(),
-		config: cfg,
+		logger:    logger,
+		config:    cfg,
+		installer: installer,
 	}, nil
 }
 
 func (a *App) Run(ctx context.Context) error {
 	a.logger.InfoContext(ctx, "starting noops", "app_name", a.config.AppName)
-	return nil
+	return a.installer.Run(ctx)
 }
