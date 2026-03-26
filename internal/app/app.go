@@ -19,7 +19,9 @@ func New(cfg config.Config) (*App, error) {
 
 	logger := logging.New()
 
-	installer, err := install.New(logger)
+	localHost := install.NewLocalHost(logger)
+
+	installer, err := install.New(logger, localHost)
 
 	if err != nil {
 		return nil, err
