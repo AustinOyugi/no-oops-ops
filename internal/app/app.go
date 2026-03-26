@@ -18,7 +18,6 @@ func New() *App {
 }
 
 func (a *App) Run(ctx context.Context) error {
-	_ = ctx
 	a.logger.InfoContext(ctx, "starting noops")
 	return nil
 }
