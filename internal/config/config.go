@@ -4,8 +4,8 @@ type Config struct {
 	AppName string
 }
 
-func Load() Config {
+func Load() (Config, error) {
 	return Config{
 		AppName: "noops",
-	}
+	}, nil
 }
