@@ -33,16 +33,32 @@ func (i *Installer) Run(ctx context.Context) (Result, error) {
 	result := Result{}
 
 	if err := i.host.VerifyDocker(ctx); err != nil {
-		return Result{}, err
+		result.Steps = append(result.Steps, StepResult{
+			Name:   StepVerifyDocker,
+			Status: StatusFailed,
+			Error:  err.Error(),
+		})
+		return result, err
 	}
 
-	result.Steps = append(result.Steps, "verify_docker")
+	result.Steps = append(result.Steps, StepResult{
+		Name:   StepVerifyDocker,
+		Status: StatusCompleted,
+	})
 
 	if err := i.host.PrepareStateDir(ctx); err != nil {
-		return Result{}, err
+		result.Steps = append(result.Steps, StepResult{
+			Name:   StepPrepareStateDir,
+			Status: StatusFailed,
+			Error:  err.Error(),
+		})
+		return result, err
 	}
 
-	result.Steps = append(result.Steps, "prepare_state_dir")
+	result.Steps = append(result.Steps, StepResult{
+		Name:   StepPrepareStateDir,
+		Status: StatusCompleted,
+	})
 
 	i.logger.InfoContext(ctx, "install flow complete")
 	return result, nil
