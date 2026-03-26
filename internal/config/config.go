@@ -8,6 +8,6 @@ type Config struct {
 func Load() (Config, error) {
 	return Config{
 		AppName:  "noops",
-		StateDir: "/var/lib/noops",
+		StateDir: "/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/.noops",
 	}, nil
 }
