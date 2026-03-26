@@ -29,7 +29,6 @@ func main() {
 	}
 
 	if err := application.Run(ctx); err != nil {
-		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }

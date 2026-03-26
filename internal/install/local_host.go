@@ -26,8 +26,12 @@ func (h *LocalHost) VerifyDocker(ctx context.Context) error {
 
 	cmd := exec.CommandContext(ctx, "docker", "version")
 	output, err := cmd.CombinedOutput()
+
 	if err != nil {
-		return fmt.Errorf("verify docker: %w: %s", err, strings.TrimSpace(string(output)))
+		return PrerequisiteError{
+			Check: StepVerifyDocker,
+			Err:   fmt.Errorf("verify docker: %w: %s", err, strings.TrimSpace(string(output))),
+		}
 	}
 
 	return nil
@@ -39,7 +43,10 @@ func (h *LocalHost) PrepareStateDir(ctx context.Context) error {
 	h.logger.InfoContext(ctx, "preparing local state directory", "path", h.stateDir)
 	err := os.MkdirAll(h.stateDir, stateDirMode)
 	if err != nil {
-		return fmt.Errorf("create state dir %q: %w", h.stateDir, err)
+		return PrerequisiteError{
+			Check: StepPrepareStateDir,
+			Err:   fmt.Errorf("create state dir %q: %w", h.stateDir, err),
+		}
 	}
 	return nil
 }

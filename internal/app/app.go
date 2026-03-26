@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
@@ -37,7 +38,18 @@ func New(cfg config.Config) (*App, error) {
 func (a *App) Run(ctx context.Context) error {
 	a.logger.InfoContext(ctx, "starting noops", "app_name", a.config.AppName)
 	result, err := a.installer.Run(ctx)
+
 	if err != nil {
+		var prereqErr install.PrerequisiteError
+		if errors.As(err, &prereqErr) {
+			a.logger.ErrorContext(
+				ctx,
+				"install prerequisite failed",
+				"check", prereqErr.Check,
+				"reason", prereqErr.Error(),
+			)
+		}
+
 		return err
 	}
 
