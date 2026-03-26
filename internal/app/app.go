@@ -5,7 +5,6 @@ import (
 	"log/slog"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
-
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/logging"
 )
 
@@ -14,11 +13,11 @@ type App struct {
 	config config.Config
 }
 
-func New(cfg config.Config) *App {
+func New(cfg config.Config) (*App, error) {
 	return &App{
 		logger: logging.New(),
 		config: cfg,
-	}
+	}, nil
 }
 
 func (a *App) Run(ctx context.Context) error {

@@ -21,7 +21,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	application := app.New(cfg)
+	application, err := app.New(cfg)
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
 	if err := application.Run(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
