@@ -27,37 +27,30 @@ func New(logger *slog.Logger, host Host) (*Installer, error) {
 	}, nil
 }
 
+type installStep struct {
+	name Step
+	run  func(context.Context) error
+}
+
 func (i *Installer) Run(ctx context.Context) (Result, error) {
 	i.logger.InfoContext(ctx, "starting install")
 
 	result := Result{}
 
-	if err := i.runStep(ctx, &result, StepVerifyDocker, i.host.VerifyDocker); err != nil {
-		return result, err
+	steps := []installStep{
+		{name: StepVerifyDocker, run: i.host.VerifyDocker},
+		{name: StepEnsureSwarmInitialized, run: i.host.EnsureSwarmInitialized},
+		{name: StepEnsureSharedNetwork, run: i.host.EnsureSharedNetwork},
+		{name: StepEnsureRegistry, run: i.host.EnsureRegistry},
+		{name: StepPrepareStateDir, run: i.host.PrepareStateDir},
+		{name: StepInitializeLocalState, run: i.host.InitializeLocalState},
+		{name: StepWriteInstallMetadata, run: i.host.WriteInstallMetadata},
 	}
 
-	if err := i.runStep(ctx, &result, StepEnsureSwarmInitialized, i.host.EnsureSwarmInitialized); err != nil {
-		return result, err
-	}
-
-	if err := i.runStep(ctx, &result, StepEnsureSharedNetwork, i.host.EnsureSharedNetwork); err != nil {
-		return result, err
-	}
-
-	if err := i.runStep(ctx, &result, StepEnsureRegistry, i.host.EnsureRegistry); err != nil {
-		return result, err
-	}
-
-	if err := i.runStep(ctx, &result, StepPrepareStateDir, i.host.PrepareStateDir); err != nil {
-		return result, err
-	}
-
-	if err := i.runStep(ctx, &result, StepInitializeLocalState, i.host.InitializeLocalState); err != nil {
-		return result, err
-	}
-
-	if err := i.runStep(ctx, &result, StepWriteInstallMetadata, i.host.WriteInstallMetadata); err != nil {
-		return result, err
+	for _, step := range steps {
+		if err := i.runStep(ctx, &result, step.name, step.run); err != nil {
+			return result, err
+		}
 	}
 
 	i.logger.InfoContext(ctx, "install flow complete")
