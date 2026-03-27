@@ -1,8 +1,10 @@
 # No Oops Ops
 
-`No Oops Ops` is a lightweight self-hosted deployment manager for Docker-based applications. It is designed for people who have a server and want safe, repeatable deployments without assembling a full DevOps platform.
+`No Oops Ops` is a lightweight self-hosted deployment manager for Docker-based applications. It is designed for people
+who have a server and want safe, repeatable deployments without assembling a full DevOps platform.
 
-Install on a server, point it at a repo or image, and get safe deployments with built-in health checks, rollback, domains, TLS, and a private registry.
+Install on a server, point it at a repo or image, and get safe deployments with built-in health checks, rollback,
+domains, TLS, and a private registry.
 
 ## What the project is for
 
@@ -31,7 +33,8 @@ The v1 design is centered on a narrow but high-value workflow:
 - roll back automatically on failure
 - manage domains, TLS, and an internal registry
 
-The primary operator experience is an interactive terminal interface, so users do not need to memorize a large command set before becoming productive.
+The primary operator experience is an interactive terminal interface, so users do not need to memorize a large command
+set before becoming productive.
 
 ## v1 capabilities
 
@@ -53,7 +56,7 @@ The primary operator experience is an interactive terminal interface, so users d
 - a managed internal Docker registry
 - Docker Swarm as the recommended v1 runtime for rolling updates and rollback behavior
 
-
 ## License
 
-This project is licensed under the terms in [`LICENSE`](/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/LICENSE).
+This project is licensed under the terms in [
+`LICENSE`](/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/LICENSE).
