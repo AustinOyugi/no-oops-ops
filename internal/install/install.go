@@ -55,6 +55,13 @@ func (i *Installer) Run(ctx context.Context) (Result, error) {
 	}
 	result.SetStep(StepInitializeLocalState, StatusCompleted, "")
 
+	result.SetStep(StepWriteInstallMetadata, StatusRunning, "")
+	if err := i.host.WriteInstallMetadata(ctx); err != nil {
+		result.SetStep(StepWriteInstallMetadata, StatusFailed, err.Error())
+		return result, err
+	}
+	result.SetStep(StepWriteInstallMetadata, StatusCompleted, "")
+
 	i.logger.InfoContext(ctx, "install flow complete")
 	return result, nil
 }

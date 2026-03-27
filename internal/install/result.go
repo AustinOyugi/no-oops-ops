@@ -6,6 +6,7 @@ const (
 	StepVerifyDocker         Step = "verify_docker"
 	StepPrepareStateDir      Step = "prepare_state_dir"
 	StepInitializeLocalState Step = "initialize_local_state"
+	StepWriteInstallMetadata Step = "write_install_metadata"
 )
 
 type StepStatus string
