@@ -32,11 +32,10 @@ func (h *Host) EnsureRegistry(ctx context.Context) error {
 		ctx,
 		"docker",
 		[]string{
-			"service", "create",
-			"--name", h.registryName,
-			"--network", h.networkName,
-			"--publish", fmt.Sprintf("%s:5000", h.registryPort),
-			"registry:2",
+			"stack", "deploy",
+			"--detach=true",
+			"--compose-file", h.registryStackPath(),
+			h.registryName,
 		},
 		command.RunOptions{
 			StreamOutput: true,
@@ -47,7 +46,7 @@ func (h *Host) EnsureRegistry(ctx context.Context) error {
 	if err != nil {
 		return install.PrerequisiteError{
 			Check: install.StepEnsureRegistry,
-			Err:   fmt.Errorf("create registry service %q: %w: %s", h.registryName, err, strings.TrimSpace(string(result.Output))),
+			Err:   fmt.Errorf("deploy registry stack %q: %w: %s", h.registryName, err, strings.TrimSpace(string(result.Output))),
 		}
 	}
 

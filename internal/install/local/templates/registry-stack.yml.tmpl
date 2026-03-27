@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  registry:
+    image: registry:2
+    ports:
+      - "{{ .RegistryPort }}:5000"
+    networks:
+      - "{{ .NetworkName }}"
+    volumes:
+      - "{{ .ConfigPath }}:/etc/docker/registry/config.yml:ro"
+      - "{{ .DataPath }}:/var/lib/registry"
+    deploy:
+      restart_policy:
+        condition: any
+
+networks:
+  "{{ .NetworkName }}":
+    external: true

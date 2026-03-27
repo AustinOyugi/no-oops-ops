@@ -71,6 +71,8 @@ func (h *Host) WriteInstallMetadata(ctx context.Context) error {
 			Name:       h.registryName,
 			Port:       h.registryPort,
 			ConfigPath: h.registryConfigPath(),
+			StackPath:  h.registryStackPath(),
+			DataPath:   h.registryDataPath(),
 		},
 	}, "", "  ")
 	if err != nil {

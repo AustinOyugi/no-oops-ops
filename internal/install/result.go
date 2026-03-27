@@ -7,6 +7,7 @@ const (
 	StepEnsureSwarmInitialized Step = "ensure_swarm_initialized"
 	StepEnsureSharedNetwork    Step = "ensure_shared_network"
 	StepWriteRegistryConfig    Step = "write_registry_config"
+	StepWriteRegistryStack     Step = "write_registry_stack"
 	StepEnsureRegistry         Step = "ensure_registry"
 
 	StepPrepareStateDir      Step = "prepare_state_dir"
