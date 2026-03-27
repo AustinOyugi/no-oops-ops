@@ -6,9 +6,11 @@ const (
 	StepVerifyDocker           Step = "verify_docker"
 	StepEnsureSwarmInitialized Step = "ensure_swarm_initialized"
 	StepEnsureSharedNetwork    Step = "ensure_shared_network"
-	StepPrepareStateDir        Step = "prepare_state_dir"
-	StepInitializeLocalState   Step = "initialize_local_state"
-	StepWriteInstallMetadata   Step = "write_install_metadata"
+	StepEnsureRegistry         Step = "ensure_registry"
+
+	StepPrepareStateDir      Step = "prepare_state_dir"
+	StepInitializeLocalState Step = "initialize_local_state"
+	StepWriteInstallMetadata Step = "write_install_metadata"
 )
 
 type StepStatus string

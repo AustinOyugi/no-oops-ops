@@ -20,14 +20,24 @@ type LocalHost struct {
 	swarmNodeState   string
 	swarmManagerAddr string
 	networkName      string
+	registryName     string
+	registryPort     string
 }
 
-func NewLocalHost(logger *slog.Logger, stateDir string, installVersion string, networkName string) *LocalHost {
+func NewLocalHost(
+	logger *slog.Logger,
+	stateDir string,
+	installVersion string,
+	networkName string,
+	registryName string,
+	registryPort string) *LocalHost {
 	return &LocalHost{
 		logger:         logger,
 		stateDir:       stateDir,
 		installVersion: installVersion,
 		networkName:    networkName,
+		registryName:   registryName,
+		registryPort:   registryPort,
 	}
 }
 
@@ -107,6 +117,17 @@ func (h *LocalHost) EnsureSharedNetwork(ctx context.Context) error {
 			Err:   fmt.Errorf("create shared network %q: %w: %s", h.networkName, err, strings.TrimSpace(string(output))),
 		}
 	}
+
+	return nil
+}
+
+func (h *LocalHost) EnsureRegistry(ctx context.Context) error {
+	h.logger.InfoContext(
+		ctx,
+		"ensuring registry",
+		"name", h.registryName,
+		"port", h.registryPort,
+	)
 
 	return nil
 }

@@ -53,13 +53,19 @@ func (i *Installer) Run(ctx context.Context) (Result, error) {
 	}
 	result.SetStep(StepEnsureSharedNetwork, StatusCompleted, "")
 
+	result.SetStep(StepEnsureRegistry, StatusRunning, "")
+	if err := i.host.EnsureRegistry(ctx); err != nil {
+		result.SetStep(StepEnsureRegistry, StatusFailed, err.Error())
+		return result, err
+	}
+	result.SetStep(StepEnsureRegistry, StatusCompleted, "")
+
 	result.SetStep(StepPrepareStateDir, StatusRunning, "")
 	if err := i.host.PrepareStateDir(ctx); err != nil {
 
 		result.SetStep(StepPrepareStateDir, StatusFailed, err.Error())
 		return result, err
 	}
-
 	result.SetStep(StepPrepareStateDir, StatusCompleted, "")
 
 	result.SetStep(StepInitializeLocalState, StatusRunning, "")
