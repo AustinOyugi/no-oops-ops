@@ -68,11 +68,13 @@ func (h *Host) WriteInstallMetadata(ctx context.Context) error {
 			Name: h.networkName,
 		},
 		Registry: registryMetadata{
-			Name:       h.registryName,
-			Port:       h.registryPort,
-			ConfigPath: h.registryConfigPath(),
-			StackPath:  h.registryStackPath(),
-			DataPath:   h.registryDataPath(),
+			Name:        h.registryName,
+			Port:        h.registryPort,
+			ConfigPath:  h.registryConfigPath(),
+			StackPath:   h.registryStackPath(),
+			DataPath:    h.registryDataPath(),
+			ServiceName: h.registryService,
+			Ready:       h.registryReady,
 		},
 	}, "", "  ")
 	if err != nil {

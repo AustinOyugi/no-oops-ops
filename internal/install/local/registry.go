@@ -10,6 +10,17 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 )
 
+func (h *Host) inspectRegistryService(ctx context.Context) bool {
+	_, err := h.runner.Run(
+		ctx,
+		"docker",
+		[]string{"service", "inspect", h.registryService},
+		command.RunOptions{},
+	)
+
+	return err == nil
+}
+
 func (h *Host) EnsureRegistry(ctx context.Context) error {
 	h.logger.InfoContext(
 		ctx,
@@ -18,13 +29,8 @@ func (h *Host) EnsureRegistry(ctx context.Context) error {
 		"port", h.registryPort,
 	)
 
-	_, err := h.runner.Run(
-		ctx,
-		"docker",
-		[]string{"service", "inspect", h.registryName},
-		command.RunOptions{},
-	)
-	if err == nil {
+	if h.inspectRegistryService(ctx) {
+		h.registryReady = true
 		return nil
 	}
 
@@ -49,6 +55,8 @@ func (h *Host) EnsureRegistry(ctx context.Context) error {
 			Err:   fmt.Errorf("deploy registry stack %q: %w: %s", h.registryName, err, strings.TrimSpace(string(result.Output))),
 		}
 	}
+
+	h.registryReady = h.inspectRegistryService(ctx)
 
 	return nil
 }

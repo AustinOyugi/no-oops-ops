@@ -19,9 +19,11 @@ type networkMetadata struct {
 }
 
 type registryMetadata struct {
-	Name       string `json:"name"`
-	Port       string `json:"port"`
-	ConfigPath string `json:"config_path"`
-	StackPath  string `json:"stack_path"`
-	DataPath   string `json:"data_path"`
+	Name        string `json:"name"`
+	Port        string `json:"port"`
+	ConfigPath  string `json:"config_path"`
+	StackPath   string `json:"stack_path"`
+	DataPath    string `json:"data_path"`
+	ServiceName string `json:"service_name"`
+	Ready       bool   `json:"ready"`
 }

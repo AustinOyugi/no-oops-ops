@@ -16,6 +16,8 @@ type Host struct {
 	networkName      string
 	registryName     string
 	registryPort     string
+	registryService  string
+	registryReady    bool
 }
 
 func NewHost(
@@ -26,12 +28,13 @@ func NewHost(
 	registryName string,
 	registryPort string) *Host {
 	return &Host{
-		runner:         command.NewRunner(logger),
-		logger:         logger,
-		stateDir:       stateDir,
-		installVersion: installVersion,
-		networkName:    networkName,
-		registryName:   registryName,
-		registryPort:   registryPort,
+		runner:          command.NewRunner(logger),
+		logger:          logger,
+		stateDir:        stateDir,
+		installVersion:  installVersion,
+		networkName:     networkName,
+		registryName:    registryName,
+		registryPort:    registryPort,
+		registryService: registryName + "_registry",
 	}
 }
