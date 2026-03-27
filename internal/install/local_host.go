@@ -59,6 +59,9 @@ func (h *LocalHost) EnsureSwarmInitialized(ctx context.Context) error {
 
 	state := strings.TrimSpace(string(output))
 	if state == "active" {
+		h.swarmNodeState = state
+		h.swarmInitialized = true
+		h.swarmManagerAddr = h.inspectSwarmManagerAddress(ctx)
 		return nil
 	}
 
@@ -72,6 +75,7 @@ func (h *LocalHost) EnsureSwarmInitialized(ctx context.Context) error {
 	}
 	h.swarmManagerAddr = h.inspectSwarmManagerAddress(ctx)
 	h.swarmInitialized = true
+	h.swarmNodeState = "active"
 	return nil
 }
 
