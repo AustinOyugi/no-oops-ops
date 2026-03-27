@@ -7,7 +7,6 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -45,13 +44,17 @@ func NewLocalHost(
 }
 
 func (h *LocalHost) inspectSwarmManagerAddress(ctx context.Context) string {
-	cmd := exec.CommandContext(ctx, "docker", "info", "--format", "{{.Swarm.NodeAddr}}")
-	output, err := cmd.CombinedOutput()
+	result, err := h.runner.Run(
+		ctx,
+		"docker",
+		[]string{"info", "--format", "{{.Swarm.NodeAddr}}"},
+		command.RunOptions{},
+	)
 	if err != nil {
 		return ""
 	}
 
-	return strings.TrimSpace(string(output))
+	return strings.TrimSpace(string(result.Output))
 }
 
 func (h *LocalHost) VerifyDocker(ctx context.Context) error {
@@ -72,16 +75,20 @@ func (h *LocalHost) VerifyDocker(ctx context.Context) error {
 func (h *LocalHost) EnsureSwarmInitialized(ctx context.Context) error {
 	h.logger.InfoContext(ctx, "ensuring swarm is initialized")
 
-	cmd := exec.CommandContext(ctx, "docker", "info", "--format", "{{.Swarm.LocalNodeState}}")
-	output, err := cmd.CombinedOutput()
+	result, err := h.runner.Run(
+		ctx,
+		"docker",
+		[]string{"info", "--format", "{{.Swarm.LocalNodeState}}"},
+		command.RunOptions{},
+	)
 	if err != nil {
 		return PrerequisiteError{
 			Check: StepEnsureSwarmInitialized,
-			Err:   fmt.Errorf("inspect swarm state: %w: %s", err, strings.TrimSpace(string(output))),
+			Err:   fmt.Errorf("inspect swarm state: %w: %s", err, strings.TrimSpace(string(result.Output))),
 		}
 	}
 
-	state := strings.TrimSpace(string(output))
+	state := strings.TrimSpace(string(result.Output))
 	if state == "active" {
 		h.swarmNodeState = state
 		h.swarmInitialized = true
@@ -89,12 +96,16 @@ func (h *LocalHost) EnsureSwarmInitialized(ctx context.Context) error {
 		return nil
 	}
 
-	initCmd := exec.CommandContext(ctx, "docker", "swarm", "init")
-	initOutput, err := initCmd.CombinedOutput()
+	initResult, err := h.runner.Run(
+		ctx,
+		"docker",
+		[]string{"swarm", "init"},
+		command.RunOptions{},
+	)
 	if err != nil {
 		return PrerequisiteError{
 			Check: StepEnsureSwarmInitialized,
-			Err:   fmt.Errorf("initialize swarm: %w: %s", err, strings.TrimSpace(string(initOutput))),
+			Err:   fmt.Errorf("initialize swarm: %w: %s", err, strings.TrimSpace(string(initResult.Output))),
 		}
 	}
 	h.swarmManagerAddr = h.inspectSwarmManagerAddress(ctx)
@@ -106,17 +117,26 @@ func (h *LocalHost) EnsureSwarmInitialized(ctx context.Context) error {
 func (h *LocalHost) EnsureSharedNetwork(ctx context.Context) error {
 	h.logger.InfoContext(ctx, "ensuring shared network", "network", h.networkName)
 
-	inspectCmd := exec.CommandContext(ctx, "docker", "network", "inspect", h.networkName)
-	if err := inspectCmd.Run(); err == nil {
+	_, err := h.runner.Run(
+		ctx,
+		"docker",
+		[]string{"network", "inspect", h.networkName},
+		command.RunOptions{},
+	)
+	if err == nil {
 		return nil
 	}
 
-	createCmd := exec.CommandContext(ctx, "docker", "network", "create", "--driver", "overlay", h.networkName)
-	output, err := createCmd.CombinedOutput()
+	result, err := h.runner.Run(
+		ctx,
+		"docker",
+		[]string{"network", "create", "--driver", "overlay", h.networkName},
+		command.RunOptions{},
+	)
 	if err != nil {
 		return PrerequisiteError{
 			Check: StepEnsureSharedNetwork,
-			Err:   fmt.Errorf("create shared network %q: %w: %s", h.networkName, err, strings.TrimSpace(string(output))),
+			Err:   fmt.Errorf("create shared network %q: %w: %s", h.networkName, err, strings.TrimSpace(string(result.Output))),
 		}
 	}
 
@@ -131,8 +151,13 @@ func (h *LocalHost) EnsureRegistry(ctx context.Context) error {
 		"port", h.registryPort,
 	)
 
-	inspectCmd := exec.CommandContext(ctx, "docker", "service", "inspect", h.registryName)
-	if err := inspectCmd.Run(); err == nil {
+	_, err := h.runner.Run(
+		ctx,
+		"docker",
+		[]string{"service", "inspect", h.registryName},
+		command.RunOptions{},
+	)
+	if err == nil {
 		return nil
 	}
 
