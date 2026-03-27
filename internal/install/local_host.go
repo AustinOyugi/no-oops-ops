@@ -108,3 +108,13 @@ func (h *LocalHost) WriteInstallMetadata(ctx context.Context) error {
 
 	return nil
 }
+
+func (h *LocalHost) readInstallMetadata(ctx context.Context) (metadata, error) {
+	_ = ctx
+
+	path := h.installMetadataPath()
+
+	h.logger.InfoContext(ctx, "reading install metadata", "path", path)
+
+	return readMetadata(path)
+}
