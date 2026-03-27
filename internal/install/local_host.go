@@ -12,18 +12,20 @@ import (
 )
 
 type LocalHost struct {
-	logger   *slog.Logger
-	stateDir string
+	logger         *slog.Logger
+	stateDir       string
+	installVersion string
 }
 
 type installMetadata struct {
 	Version string `json:"version"`
 }
 
-func NewLocalHost(logger *slog.Logger, stateDir string) *LocalHost {
+func NewLocalHost(logger *slog.Logger, stateDir string, installVersion string) *LocalHost {
 	return &LocalHost{
-		logger:   logger,
-		stateDir: stateDir,
+		logger:         logger,
+		stateDir:       stateDir,
+		installVersion: installVersion,
 	}
 }
 
@@ -87,7 +89,7 @@ func (h *LocalHost) WriteInstallMetadata(ctx context.Context) error {
 	h.logger.InfoContext(ctx, "writing install metadata", "path", path)
 
 	data, err := json.MarshalIndent(installMetadata{
-		Version: "dev",
+		Version: h.installVersion,
 	}, "", "  ")
 
 	if err != nil {
