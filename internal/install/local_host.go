@@ -84,7 +84,7 @@ func (h *LocalHost) WriteInstallMetadata(ctx context.Context) error {
 
 	h.logger.InfoContext(ctx, "writing install metadata", "path", path)
 
-	data, err := json.MarshalIndent(Metadata{
+	data, err := json.MarshalIndent(metadata{
 		Version: h.installVersion,
 	}, "", "  ")
 

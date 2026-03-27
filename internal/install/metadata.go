@@ -1,5 +1,5 @@
 package install
 
-type Metadata struct {
+type metadata struct {
 	Version string `json:"version"`
 }
