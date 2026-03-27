@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type LocalHost struct {
@@ -85,7 +86,8 @@ func (h *LocalHost) WriteInstallMetadata(ctx context.Context) error {
 	h.logger.InfoContext(ctx, "writing install metadata", "path", path)
 
 	data, err := json.MarshalIndent(metadata{
-		Version: h.installVersion,
+		Version:     h.installVersion,
+		InstalledAt: time.Now().UTC().Format(time.RFC3339),
 	}, "", "  ")
 
 	if err != nil {
