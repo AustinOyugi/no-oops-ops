@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -48,5 +49,24 @@ func (h *LocalHost) PrepareStateDir(ctx context.Context) error {
 			Err:   fmt.Errorf("create state dir %q: %w", h.stateDir, err),
 		}
 	}
+	return nil
+}
+
+func (h *LocalHost) stateDataDir() string {
+	return filepath.Join(h.stateDir, "data")
+}
+
+func (h *LocalHost) InitializeLocalState(ctx context.Context) error {
+	path := h.stateDataDir()
+
+	h.logger.InfoContext(ctx, "initializing local state", "path", path)
+
+	if err := os.MkdirAll(path, stateDirMode); err != nil {
+		return PrerequisiteError{
+			Check: StepInitializeLocalState,
+			Err:   fmt.Errorf("initialize local state %q: %w", path, err),
+		}
+	}
+
 	return nil
 }

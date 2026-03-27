@@ -32,33 +32,28 @@ func (i *Installer) Run(ctx context.Context) (Result, error) {
 
 	result := Result{}
 
+	result.SetStep(StepVerifyDocker, StatusRunning, "")
 	if err := i.host.VerifyDocker(ctx); err != nil {
-		result.Steps = append(result.Steps, StepResult{
-			Name:   StepVerifyDocker,
-			Status: StatusFailed,
-			Error:  err.Error(),
-		})
+		result.SetStep(StepVerifyDocker, StatusFailed, err.Error())
 		return result, err
 	}
+	result.SetStep(StepVerifyDocker, StatusCompleted, "")
 
-	result.Steps = append(result.Steps, StepResult{
-		Name:   StepVerifyDocker,
-		Status: StatusCompleted,
-	})
-
+	result.SetStep(StepPrepareStateDir, StatusRunning, "")
 	if err := i.host.PrepareStateDir(ctx); err != nil {
-		result.Steps = append(result.Steps, StepResult{
-			Name:   StepPrepareStateDir,
-			Status: StatusFailed,
-			Error:  err.Error(),
-		})
+
+		result.SetStep(StepPrepareStateDir, StatusFailed, err.Error())
 		return result, err
 	}
 
-	result.Steps = append(result.Steps, StepResult{
-		Name:   StepPrepareStateDir,
-		Status: StatusCompleted,
-	})
+	result.SetStep(StepPrepareStateDir, StatusCompleted, "")
+
+	result.SetStep(StepInitializeLocalState, StatusRunning, "")
+	if err := i.host.InitializeLocalState(ctx); err != nil {
+		result.SetStep(StepInitializeLocalState, StatusFailed, err.Error())
+		return result, err
+	}
+	result.SetStep(StepInitializeLocalState, StatusCompleted, "")
 
 	i.logger.InfoContext(ctx, "install flow complete")
 	return result, nil
