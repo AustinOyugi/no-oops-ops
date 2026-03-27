@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -13,6 +14,7 @@ import (
 )
 
 type LocalHost struct {
+	runner           *command.Runner
 	logger           *slog.Logger
 	stateDir         string
 	installVersion   string
@@ -32,6 +34,7 @@ func NewLocalHost(
 	registryName string,
 	registryPort string) *LocalHost {
 	return &LocalHost{
+		runner:         command.NewRunner(logger),
 		logger:         logger,
 		stateDir:       stateDir,
 		installVersion: installVersion,
@@ -54,13 +57,12 @@ func (h *LocalHost) inspectSwarmManagerAddress(ctx context.Context) string {
 func (h *LocalHost) VerifyDocker(ctx context.Context) error {
 	h.logger.InfoContext(ctx, "checking docker installation")
 
-	cmd := exec.CommandContext(ctx, "docker", "version")
-	output, err := cmd.CombinedOutput()
+	result, err := h.runner.Run(ctx, "docker", []string{"version"}, command.RunOptions{})
 
 	if err != nil {
 		return PrerequisiteError{
 			Check: StepVerifyDocker,
-			Err:   fmt.Errorf("verify docker: %w: %s", err, strings.TrimSpace(string(output))),
+			Err:   fmt.Errorf("verify docker: %w: %s", err, strings.TrimSpace(string(result.Output))),
 		}
 	}
 
@@ -128,6 +130,35 @@ func (h *LocalHost) EnsureRegistry(ctx context.Context) error {
 		"name", h.registryName,
 		"port", h.registryPort,
 	)
+
+	inspectCmd := exec.CommandContext(ctx, "docker", "service", "inspect", h.registryName)
+	if err := inspectCmd.Run(); err == nil {
+		return nil
+	}
+
+	result, err := h.runner.Run(
+		ctx,
+		"docker",
+		[]string{
+			"service", "create",
+			"--name", h.registryName,
+			"--network", h.networkName,
+			"--publish", fmt.Sprintf("%s:5000", h.registryPort),
+			"registry:2",
+		},
+		command.RunOptions{
+			StreamOutput: true,
+			Stdout:       os.Stdout,
+			Stderr:       os.Stderr,
+		},
+	)
+
+	if err != nil {
+		return PrerequisiteError{
+			Check: StepEnsureRegistry,
+			Err:   fmt.Errorf("create registry service %q: %w: %s", h.registryName, err, strings.TrimSpace(string(result.Output))),
+		}
+	}
 
 	return nil
 }
