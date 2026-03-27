@@ -3,10 +3,11 @@ package install
 type Step string
 
 const (
-	StepVerifyDocker         Step = "verify_docker"
-	StepPrepareStateDir      Step = "prepare_state_dir"
-	StepInitializeLocalState Step = "initialize_local_state"
-	StepWriteInstallMetadata Step = "write_install_metadata"
+	StepVerifyDocker           Step = "verify_docker"
+	StepEnsureSwarmInitialized Step = "ensure_swarm_initialized"
+	StepPrepareStateDir        Step = "prepare_state_dir"
+	StepInitializeLocalState   Step = "initialize_local_state"
+	StepWriteInstallMetadata   Step = "write_install_metadata"
 )
 
 type StepStatus string

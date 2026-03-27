@@ -1,6 +1,9 @@
 package config
 
-import "os"
+import (
+	"github.com/joho/godotenv"
+	"os"
+)
 
 type Config struct {
 	AppName        string
@@ -13,6 +16,8 @@ const defaultInstallVersion = "dev"
 const defaultStateDir = "/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/.noops"
 
 func Load() (Config, error) {
+	_ = godotenv.Load(".env.noops")
+
 	return Config{
 		AppName:        defaultAppName,
 		StateDir:       envOrDefault("NOOPS_STATE_DIR", defaultStateDir),

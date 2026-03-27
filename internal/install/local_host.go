@@ -13,9 +13,12 @@ import (
 )
 
 type LocalHost struct {
-	logger         *slog.Logger
-	stateDir       string
-	installVersion string
+	logger           *slog.Logger
+	stateDir         string
+	installVersion   string
+	swarmInitialized bool
+	swarmNodeState   string
+	swarmManagerAddr string
 }
 
 func NewLocalHost(logger *slog.Logger, stateDir string, installVersion string) *LocalHost {
@@ -40,6 +43,46 @@ func (h *LocalHost) VerifyDocker(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (h *LocalHost) EnsureSwarmInitialized(ctx context.Context) error {
+	h.logger.InfoContext(ctx, "ensuring swarm is initialized")
+
+	cmd := exec.CommandContext(ctx, "docker", "info", "--format", "{{.Swarm.LocalNodeState}}")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return PrerequisiteError{
+			Check: StepEnsureSwarmInitialized,
+			Err:   fmt.Errorf("inspect swarm state: %w: %s", err, strings.TrimSpace(string(output))),
+		}
+	}
+
+	state := strings.TrimSpace(string(output))
+	if state == "active" {
+		return nil
+	}
+
+	initCmd := exec.CommandContext(ctx, "docker", "swarm", "init")
+	initOutput, err := initCmd.CombinedOutput()
+	if err != nil {
+		return PrerequisiteError{
+			Check: StepEnsureSwarmInitialized,
+			Err:   fmt.Errorf("initialize swarm: %w: %s", err, strings.TrimSpace(string(initOutput))),
+		}
+	}
+	h.swarmManagerAddr = h.inspectSwarmManagerAddress(ctx)
+	h.swarmInitialized = true
+	return nil
+}
+
+func (h *LocalHost) inspectSwarmManagerAddress(ctx context.Context) string {
+	cmd := exec.CommandContext(ctx, "docker", "info", "--format", "{{.Swarm.NodeAddr}}")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(string(output))
 }
 
 const stateDirMode = 0o700
@@ -88,6 +131,11 @@ func (h *LocalHost) WriteInstallMetadata(ctx context.Context) error {
 	data, err := json.MarshalIndent(metadata{
 		Version:     h.installVersion,
 		InstalledAt: time.Now().UTC().Format(time.RFC3339),
+		Swarm: swarmMetadata{
+			Initialized:    h.swarmInitialized,
+			LocalNodeState: h.swarmNodeState,
+			ManagerAddress: h.swarmManagerAddr,
+		},
 	}, "", "  ")
 
 	if err != nil {

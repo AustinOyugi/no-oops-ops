@@ -39,6 +39,13 @@ func (i *Installer) Run(ctx context.Context) (Result, error) {
 	}
 	result.SetStep(StepVerifyDocker, StatusCompleted, "")
 
+	result.SetStep(StepEnsureSwarmInitialized, StatusRunning, "")
+	if err := i.host.EnsureSwarmInitialized(ctx); err != nil {
+		result.SetStep(StepEnsureSwarmInitialized, StatusFailed, err.Error())
+		return result, err
+	}
+	result.SetStep(StepEnsureSwarmInitialized, StatusCompleted, "")
+
 	result.SetStep(StepPrepareStateDir, StatusRunning, "")
 	if err := i.host.PrepareStateDir(ctx); err != nil {
 
