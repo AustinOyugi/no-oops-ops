@@ -13,17 +13,32 @@ import (
 )
 
 type LocalHost struct {
-	logger         *slog.Logger
-	stateDir       string
-	installVersion string
+	logger           *slog.Logger
+	stateDir         string
+	installVersion   string
+	swarmInitialized bool
+	swarmNodeState   string
+	swarmManagerAddr string
+	networkName      string
 }
 
-func NewLocalHost(logger *slog.Logger, stateDir string, installVersion string) *LocalHost {
+func NewLocalHost(logger *slog.Logger, stateDir string, installVersion string, networkName string) *LocalHost {
 	return &LocalHost{
 		logger:         logger,
 		stateDir:       stateDir,
 		installVersion: installVersion,
+		networkName:    networkName,
 	}
+}
+
+func (h *LocalHost) inspectSwarmManagerAddress(ctx context.Context) string {
+	cmd := exec.CommandContext(ctx, "docker", "info", "--format", "{{.Swarm.NodeAddr}}")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(string(output))
 }
 
 func (h *LocalHost) VerifyDocker(ctx context.Context) error {
@@ -36,6 +51,60 @@ func (h *LocalHost) VerifyDocker(ctx context.Context) error {
 		return PrerequisiteError{
 			Check: StepVerifyDocker,
 			Err:   fmt.Errorf("verify docker: %w: %s", err, strings.TrimSpace(string(output))),
+		}
+	}
+
+	return nil
+}
+
+func (h *LocalHost) EnsureSwarmInitialized(ctx context.Context) error {
+	h.logger.InfoContext(ctx, "ensuring swarm is initialized")
+
+	cmd := exec.CommandContext(ctx, "docker", "info", "--format", "{{.Swarm.LocalNodeState}}")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return PrerequisiteError{
+			Check: StepEnsureSwarmInitialized,
+			Err:   fmt.Errorf("inspect swarm state: %w: %s", err, strings.TrimSpace(string(output))),
+		}
+	}
+
+	state := strings.TrimSpace(string(output))
+	if state == "active" {
+		h.swarmNodeState = state
+		h.swarmInitialized = true
+		h.swarmManagerAddr = h.inspectSwarmManagerAddress(ctx)
+		return nil
+	}
+
+	initCmd := exec.CommandContext(ctx, "docker", "swarm", "init")
+	initOutput, err := initCmd.CombinedOutput()
+	if err != nil {
+		return PrerequisiteError{
+			Check: StepEnsureSwarmInitialized,
+			Err:   fmt.Errorf("initialize swarm: %w: %s", err, strings.TrimSpace(string(initOutput))),
+		}
+	}
+	h.swarmManagerAddr = h.inspectSwarmManagerAddress(ctx)
+	h.swarmInitialized = true
+	h.swarmNodeState = "active"
+	return nil
+}
+
+func (h *LocalHost) EnsureSharedNetwork(ctx context.Context) error {
+	h.logger.InfoContext(ctx, "ensuring shared network", "network", h.networkName)
+
+	inspectCmd := exec.CommandContext(ctx, "docker", "network", "inspect", h.networkName)
+	if err := inspectCmd.Run(); err == nil {
+		return nil
+	}
+
+	createCmd := exec.CommandContext(ctx, "docker", "network", "create", "--driver", "overlay", h.networkName)
+	output, err := createCmd.CombinedOutput()
+	if err != nil {
+		return PrerequisiteError{
+			Check: StepEnsureSharedNetwork,
+			Err:   fmt.Errorf("create shared network %q: %w: %s", h.networkName, err, strings.TrimSpace(string(output))),
 		}
 	}
 
@@ -88,6 +157,14 @@ func (h *LocalHost) WriteInstallMetadata(ctx context.Context) error {
 	data, err := json.MarshalIndent(metadata{
 		Version:     h.installVersion,
 		InstalledAt: time.Now().UTC().Format(time.RFC3339),
+		Swarm: swarmMetadata{
+			Initialized:    h.swarmInitialized,
+			LocalNodeState: h.swarmNodeState,
+			ManagerAddress: h.swarmManagerAddr,
+		},
+		Network: networkMetadata{
+			Name: h.networkName,
+		},
 	}, "", "  ")
 
 	if err != nil {
@@ -107,4 +184,14 @@ func (h *LocalHost) WriteInstallMetadata(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (h *LocalHost) readInstallMetadata(ctx context.Context) (metadata, error) {
+	_ = ctx
+
+	path := h.installMetadataPath()
+
+	h.logger.InfoContext(ctx, "reading install metadata", "path", path)
+
+	return readMetadata(path)
 }
