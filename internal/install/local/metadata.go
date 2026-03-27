@@ -1,4 +1,4 @@
-package install
+package local
 
 type metadata struct {
 	Version     string          `json:"version"`

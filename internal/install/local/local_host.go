@@ -1,9 +1,10 @@
-package install
+package local
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/AustinOyugi/no-oops-ops/internal/install"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"log/slog"
 	"os"
@@ -12,7 +13,7 @@ import (
 	"time"
 )
 
-type LocalHost struct {
+type Host struct {
 	runner           *command.Runner
 	logger           *slog.Logger
 	stateDir         string
@@ -25,14 +26,14 @@ type LocalHost struct {
 	registryPort     string
 }
 
-func NewLocalHost(
+func NewHost(
 	logger *slog.Logger,
 	stateDir string,
 	installVersion string,
 	networkName string,
 	registryName string,
-	registryPort string) *LocalHost {
-	return &LocalHost{
+	registryPort string) *Host {
+	return &Host{
 		runner:         command.NewRunner(logger),
 		logger:         logger,
 		stateDir:       stateDir,
@@ -43,7 +44,7 @@ func NewLocalHost(
 	}
 }
 
-func (h *LocalHost) inspectSwarmManagerAddress(ctx context.Context) string {
+func (h *Host) inspectSwarmManagerAddress(ctx context.Context) string {
 	result, err := h.runner.Run(
 		ctx,
 		"docker",
@@ -57,14 +58,14 @@ func (h *LocalHost) inspectSwarmManagerAddress(ctx context.Context) string {
 	return strings.TrimSpace(string(result.Output))
 }
 
-func (h *LocalHost) VerifyDocker(ctx context.Context) error {
+func (h *Host) VerifyDocker(ctx context.Context) error {
 	h.logger.InfoContext(ctx, "checking docker installation")
 
 	result, err := h.runner.Run(ctx, "docker", []string{"version"}, command.RunOptions{})
 
 	if err != nil {
-		return PrerequisiteError{
-			Check: StepVerifyDocker,
+		return install.PrerequisiteError{
+			Check: install.StepVerifyDocker,
 			Err:   fmt.Errorf("verify docker: %w: %s", err, strings.TrimSpace(string(result.Output))),
 		}
 	}
@@ -72,7 +73,7 @@ func (h *LocalHost) VerifyDocker(ctx context.Context) error {
 	return nil
 }
 
-func (h *LocalHost) EnsureSwarmInitialized(ctx context.Context) error {
+func (h *Host) EnsureSwarmInitialized(ctx context.Context) error {
 	h.logger.InfoContext(ctx, "ensuring swarm is initialized")
 
 	result, err := h.runner.Run(
@@ -82,8 +83,8 @@ func (h *LocalHost) EnsureSwarmInitialized(ctx context.Context) error {
 		command.RunOptions{},
 	)
 	if err != nil {
-		return PrerequisiteError{
-			Check: StepEnsureSwarmInitialized,
+		return install.PrerequisiteError{
+			Check: install.StepEnsureSwarmInitialized,
 			Err:   fmt.Errorf("inspect swarm state: %w: %s", err, strings.TrimSpace(string(result.Output))),
 		}
 	}
@@ -103,8 +104,8 @@ func (h *LocalHost) EnsureSwarmInitialized(ctx context.Context) error {
 		command.RunOptions{},
 	)
 	if err != nil {
-		return PrerequisiteError{
-			Check: StepEnsureSwarmInitialized,
+		return install.PrerequisiteError{
+			Check: install.StepEnsureSwarmInitialized,
 			Err:   fmt.Errorf("initialize swarm: %w: %s", err, strings.TrimSpace(string(initResult.Output))),
 		}
 	}
@@ -114,7 +115,7 @@ func (h *LocalHost) EnsureSwarmInitialized(ctx context.Context) error {
 	return nil
 }
 
-func (h *LocalHost) EnsureSharedNetwork(ctx context.Context) error {
+func (h *Host) EnsureSharedNetwork(ctx context.Context) error {
 	h.logger.InfoContext(ctx, "ensuring shared network", "network", h.networkName)
 
 	_, err := h.runner.Run(
@@ -134,8 +135,8 @@ func (h *LocalHost) EnsureSharedNetwork(ctx context.Context) error {
 		command.RunOptions{},
 	)
 	if err != nil {
-		return PrerequisiteError{
-			Check: StepEnsureSharedNetwork,
+		return install.PrerequisiteError{
+			Check: install.StepEnsureSharedNetwork,
 			Err:   fmt.Errorf("create shared network %q: %w: %s", h.networkName, err, strings.TrimSpace(string(result.Output))),
 		}
 	}
@@ -143,7 +144,7 @@ func (h *LocalHost) EnsureSharedNetwork(ctx context.Context) error {
 	return nil
 }
 
-func (h *LocalHost) EnsureRegistry(ctx context.Context) error {
+func (h *Host) EnsureRegistry(ctx context.Context) error {
 	h.logger.InfoContext(
 		ctx,
 		"ensuring registry",
@@ -179,8 +180,8 @@ func (h *LocalHost) EnsureRegistry(ctx context.Context) error {
 	)
 
 	if err != nil {
-		return PrerequisiteError{
-			Check: StepEnsureRegistry,
+		return install.PrerequisiteError{
+			Check: install.StepEnsureRegistry,
 			Err:   fmt.Errorf("create registry service %q: %w: %s", h.registryName, err, strings.TrimSpace(string(result.Output))),
 		}
 	}
@@ -191,30 +192,30 @@ func (h *LocalHost) EnsureRegistry(ctx context.Context) error {
 const stateDirMode = 0o700
 const installMetadataFileMode = 0o600
 
-func (h *LocalHost) PrepareStateDir(ctx context.Context) error {
+func (h *Host) PrepareStateDir(ctx context.Context) error {
 	h.logger.InfoContext(ctx, "preparing local state directory", "path", h.stateDir)
 	err := os.MkdirAll(h.stateDir, stateDirMode)
 	if err != nil {
-		return PrerequisiteError{
-			Check: StepPrepareStateDir,
+		return install.PrerequisiteError{
+			Check: install.StepPrepareStateDir,
 			Err:   fmt.Errorf("create state dir %q: %w", h.stateDir, err),
 		}
 	}
 	return nil
 }
 
-func (h *LocalHost) stateDataDir() string {
+func (h *Host) stateDataDir() string {
 	return filepath.Join(h.stateDir, "data")
 }
 
-func (h *LocalHost) InitializeLocalState(ctx context.Context) error {
+func (h *Host) InitializeLocalState(ctx context.Context) error {
 	path := h.stateDataDir()
 
 	h.logger.InfoContext(ctx, "initializing local state", "path", path)
 
 	if err := os.MkdirAll(path, stateDirMode); err != nil {
-		return PrerequisiteError{
-			Check: StepInitializeLocalState,
+		return install.PrerequisiteError{
+			Check: install.StepInitializeLocalState,
 			Err:   fmt.Errorf("initialize local state %q: %w", path, err),
 		}
 	}
@@ -222,11 +223,11 @@ func (h *LocalHost) InitializeLocalState(ctx context.Context) error {
 	return nil
 }
 
-func (h *LocalHost) installMetadataPath() string {
+func (h *Host) installMetadataPath() string {
 	return filepath.Join(h.stateDir, "install.json")
 }
 
-func (h *LocalHost) WriteInstallMetadata(ctx context.Context) error {
+func (h *Host) WriteInstallMetadata(ctx context.Context) error {
 	path := h.installMetadataPath()
 
 	h.logger.InfoContext(ctx, "writing install metadata", "path", path)
@@ -245,8 +246,8 @@ func (h *LocalHost) WriteInstallMetadata(ctx context.Context) error {
 	}, "", "  ")
 
 	if err != nil {
-		return PrerequisiteError{
-			Check: StepWriteInstallMetadata,
+		return install.PrerequisiteError{
+			Check: install.StepWriteInstallMetadata,
 			Err:   fmt.Errorf("marshal install metadata: %w", err),
 		}
 	}
@@ -254,8 +255,8 @@ func (h *LocalHost) WriteInstallMetadata(ctx context.Context) error {
 	data = append(data, '\n')
 
 	if err := os.WriteFile(path, data, installMetadataFileMode); err != nil {
-		return PrerequisiteError{
-			Check: StepWriteInstallMetadata,
+		return install.PrerequisiteError{
+			Check: install.StepWriteInstallMetadata,
 			Err:   fmt.Errorf("write install metadata %q: %w", path, err),
 		}
 	}
@@ -263,7 +264,7 @@ func (h *LocalHost) WriteInstallMetadata(ctx context.Context) error {
 	return nil
 }
 
-func (h *LocalHost) readInstallMetadata(ctx context.Context) (metadata, error) {
+func (h *Host) readInstallMetadata(ctx context.Context) (metadata, error) {
 	_ = ctx
 
 	path := h.installMetadataPath()
