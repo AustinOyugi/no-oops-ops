@@ -46,6 +46,13 @@ func (i *Installer) Run(ctx context.Context) (Result, error) {
 	}
 	result.SetStep(StepEnsureSwarmInitialized, StatusCompleted, "")
 
+	result.SetStep(StepEnsureSharedNetwork, StatusRunning, "")
+	if err := i.host.EnsureSharedNetwork(ctx); err != nil {
+		result.SetStep(StepEnsureSharedNetwork, StatusFailed, err.Error())
+		return result, err
+	}
+	result.SetStep(StepEnsureSharedNetwork, StatusCompleted, "")
+
 	result.SetStep(StepPrepareStateDir, StatusRunning, "")
 	if err := i.host.PrepareStateDir(ctx); err != nil {
 

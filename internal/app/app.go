@@ -20,7 +20,7 @@ func New(cfg config.Config) (*App, error) {
 
 	logger := logging.New()
 
-	localHost := install.NewLocalHost(logger, cfg.StateDir, cfg.InstallVersion)
+	localHost := install.NewLocalHost(logger, cfg.StateDir, cfg.InstallVersion, cfg.NetworkName)
 
 	installer, err := install.New(logger, localHost)
 
