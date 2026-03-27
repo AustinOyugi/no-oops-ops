@@ -8,12 +8,13 @@ type Config struct {
 	InstallVersion string
 }
 
+const defaultAppName = "noops"
 const defaultInstallVersion = "dev"
 const defaultStateDir = "/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/.noops"
 
 func Load() (Config, error) {
 	return Config{
-		AppName:        "noops",
+		AppName:        defaultAppName,
 		StateDir:       envOrDefault("NOOPS_STATE_DIR", defaultStateDir),
 		InstallVersion: envOrDefault("NOOPS_INSTALL_VERSION", defaultInstallVersion),
 	}, nil
