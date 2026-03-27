@@ -67,6 +67,11 @@ func (h *Host) WriteInstallMetadata(ctx context.Context) error {
 		Network: networkMetadata{
 			Name: h.networkName,
 		},
+		Registry: registryMetadata{
+			Name:       h.registryName,
+			Port:       h.registryPort,
+			ConfigPath: h.registryConfigPath(),
+		},
 	}, "", "  ")
 	if err != nil {
 		return install.PrerequisiteError{

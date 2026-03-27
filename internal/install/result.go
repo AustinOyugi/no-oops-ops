@@ -6,6 +6,7 @@ const (
 	StepVerifyDocker           Step = "verify_docker"
 	StepEnsureSwarmInitialized Step = "ensure_swarm_initialized"
 	StepEnsureSharedNetwork    Step = "ensure_shared_network"
+	StepWriteRegistryConfig    Step = "write_registry_config"
 	StepEnsureRegistry         Step = "ensure_registry"
 
 	StepPrepareStateDir      Step = "prepare_state_dir"
