@@ -23,6 +23,20 @@ func (h *Host) inspectSwarmManagerAddress(ctx context.Context) string {
 	return strings.TrimSpace(string(result.Output))
 }
 
+func (h *Host) InspectSwarmState(ctx context.Context) (string, error) {
+	result, err := h.runner.Run(
+		ctx,
+		"docker",
+		[]string{"info", "--format", "{{.Swarm.LocalNodeState}}"},
+		command.RunOptions{},
+	)
+	if err != nil {
+		return "", fmt.Errorf("inspect swarm state: %w: %s", err, strings.TrimSpace(string(result.Output)))
+	}
+
+	return strings.TrimSpace(string(result.Output)), nil
+}
+
 func (h *Host) VerifyDocker(ctx context.Context) error {
 	h.logger.InfoContext(ctx, "checking docker installation")
 
@@ -40,20 +54,14 @@ func (h *Host) VerifyDocker(ctx context.Context) error {
 func (h *Host) EnsureSwarmInitialized(ctx context.Context) error {
 	h.logger.InfoContext(ctx, "ensuring swarm is initialized")
 
-	result, err := h.runner.Run(
-		ctx,
-		"docker",
-		[]string{"info", "--format", "{{.Swarm.LocalNodeState}}"},
-		command.RunOptions{},
-	)
+	state, err := h.InspectSwarmState(ctx)
 	if err != nil {
 		return install.PrerequisiteError{
 			Check: install.StepEnsureSwarmInitialized,
-			Err:   fmt.Errorf("inspect swarm state: %w: %s", err, strings.TrimSpace(string(result.Output))),
+			Err:   err,
 		}
 	}
 
-	state := strings.TrimSpace(string(result.Output))
 	if state == "active" {
 		h.swarmNodeState = state
 		h.swarmInitialized = true
@@ -65,7 +73,7 @@ func (h *Host) EnsureSwarmInitialized(ctx context.Context) error {
 		ctx,
 		"docker",
 		[]string{"swarm", "init"},
-		command.RunOptions{},
+		command.RunOptions{LogCommand: true},
 	)
 	if err != nil {
 		return install.PrerequisiteError{

@@ -11,14 +11,22 @@ import (
 )
 
 func (h *Host) inspectRegistryService(ctx context.Context) bool {
-	_, err := h.runner.Run(
+	err := h.InspectRegistryService(ctx)
+	return err == nil
+}
+
+func (h *Host) InspectRegistryService(ctx context.Context) error {
+	result, err := h.runner.Run(
 		ctx,
 		"docker",
 		[]string{"service", "inspect", h.registryService},
 		command.RunOptions{},
 	)
+	if err != nil {
+		return fmt.Errorf("inspect registry service %q: %w: %s", h.registryService, err, strings.TrimSpace(string(result.Output)))
+	}
 
-	return err == nil
+	return nil
 }
 
 func (h *Host) EnsureRegistry(ctx context.Context) error {
@@ -45,6 +53,7 @@ func (h *Host) EnsureRegistry(ctx context.Context) error {
 		},
 		command.RunOptions{
 			StreamOutput: true,
+			LogCommand:   true,
 			Stdout:       os.Stdout,
 			Stderr:       os.Stderr,
 		},

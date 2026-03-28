@@ -18,6 +18,7 @@ type RunOptions struct {
 	Stdout       io.Writer
 	Stderr       io.Writer
 	StreamOutput bool
+	LogCommand   bool
 }
 
 type Result struct {
@@ -31,7 +32,9 @@ func NewRunner(logger *slog.Logger) *Runner {
 }
 
 func (r *Runner) Run(ctx context.Context, name string, args []string, opts RunOptions) (Result, error) {
-	r.logger.InfoContext(ctx, "running command", "command", name, "args", args)
+	if opts.LogCommand {
+		r.logger.InfoContext(ctx, "running command", "command", name, "args", args)
+	}
 
 	start := time.Now()
 
@@ -59,13 +62,15 @@ func (r *Runner) Run(ctx context.Context, name string, args []string, opts RunOp
 
 	err := cmd.Run()
 
-	r.logger.InfoContext(
-		ctx,
-		"command finished",
-		"command", name,
-		"args", args,
-		"duration", time.Since(start).String(),
-	)
+	if opts.LogCommand {
+		r.logger.InfoContext(
+			ctx,
+			"command finished",
+			"command", name,
+			"args", args,
+			"duration", time.Since(start).String(),
+		)
+	}
 
 	return Result{
 		Output: output.Bytes(),

@@ -28,7 +28,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := application.Run(ctx); err != nil {
+	if err := application.Run(ctx, os.Args[1:]); err != nil {
 		os.Exit(1)
 	}
 }

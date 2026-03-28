@@ -12,12 +12,7 @@ import (
 func (h *Host) EnsureSharedNetwork(ctx context.Context) error {
 	h.logger.InfoContext(ctx, "ensuring shared network", "network", h.networkName)
 
-	_, err := h.runner.Run(
-		ctx,
-		"docker",
-		[]string{"network", "inspect", h.networkName},
-		command.RunOptions{},
-	)
+	err := h.InspectSharedNetwork(ctx)
 	if err == nil {
 		return nil
 	}
@@ -26,13 +21,27 @@ func (h *Host) EnsureSharedNetwork(ctx context.Context) error {
 		ctx,
 		"docker",
 		[]string{"network", "create", "--driver", "overlay", h.networkName},
-		command.RunOptions{},
+		command.RunOptions{LogCommand: true},
 	)
 	if err != nil {
 		return install.PrerequisiteError{
 			Check: install.StepEnsureSharedNetwork,
 			Err:   fmt.Errorf("create shared network %q: %w: %s", h.networkName, err, strings.TrimSpace(string(result.Output))),
 		}
+	}
+
+	return nil
+}
+
+func (h *Host) InspectSharedNetwork(ctx context.Context) error {
+	result, err := h.runner.Run(
+		ctx,
+		"docker",
+		[]string{"network", "inspect", h.networkName},
+		command.RunOptions{},
+	)
+	if err != nil {
+		return fmt.Errorf("inspect shared network %q: %w: %s", h.networkName, err, strings.TrimSpace(string(result.Output)))
 	}
 
 	return nil
