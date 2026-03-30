@@ -3,9 +3,11 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
+	"github.com/AustinOyugi/no-oops-ops/internal/deploy"
 	"github.com/AustinOyugi/no-oops-ops/internal/doctor"
 	"github.com/AustinOyugi/no-oops-ops/internal/install"
 	"github.com/AustinOyugi/no-oops-ops/internal/install/local"
@@ -17,6 +19,7 @@ type App struct {
 	logger    *slog.Logger
 	config    config.Config
 	installer *install.Installer
+	deployer  *deploy.Service
 	doctor    *doctor.Service
 	status    *status.Service
 }
@@ -39,6 +42,7 @@ func New(cfg config.Config) (*App, error) {
 		logger:    logger,
 		config:    cfg,
 		installer: installer,
+		deployer:  deploy.NewService(logger),
 		doctor:    doctor.NewService(logger, cfg, localHost),
 		status:    status.NewService(logger, cfg, localHost),
 	}, nil
@@ -55,6 +59,10 @@ func (a *App) Run(ctx context.Context, args []string) error {
 
 	if len(args) > 0 && args[0] == "install" {
 		return a.runInstall(ctx)
+	}
+
+	if len(args) > 0 && args[0] == "deploy" {
+		return a.runDeploy(ctx, args[1:])
 	}
 
 	if len(args) > 0 {
@@ -170,5 +178,63 @@ func (a *App) runStatus(ctx context.Context) error {
 	}
 
 	a.logger.InfoContext(ctx, "status completed", "components", len(result.Components))
+	return nil
+}
+
+func (a *App) runDeploy(ctx context.Context, args []string) error {
+	if len(args) == 0 {
+		return errors.New("deploy requires a manifest path")
+	}
+
+	result, err := a.deployer.Run(ctx, args[0])
+	if err != nil {
+		return err
+	}
+
+	manifest := result.Manifest
+
+	a.logger.InfoContext(
+		ctx,
+		"deploy manifest",
+		"path", result.ManifestPath,
+		"name", manifest.Name,
+		"image", fmt.Sprintf("%s:%s", manifest.Image.Repository, manifest.Image.Tag),
+		"internal_port", manifest.Service.InternalPort,
+		"replicas", manifest.Service.Replicas,
+		"network", manifest.Service.Network,
+	)
+
+	a.logger.InfoContext(
+		ctx,
+		"deploy healthcheck",
+		"type", manifest.Healthcheck.Type,
+		"path", manifest.Healthcheck.Path,
+		"port", manifest.Healthcheck.Port,
+		"interval", manifest.Healthcheck.Interval,
+		"timeout", manifest.Healthcheck.Timeout,
+		"retries", manifest.Healthcheck.Retries,
+		"start_period", manifest.Healthcheck.StartPeriod,
+	)
+
+	a.logger.InfoContext(
+		ctx,
+		"deploy rollout",
+		"order", manifest.Rollout.Order,
+		"parallelism", manifest.Rollout.Parallelism,
+		"delay", manifest.Rollout.Delay,
+		"failure_action", manifest.Rollout.FailureAction,
+		"restart_condition", manifest.Rollout.RestartCondition,
+	)
+
+	a.logger.InfoContext(
+		ctx,
+		"deploy inputs",
+		"shared_env", len(manifest.Env.Shared),
+		"environments", len(manifest.Env.Environments),
+		"depends_on", manifest.DependsOn,
+		"secrets", manifest.Secrets,
+		"volumes", manifest.Volumes,
+	)
+
 	return nil
 }
