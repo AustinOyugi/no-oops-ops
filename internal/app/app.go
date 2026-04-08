@@ -207,9 +207,7 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 	a.logger.InfoContext(
 		ctx,
 		"deploy healthcheck",
-		"type", manifest.Healthcheck.Type,
-		"path", manifest.Healthcheck.Path,
-		"port", manifest.Healthcheck.Port,
+		"test", manifest.Healthcheck.Test,
 		"interval", manifest.Healthcheck.Interval,
 		"timeout", manifest.Healthcheck.Timeout,
 		"retries", manifest.Healthcheck.Retries,

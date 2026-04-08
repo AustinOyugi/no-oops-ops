@@ -4,7 +4,6 @@ const (
 	defaultImageTag               = "latest"
 	defaultServiceReplicas        = 1
 	defaultServiceNetwork         = "noops-net"
-	defaultHealthcheckType        = "http"
 	defaultHealthcheckInterval    = "10s"
 	defaultHealthcheckTimeout     = "10s"
 	defaultHealthcheckRetries     = 3
@@ -31,14 +30,6 @@ func (m *Manifest) applyDefaults() {
 
 	if m.Service.Network == "" {
 		m.Service.Network = defaultServiceNetwork
-	}
-
-	if m.Healthcheck.Type == "" {
-		m.Healthcheck.Type = defaultHealthcheckType
-	}
-
-	if m.Healthcheck.Port == 0 {
-		m.Healthcheck.Port = m.Service.InternalPort
 	}
 
 	if m.Healthcheck.Interval == "" {

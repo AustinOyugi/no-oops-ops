@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  {{ .ServiceName }}:
+    image: {{ .Image }}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:{{ .HealthcheckPort }}{{ .HealthcheckPath }}"]
+      start_period: {{ .HealthcheckStartPeriod }}
+      interval: {{ .HealthcheckInterval }}
+      timeout: {{ .HealthcheckTimeout }}
+      retries: {{ .HealthcheckRetries }}
+    deploy:
+      replicas: {{ .Replicas }}
+      restart_policy:
+        condition: {{ .RestartCondition }}
+        delay: {{ .RestartDelay }}
+        max_attempts: {{ .RestartMaxAttempts }}
+        window: {{ .RestartWindow }}
+      update_config:
+        parallelism: {{ .Parallelism }}
+        delay: {{ .RolloutDelay }}
+        order: {{ .RolloutOrder }}
+        failure_action: {{ .FailureAction }}
+    networks:
+      - {{ .Network }}
+
+networks:
+  {{ .Network }}:
+    external: true
