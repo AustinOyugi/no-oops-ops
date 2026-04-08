@@ -3,6 +3,7 @@ package deploy
 import (
 	"context"
 	"fmt"
+	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"log/slog"
 	"path/filepath"
 
@@ -11,11 +12,13 @@ import (
 
 type Service struct {
 	logger *slog.Logger
+	config config.Config
 }
 
-func NewService(logger *slog.Logger) *Service {
+func NewService(logger *slog.Logger, cfg config.Config) *Service {
 	return &Service{
 		logger: logger,
+		config: cfg,
 	}
 }
 
@@ -32,8 +35,14 @@ func (s *Service) Run(ctx context.Context, path string) (Result, error) {
 		return Result{}, err
 	}
 
+	stackPath, err := writeStack(s.config, m)
+	if err != nil {
+		return Result{}, err
+	}
+
 	return Result{
 		ManifestPath: absPath,
+		StackPath:    stackPath,
 		Manifest:     m,
 	}, nil
 }
