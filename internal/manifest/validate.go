@@ -15,8 +15,8 @@ func (m Manifest) Validate() error {
 		return fmt.Errorf("service.internal_port is required")
 	}
 
-	if m.Healthcheck.Path == "" {
-		return fmt.Errorf("healthcheck.path is required")
+	if len(m.Healthcheck.Test) == 0 {
+		return fmt.Errorf("healthcheck.test is required")
 	}
 
 	return nil

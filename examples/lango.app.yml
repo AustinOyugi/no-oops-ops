@@ -7,7 +7,15 @@ service:
   internal_port: 8080
 
 healthcheck:
-  path: /lango/liveness
+  test:
+    - CMD
+    - curl
+    - -f
+    - http://localhost:8080/lango/liveness
+  start_period: 60s
+  interval: 10s
+  timeout: 10s
+  retries: 3
 
 env:
   shared:

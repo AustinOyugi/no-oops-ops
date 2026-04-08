@@ -42,7 +42,7 @@ func New(cfg config.Config) (*App, error) {
 		logger:    logger,
 		config:    cfg,
 		installer: installer,
-		deployer:  deploy.NewService(logger),
+		deployer:  deploy.NewService(logger, cfg),
 		doctor:    doctor.NewService(logger, cfg, localHost),
 		status:    status.NewService(logger, cfg, localHost),
 	}, nil
@@ -207,9 +207,7 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 	a.logger.InfoContext(
 		ctx,
 		"deploy healthcheck",
-		"type", manifest.Healthcheck.Type,
-		"path", manifest.Healthcheck.Path,
-		"port", manifest.Healthcheck.Port,
+		"test", manifest.Healthcheck.Test,
 		"interval", manifest.Healthcheck.Interval,
 		"timeout", manifest.Healthcheck.Timeout,
 		"retries", manifest.Healthcheck.Retries,
@@ -234,6 +232,12 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 		"depends_on", manifest.DependsOn,
 		"secrets", manifest.Secrets,
 		"volumes", manifest.Volumes,
+	)
+
+	a.logger.InfoContext(
+		ctx,
+		"deploy artifact",
+		"stack_path", result.StackPath,
 	)
 
 	return nil

@@ -25,13 +25,11 @@ type Service struct {
 }
 
 type Healthcheck struct {
-	Type        string `yaml:"type"`
-	Path        string `yaml:"path"`
-	Port        int    `yaml:"port"`
-	Interval    string `yaml:"interval"`
-	Timeout     string `yaml:"timeout"`
-	Retries     int    `yaml:"retries"`
-	StartPeriod string `yaml:"start_period"`
+	Test        []string `yaml:"test"`
+	Interval    string   `yaml:"interval"`
+	Timeout     string   `yaml:"timeout"`
+	Retries     int      `yaml:"retries"`
+	StartPeriod string   `yaml:"start_period"`
 }
 
 type Rollout struct {
