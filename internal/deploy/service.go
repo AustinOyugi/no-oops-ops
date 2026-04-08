@@ -35,6 +35,11 @@ func (s *Service) Run(ctx context.Context, path string) (Result, error) {
 		return Result{}, err
 	}
 
+	envPath, err := writeEnv(s.config, m)
+	if err != nil {
+		return Result{}, err
+	}
+
 	stackPath, err := writeStack(s.config, m)
 	if err != nil {
 		return Result{}, err
@@ -43,6 +48,7 @@ func (s *Service) Run(ctx context.Context, path string) (Result, error) {
 	return Result{
 		ManifestPath: absPath,
 		StackPath:    stackPath,
+		EnvPath:      envPath,
 		Manifest:     m,
 	}, nil
 }
