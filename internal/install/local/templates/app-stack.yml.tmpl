@@ -4,7 +4,10 @@ services:
   {{ .ServiceName }}:
     image: {{ .Image }}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:{{ .HealthcheckPort }}{{ .HealthcheckPath }}"]
+      test:
+{{- range .HealthcheckTest }}
+        - {{ . }}
+{{- end }}
       start_period: {{ .HealthcheckStartPeriod }}
       interval: {{ .HealthcheckInterval }}
       timeout: {{ .HealthcheckTimeout }}
