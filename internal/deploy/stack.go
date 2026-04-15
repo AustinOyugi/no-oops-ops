@@ -49,6 +49,28 @@ func envPath(cfg config.Config, name string) string {
 	return filepath.Join(appDir(cfg, name), ".env")
 }
 
+func writeEnvMap(cfg config.Config, appName string, values map[string]string) (string, error) {
+	dir := appDir(cfg, appName)
+	if err := os.MkdirAll(dir, appDirMode); err != nil {
+		return "", fmt.Errorf("create app dir %q: %w", dir, err)
+	}
+
+	path := envPath(cfg, appName)
+
+	var out bytes.Buffer
+	for key, value := range values {
+		if _, err := fmt.Fprintf(&out, "%s=%s\n", key, value); err != nil {
+			return "", fmt.Errorf("render env file %q: %w", path, err)
+		}
+	}
+
+	if err := os.WriteFile(path, out.Bytes(), envFileMode); err != nil {
+		return "", fmt.Errorf("write env file %q: %w", path, err)
+	}
+
+	return path, nil
+}
+
 func writeStack(cfg config.Config, m manifest.Manifest) (string, error) {
 	dir := appDir(cfg, m.Name)
 	if err := os.MkdirAll(dir, appDirMode); err != nil {
@@ -83,23 +105,6 @@ func writeStack(cfg config.Config, m manifest.Manifest) (string, error) {
 	path := stackPath(cfg, m.Name)
 	if err := os.WriteFile(path, rendered, stackFileMode); err != nil {
 		return "", fmt.Errorf("write stack file %q: %w", path, err)
-	}
-
-	return path, nil
-}
-
-func writeEnv(cfg config.Config, m manifest.Manifest) (string, error) {
-	path := envPath(cfg, m.Name)
-
-	var out bytes.Buffer
-	for key, value := range m.Env.Shared {
-		if _, err := fmt.Fprintf(&out, "%s=%s\n", key, value); err != nil {
-			return "", fmt.Errorf("render env file %q: %w", path, err)
-		}
-	}
-
-	if err := os.WriteFile(path, out.Bytes(), envFileMode); err != nil {
-		return "", fmt.Errorf("write env file %q: %w", path, err)
 	}
 
 	return path, nil

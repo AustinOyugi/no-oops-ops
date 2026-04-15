@@ -84,14 +84,6 @@ func (m *Manifest) applyDefaults() {
 		m.Expose.PathPrefix = defaultExposePathPrefix
 	}
 
-	if m.Env.Shared == nil {
-		m.Env.Shared = map[string]string{}
-	}
-
-	if m.Env.Environments == nil {
-		m.Env.Environments = map[string]map[string]string{}
-	}
-
 	if m.DependsOn == nil {
 		m.DependsOn = []string{}
 	}

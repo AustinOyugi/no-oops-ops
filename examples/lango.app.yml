@@ -18,9 +18,4 @@ healthcheck:
   retries: 3
 
 env:
-  shared:
-    SERVER_PORT: "8080"
-    SPRING_PROFILES_ACTIVE: prod
-  environments:
-    prod:
-      ENVIRONMENT: prod
+  file: lango.env.yml

@@ -50,6 +50,5 @@ type Expose struct {
 }
 
 type Env struct {
-	Shared       map[string]string            `yaml:"shared"`
-	Environments map[string]map[string]string `yaml:"environments"`
+	File string `yaml:"file"`
 }

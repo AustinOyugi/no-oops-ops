@@ -35,7 +35,16 @@ func (s *Service) Run(ctx context.Context, path string) (Result, error) {
 		return Result{}, err
 	}
 
-	envPath, err := writeEnv(s.config, m)
+	envFilePath := resolveEnvFilePath(absPath, m.Env.File)
+
+	envFile, err := LoadEnvFile(envFilePath)
+	if err != nil {
+		return Result{}, err
+	}
+
+	resolvedEnv := ResolveEnvFile(envFile, "prod")
+
+	envPath, err := writeEnvMap(s.config, m.Name, resolvedEnv)
 	if err != nil {
 		return Result{}, err
 	}
@@ -51,4 +60,8 @@ func (s *Service) Run(ctx context.Context, path string) (Result, error) {
 		EnvPath:      envPath,
 		Manifest:     m,
 	}, nil
+}
+
+func resolveEnvFilePath(manifestPath string, envFile string) string {
+	return filepath.Join(filepath.Dir(manifestPath), envFile)
 }
