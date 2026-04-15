@@ -3,6 +3,7 @@ package deploy
 import "github.com/AustinOyugi/no-oops-ops/internal/manifest"
 
 type Result struct {
+	Environment  string
 	ManifestPath string
 	EnvFilePath  string
 	StackPath    string

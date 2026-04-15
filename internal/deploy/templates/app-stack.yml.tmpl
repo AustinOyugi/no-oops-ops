@@ -3,6 +3,8 @@ version: "3.9"
 services:
   {{ .ServiceName }}:
     image: {{ .Image }}
+    env_file:
+      - .env
     healthcheck:
       test:
 {{- range .HealthcheckTest }}

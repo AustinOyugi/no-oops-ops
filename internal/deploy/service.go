@@ -22,13 +22,13 @@ func NewService(logger *slog.Logger, cfg config.Config) *Service {
 	}
 }
 
-func (s *Service) Run(ctx context.Context, path string) (Result, error) {
+func (s *Service) Run(ctx context.Context, environment string, path string) (Result, error) {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return Result{}, fmt.Errorf("resolve manifest path %q: %w", path, err)
 	}
 
-	s.logger.InfoContext(ctx, "starting deploy", "manifest", absPath)
+	s.logger.InfoContext(ctx, "starting deploy", "manifest", absPath, "environment", environment)
 
 	m, err := manifest.Load(absPath)
 	if err != nil {
@@ -42,7 +42,7 @@ func (s *Service) Run(ctx context.Context, path string) (Result, error) {
 		return Result{}, err
 	}
 
-	resolvedEnv := ResolveEnvFile(envFile, "prod")
+	resolvedEnv := ResolveEnvFile(envFile, environment)
 
 	envPath, err := writeEnvMap(s.config, m.Name, resolvedEnv)
 	if err != nil {
@@ -55,6 +55,7 @@ func (s *Service) Run(ctx context.Context, path string) (Result, error) {
 	}
 
 	return Result{
+		Environment:  environment,
 		ManifestPath: absPath,
 		StackPath:    stackPath,
 		EnvPath:      envPath,

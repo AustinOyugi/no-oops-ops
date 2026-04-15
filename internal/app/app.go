@@ -182,11 +182,14 @@ func (a *App) runStatus(ctx context.Context) error {
 }
 
 func (a *App) runDeploy(ctx context.Context, args []string) error {
-	if len(args) == 0 {
-		return errors.New("deploy requires a manifest path")
+	if len(args) < 2 {
+		return errors.New("deploy requires an environment and manifest path")
 	}
 
-	result, err := a.deployer.Run(ctx, args[0])
+	environment := args[0]
+	manifestPath := args[1]
+
+	result, err := a.deployer.Run(ctx, environment, manifestPath)
 	if err != nil {
 		return err
 	}
@@ -197,6 +200,7 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 		ctx,
 		"deploy manifest",
 		"path", result.ManifestPath,
+		"environment", result.Environment,
 		"name", manifest.Name,
 		"image", fmt.Sprintf("%s:%s", manifest.Image.Repository, manifest.Image.Tag),
 		"internal_port", manifest.Service.InternalPort,
