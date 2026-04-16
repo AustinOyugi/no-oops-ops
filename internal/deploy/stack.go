@@ -37,29 +37,29 @@ type stackTemplateData struct {
 	RestartWindow          string
 }
 
-func appDir(cfg config.Config, name string) string {
-	return filepath.Join(cfg.StateDir, "apps", name)
+func appDir(cfg config.Config, name string, environment string) string {
+	return filepath.Join(cfg.StateDir, "apps", name, environment)
 }
 
-func stackPath(cfg config.Config, name string) string {
-	return filepath.Join(appDir(cfg, name), "stack.yml")
+func stackPath(cfg config.Config, name string, environment string) string {
+	return filepath.Join(appDir(cfg, name, environment), "stack.yml")
 }
 
-func envPath(cfg config.Config, name string) string {
-	return filepath.Join(appDir(cfg, name), ".env")
+func envPath(cfg config.Config, name string, environment string) string {
+	return filepath.Join(appDir(cfg, name, environment), ".env")
 }
 
 func serviceName(environment string, appName string) string {
 	return environment + "-" + appName
 }
 
-func writeEnvMap(cfg config.Config, appName string, values map[string]string) (string, error) {
-	dir := appDir(cfg, appName)
+func writeEnvMap(cfg config.Config, appName string, environment string, values map[string]string) (string, error) {
+	dir := appDir(cfg, appName, environment)
 	if err := os.MkdirAll(dir, appDirMode); err != nil {
 		return "", fmt.Errorf("create app dir %q: %w", dir, err)
 	}
 
-	path := envPath(cfg, appName)
+	path := envPath(cfg, appName, environment)
 
 	var out bytes.Buffer
 	for key, value := range values {
@@ -76,7 +76,7 @@ func writeEnvMap(cfg config.Config, appName string, values map[string]string) (s
 }
 
 func writeStack(cfg config.Config, environment string, m manifest.Manifest) (string, error) {
-	dir := appDir(cfg, m.Name)
+	dir := appDir(cfg, m.Name, environment)
 	if err := os.MkdirAll(dir, appDirMode); err != nil {
 		return "", fmt.Errorf("create app dir %q: %w", dir, err)
 	}
@@ -106,7 +106,7 @@ func writeStack(cfg config.Config, environment string, m manifest.Manifest) (str
 
 	rendered = append(rendered, '\n')
 
-	path := stackPath(cfg, m.Name)
+	path := stackPath(cfg, m.Name, environment)
 	if err := os.WriteFile(path, rendered, stackFileMode); err != nil {
 		return "", fmt.Errorf("write stack file %q: %w", path, err)
 	}

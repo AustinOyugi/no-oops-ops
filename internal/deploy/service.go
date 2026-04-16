@@ -44,7 +44,7 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 
 	resolvedEnv := ResolveEnvFile(envFile, environment)
 
-	envPath, err := writeEnvMap(s.config, m.Name, resolvedEnv)
+	envPath, err := writeEnvMap(s.config, environment, m.Name, resolvedEnv)
 	if err != nil {
 		return Result{}, err
 	}
