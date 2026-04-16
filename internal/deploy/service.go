@@ -49,13 +49,14 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 		return Result{}, err
 	}
 
-	stackPath, err := writeStack(s.config, m)
+	stackPath, err := writeStack(s.config, environment, m)
 	if err != nil {
 		return Result{}, err
 	}
 
 	return Result{
 		Environment:  environment,
+		ServiceName:  serviceName(environment, m.Name),
 		ManifestPath: absPath,
 		StackPath:    stackPath,
 		EnvPath:      envPath,

@@ -202,6 +202,7 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 		"path", result.ManifestPath,
 		"environment", result.Environment,
 		"name", manifest.Name,
+		"service_name", result.ServiceName,
 		"image", fmt.Sprintf("%s:%s", manifest.Image.Repository, manifest.Image.Tag),
 		"internal_port", manifest.Service.InternalPort,
 		"replicas", manifest.Service.Replicas,

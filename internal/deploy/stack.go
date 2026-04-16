@@ -49,6 +49,10 @@ func envPath(cfg config.Config, name string) string {
 	return filepath.Join(appDir(cfg, name), ".env")
 }
 
+func serviceName(environment string, appName string) string {
+	return environment + "-" + appName
+}
+
 func writeEnvMap(cfg config.Config, appName string, values map[string]string) (string, error) {
 	dir := appDir(cfg, appName)
 	if err := os.MkdirAll(dir, appDirMode); err != nil {
@@ -71,14 +75,14 @@ func writeEnvMap(cfg config.Config, appName string, values map[string]string) (s
 	return path, nil
 }
 
-func writeStack(cfg config.Config, m manifest.Manifest) (string, error) {
+func writeStack(cfg config.Config, environment string, m manifest.Manifest) (string, error) {
 	dir := appDir(cfg, m.Name)
 	if err := os.MkdirAll(dir, appDirMode); err != nil {
 		return "", fmt.Errorf("create app dir %q: %w", dir, err)
 	}
 
 	rendered, err := renderStackTemplate(stackTemplateData{
-		ServiceName:            m.Name,
+		ServiceName:            serviceName(environment, m.Name),
 		Image:                  fmt.Sprintf("%s:%s", m.Image.Repository, m.Image.Tag),
 		Network:                m.Service.Network,
 		Replicas:               m.Service.Replicas,
