@@ -53,6 +53,10 @@ func serviceName(environment string, appName string) string {
 	return environment + "-" + appName
 }
 
+func stackName(environment string, appName string) string {
+	return environment + "-" + appName
+}
+
 func writeEnvMap(cfg config.Config, appName string, environment string, values map[string]string) (string, error) {
 	dir := appDir(cfg, appName, environment)
 	if err := os.MkdirAll(dir, appDirMode); err != nil {

@@ -200,6 +200,7 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 		ctx,
 		"deploy manifest",
 		"path", result.ManifestPath,
+		"stack_name", result.StackName,
 		"environment", result.Environment,
 		"name", manifest.Name,
 		"service_name", result.ServiceName,

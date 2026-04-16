@@ -44,7 +44,7 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 
 	resolvedEnv := ResolveEnvFile(envFile, environment)
 
-	envPath, err := writeEnvMap(s.config, environment, m.Name, resolvedEnv)
+	envPath, err := writeEnvMap(s.config, m.Name, environment, resolvedEnv)
 	if err != nil {
 		return Result{}, err
 	}
@@ -59,6 +59,8 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 		ServiceName:  serviceName(environment, m.Name),
 		ManifestPath: absPath,
 		StackPath:    stackPath,
+		EnvFilePath:  envFilePath,
+		StackName:    stackName(environment, m.Name),
 		EnvPath:      envPath,
 		Manifest:     m,
 	}, nil
