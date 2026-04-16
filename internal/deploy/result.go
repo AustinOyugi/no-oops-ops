@@ -6,6 +6,7 @@ type Result struct {
 	Environment  string
 	ServiceName  string
 	StackName    string
+	Executed     bool
 	ManifestPath string
 	EnvFilePath  string
 	StackPath    string

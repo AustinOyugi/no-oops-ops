@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
+	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"log/slog"
 	"path/filepath"
 
@@ -13,12 +14,14 @@ import (
 type Service struct {
 	logger *slog.Logger
 	config config.Config
+	runner *command.Runner
 }
 
 func NewService(logger *slog.Logger, cfg config.Config) *Service {
 	return &Service{
 		logger: logger,
 		config: cfg,
+		runner: command.NewRunner(logger),
 	}
 }
 
@@ -54,9 +57,14 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 		return Result{}, err
 	}
 
+	if err := s.deployStack(ctx, stackPath, stackName(environment, m.Name)); err != nil {
+		return Result{}, err
+	}
+
 	return Result{
 		Environment:  environment,
 		ServiceName:  serviceName(environment, m.Name),
+		Executed:     true,
 		ManifestPath: absPath,
 		StackPath:    stackPath,
 		EnvFilePath:  envFilePath,
@@ -68,4 +76,26 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 
 func resolveEnvFilePath(manifestPath string, envFile string) string {
 	return filepath.Join(filepath.Dir(manifestPath), envFile)
+}
+
+func (s *Service) deployStack(ctx context.Context, stackPath string, stackName string) error {
+	_, err := s.runner.Run(
+		ctx,
+		"docker",
+		[]string{
+			"stack",
+			"deploy",
+			"--compose-file",
+			stackPath,
+			stackName,
+		},
+		command.RunOptions{
+			LogCommand: true,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("deploy stack %q: %w", stackName, err)
+	}
+
+	return nil
 }
