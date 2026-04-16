@@ -191,6 +191,7 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 
 	result, err := a.deployer.Run(ctx, environment, manifestPath)
 	if err != nil {
+		a.logger.ErrorContext(ctx, "deploy failed", "environment", environment, "manifest_path", manifestPath, "reason", err.Error())
 		return err
 	}
 
@@ -202,6 +203,7 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 		"path", result.ManifestPath,
 		"stack_name", result.StackName,
 		"executed", result.Executed,
+		"verified", result.Verified,
 		"environment", result.Environment,
 		"name", manifest.Name,
 		"service_name", result.ServiceName,

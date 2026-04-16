@@ -61,10 +61,15 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 		return Result{}, err
 	}
 
+	if err := s.verifyService(ctx, swarmServiceName(environment, m.Name)); err != nil {
+		return Result{}, err
+	}
+
 	return Result{
 		Environment:  environment,
 		ServiceName:  serviceName(environment, m.Name),
 		Executed:     true,
+		Verified:     true,
 		ManifestPath: absPath,
 		StackPath:    stackPath,
 		EnvFilePath:  envFilePath,
@@ -95,6 +100,24 @@ func (s *Service) deployStack(ctx context.Context, stackPath string, stackName s
 	)
 	if err != nil {
 		return fmt.Errorf("deploy stack %q: %w", stackName, err)
+	}
+
+	return nil
+}
+
+func (s *Service) verifyService(ctx context.Context, serviceName string) error {
+	_, err := s.runner.Run(
+		ctx,
+		"docker",
+		[]string{
+			"service",
+			"inspect",
+			serviceName,
+		},
+		command.RunOptions{},
+	)
+	if err != nil {
+		return fmt.Errorf("verify service %q: %w", serviceName, err)
 	}
 
 	return nil
