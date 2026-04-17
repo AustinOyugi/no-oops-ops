@@ -8,6 +8,7 @@ type Result struct {
 	StackName    string
 	Executed     bool
 	Verified     bool
+	RunningTasks int
 	ManifestPath string
 	EnvFilePath  string
 	StackPath    string

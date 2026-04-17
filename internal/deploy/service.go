@@ -7,6 +7,7 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"log/slog"
 	"path/filepath"
+	"strings"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 )
@@ -65,11 +66,17 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 		return Result{}, err
 	}
 
+	runningTasks, err := s.runningTaskCount(ctx, swarmServiceName(environment, m.Name))
+	if err != nil {
+		return Result{}, err
+	}
+
 	return Result{
 		Environment:  environment,
 		ServiceName:  serviceName(environment, m.Name),
 		Executed:     true,
 		Verified:     true,
+		RunningTasks: runningTasks,
 		ManifestPath: absPath,
 		StackPath:    stackPath,
 		EnvFilePath:  envFilePath,
@@ -121,4 +128,37 @@ func (s *Service) verifyService(ctx context.Context, serviceName string) error {
 	}
 
 	return nil
+}
+
+func (s *Service) runningTaskCount(ctx context.Context, serviceName string) (int, error) {
+	result, err := s.runner.Run(
+		ctx,
+		"docker",
+		[]string{
+			"service",
+			"ps",
+			"--filter",
+			"desired-state=running",
+			"--format",
+			"{{.CurrentState}}",
+			serviceName,
+		},
+		command.RunOptions{},
+	)
+	if err != nil {
+		return 0, fmt.Errorf("inspect running tasks for service %q: %w", serviceName, err)
+	}
+
+	count := 0
+	for _, line := range strings.Split(strings.TrimSpace(string(result.Output)), "\n") {
+		if line == "" {
+			continue
+		}
+
+		if strings.HasPrefix(line, "Running") {
+			count++
+		}
+	}
+
+	return count, nil
 }
