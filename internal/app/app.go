@@ -205,6 +205,7 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 		"executed", result.Executed,
 		"verified", result.Verified,
 		"running_tasks", result.RunningTasks,
+		"readiness_checked", true,
 		"environment", result.Environment,
 		"name", manifest.Name,
 		"service_name", result.ServiceName,

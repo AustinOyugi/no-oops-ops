@@ -19,3 +19,15 @@ healthcheck:
 
 env:
   file: lango.env.yml
+
+rollout:
+  parallelism: 1
+  delay: 10s
+  order: start-first
+  failure_action: rollback
+  restart_condition: on-failure
+  restart_delay: 10s
+  restart_max_attempts: 5
+  restart_window: 70s
+  readiness_timeout: 30s
+  readiness_interval: 2s

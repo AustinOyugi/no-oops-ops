@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
+	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"log/slog"
 	"path/filepath"
 	"strings"
-
-	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
+	"time"
 )
 
 type Service struct {
@@ -66,7 +66,17 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 		return Result{}, err
 	}
 
-	runningTasks, err := s.runningTaskCount(ctx, swarmServiceName(environment, m.Name))
+	timeout, interval, err := readinessConfig(m)
+	if err != nil {
+		return Result{}, err
+	}
+
+	runningTasks, err := s.waitForRunningTasks(
+		ctx,
+		swarmServiceName(environment, m.Name),
+		timeout,
+		interval,
+	)
 	if err != nil {
 		return Result{}, err
 	}
@@ -161,4 +171,77 @@ func (s *Service) runningTaskCount(ctx context.Context, serviceName string) (int
 	}
 
 	return count, nil
+}
+
+func readinessConfig(m manifest.Manifest) (time.Duration, time.Duration, error) {
+	timeout, err := time.ParseDuration(m.Rollout.ReadinessTimeout)
+	if err != nil {
+		return 0, 0, fmt.Errorf("parse rollout.readiness_timeout %q: %w", m.Rollout.ReadinessTimeout, err)
+	}
+
+	interval, err := time.ParseDuration(m.Rollout.ReadinessInterval)
+	if err != nil {
+		return 0, 0, fmt.Errorf("parse rollout.readiness_interval %q: %w", m.Rollout.ReadinessInterval, err)
+	}
+
+	return timeout, interval, nil
+}
+
+func (s *Service) waitForRunningTasks(
+	ctx context.Context,
+	serviceName string,
+	timeout time.Duration,
+	interval time.Duration,
+) (int, error) {
+	deadline := time.Now().Add(timeout)
+
+	s.logger.InfoContext(
+		ctx,
+		"waiting for service readiness",
+		"service", serviceName,
+		"timeout", timeout.String(),
+		"interval", interval.String(),
+	)
+
+	for {
+		runningTasks, err := s.runningTaskCount(ctx, serviceName)
+		if err != nil {
+			return 0, err
+		}
+
+		s.logger.InfoContext(
+			ctx,
+			"readiness poll",
+			"service", serviceName,
+			"running_tasks", runningTasks,
+		)
+
+		if runningTasks > 0 {
+
+			s.logger.InfoContext(
+				ctx,
+				"service ready",
+				"service", serviceName,
+				"running_tasks", runningTasks,
+			)
+
+			return runningTasks, nil
+		}
+
+		if time.Now().After(deadline) {
+			s.logger.ErrorContext(
+				ctx,
+				"service readiness timed out",
+				"service", serviceName,
+				"timeout", timeout.String(),
+			)
+			return 0, fmt.Errorf("service %q did not reach a running state within %s", serviceName, timeout)
+		}
+
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-time.After(interval):
+		}
+	}
 }

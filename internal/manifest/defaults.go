@@ -16,6 +16,8 @@ const (
 	defaultRestartDelay           = "10s"
 	defaultRestartMaxAttempts     = 5
 	defaultRestartWindow          = "70s"
+	defaultReadinessTimeout       = "30s"
+	defaultReadinessInterval      = "2s"
 	defaultExposePathPrefix       = "/"
 )
 
@@ -78,6 +80,14 @@ func (m *Manifest) applyDefaults() {
 
 	if m.Rollout.RestartWindow == "" {
 		m.Rollout.RestartWindow = defaultRestartWindow
+	}
+
+	if m.Rollout.ReadinessTimeout == "" {
+		m.Rollout.ReadinessTimeout = defaultReadinessTimeout
+	}
+
+	if m.Rollout.ReadinessInterval == "" {
+		m.Rollout.ReadinessInterval = defaultReadinessInterval
 	}
 
 	if m.Expose.PathPrefix == "" {

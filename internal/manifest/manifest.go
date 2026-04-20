@@ -41,6 +41,8 @@ type Rollout struct {
 	RestartDelay       string `yaml:"restart_delay"`
 	RestartMaxAttempts int    `yaml:"restart_max_attempts"`
 	RestartWindow      string `yaml:"restart_window"`
+	ReadinessTimeout   string `yaml:"readiness_timeout"`
+	ReadinessInterval  string `yaml:"readiness_interval"`
 }
 
 type Expose struct {
