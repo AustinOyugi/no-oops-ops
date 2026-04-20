@@ -305,6 +305,7 @@ func (a *App) runRelease(ctx context.Context, args []string) error {
 		"source_context", manifest.Source.Context,
 		"source_dockerfile", manifest.Source.Dockerfile,
 		"built", result.Built,
+		"build_executed", result.Built,
 	)
 
 	return nil
