@@ -15,8 +15,13 @@ type Manifest struct {
 }
 
 type Source struct {
-	Context    string `yaml:"context"`
-	Dockerfile string `yaml:"dockerfile"`
+	Context    string      `yaml:"context"`
+	Dockerfile string      `yaml:"dockerfile"`
+	Build      SourceBuild `yaml:"build"`
+}
+
+type SourceBuild struct {
+	Command []string `yaml:"command"`
 }
 
 type Image struct {

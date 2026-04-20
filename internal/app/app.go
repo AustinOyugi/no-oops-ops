@@ -304,6 +304,8 @@ func (a *App) runRelease(ctx context.Context, args []string) error {
 		"image", result.Image,
 		"source_context", manifest.Source.Context,
 		"source_dockerfile", manifest.Source.Dockerfile,
+		"build_command", manifest.Source.Build.Command,
+		"prebuild_configured", len(manifest.Source.Build.Command) > 0,
 		"built", result.Built,
 		"build_executed", result.Built,
 	)
