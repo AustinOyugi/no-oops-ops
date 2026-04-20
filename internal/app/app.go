@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/AustinOyugi/no-oops-ops/internal/release"
 	"log/slog"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
@@ -20,6 +21,7 @@ type App struct {
 	config    config.Config
 	installer *install.Installer
 	deployer  *deploy.Service
+	releaser  *release.Service
 	doctor    *doctor.Service
 	status    *status.Service
 }
@@ -43,6 +45,7 @@ func New(cfg config.Config) (*App, error) {
 		config:    cfg,
 		installer: installer,
 		deployer:  deploy.NewService(logger, cfg),
+		releaser:  release.NewService(logger, cfg),
 		doctor:    doctor.NewService(logger, cfg, localHost),
 		status:    status.NewService(logger, cfg, localHost),
 	}, nil
@@ -63,6 +66,10 @@ func (a *App) Run(ctx context.Context, args []string) error {
 
 	if len(args) > 0 && args[0] == "deploy" {
 		return a.runDeploy(ctx, args[1:])
+	}
+
+	if len(args) > 0 && args[0] == "release" {
+		return a.runRelease(ctx, args[1:])
 	}
 
 	if len(args) > 0 {
@@ -209,6 +216,8 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 		"environment", result.Environment,
 		"name", manifest.Name,
 		"service_name", result.ServiceName,
+		"source_context", manifest.Source.Context,
+		"source_dockerfile", manifest.Source.Dockerfile,
 		"image", fmt.Sprintf("%s:%s", manifest.Image.Repository, manifest.Image.Tag),
 		"internal_port", manifest.Service.InternalPort,
 		"replicas", manifest.Service.Replicas,
@@ -259,6 +268,43 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 		ctx,
 		"deploy env artifact",
 		"env_path", result.EnvPath,
+	)
+
+	return nil
+}
+
+func (a *App) runRelease(ctx context.Context, args []string) error {
+	if len(args) < 2 {
+		return errors.New("release requires an environment and manifest path")
+	}
+
+	environment := args[0]
+	manifestPath := args[1]
+
+	result, err := a.releaser.Run(ctx, environment, manifestPath)
+	if err != nil {
+		a.logger.ErrorContext(
+			ctx,
+			"release failed",
+			"environment", environment,
+			"manifest_path", manifestPath,
+			"reason", err.Error(),
+		)
+		return err
+	}
+
+	manifest := result.Manifest
+
+	a.logger.InfoContext(
+		ctx,
+		"release manifest",
+		"path", result.ManifestPath,
+		"environment", result.Environment,
+		"name", manifest.Name,
+		"image", result.Image,
+		"source_context", manifest.Source.Context,
+		"source_dockerfile", manifest.Source.Dockerfile,
+		"built", result.Built,
 	)
 
 	return nil

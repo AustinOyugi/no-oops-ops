@@ -19,5 +19,13 @@ func (m Manifest) Validate() error {
 		return fmt.Errorf("healthcheck.test is required")
 	}
 
+	if m.Source.Context == "" {
+		return fmt.Errorf("source.context is required")
+	}
+
+	if m.Source.Dockerfile == "" {
+		return fmt.Errorf("source.dockerfile is required")
+	}
+
 	return nil
 }

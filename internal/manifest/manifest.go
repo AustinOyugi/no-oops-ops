@@ -2,6 +2,7 @@ package manifest
 
 type Manifest struct {
 	Name        string      `yaml:"name"`
+	Source      Source      `yaml:"source"`
 	Image       Image       `yaml:"image"`
 	Service     Service     `yaml:"service"`
 	Healthcheck Healthcheck `yaml:"healthcheck"`
@@ -11,6 +12,11 @@ type Manifest struct {
 	DependsOn   []string    `yaml:"depends_on"`
 	Secrets     []string    `yaml:"secrets"`
 	Volumes     []string    `yaml:"volumes"`
+}
+
+type Source struct {
+	Context    string `yaml:"context"`
+	Dockerfile string `yaml:"dockerfile"`
 }
 
 type Image struct {

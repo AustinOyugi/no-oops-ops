@@ -1,5 +1,9 @@
 name: lango
 
+source:
+  context: .
+  dockerfile: Dockerfile
+
 image:
   repository: lango-service
 
