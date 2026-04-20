@@ -19,6 +19,7 @@ type RunOptions struct {
 	Stderr       io.Writer
 	StreamOutput bool
 	LogCommand   bool
+	Workdir      string
 }
 
 type Result struct {
@@ -40,6 +41,10 @@ func (r *Runner) Run(ctx context.Context, name string, args []string, opts RunOp
 
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Stdin = opts.Stdin
+
+	if opts.Workdir != "" {
+		cmd.Dir = opts.Workdir
+	}
 
 	var output bytes.Buffer
 

@@ -1,5 +1,14 @@
 name: lango
 
+source:
+  context: .
+  dockerfile: Dockerfile
+  build:
+    command:
+      - mvn
+      - package
+      - -DskipTests
+
 image:
   repository: lango-service
 
