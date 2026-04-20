@@ -229,13 +229,30 @@ func (s *Service) waitForRunningTasks(
 		}
 
 		if time.Now().After(deadline) {
+			diagnostics, diagErr := s.taskDiagnostics(ctx, serviceName)
+			if diagErr != nil {
+				s.logger.ErrorContext(
+					ctx,
+					"service readiness timed out",
+					"service", serviceName,
+					"timeout", timeout.String(),
+				)
+				return 0, fmt.Errorf("service %q did not reach a running state within %s", serviceName, timeout)
+			}
+
 			s.logger.ErrorContext(
 				ctx,
 				"service readiness timed out",
 				"service", serviceName,
 				"timeout", timeout.String(),
+				"diagnostics", diagnostics,
 			)
-			return 0, fmt.Errorf("service %q did not reach a running state within %s", serviceName, timeout)
+			return 0, fmt.Errorf(
+				"service %q did not reach a running state within %s: %s",
+				serviceName,
+				timeout,
+				diagnostics,
+			)
 		}
 
 		select {
@@ -244,4 +261,33 @@ func (s *Service) waitForRunningTasks(
 		case <-time.After(interval):
 		}
 	}
+}
+
+func (s *Service) taskDiagnostics(ctx context.Context, serviceName string) (string, error) {
+	result, err := s.runner.Run(
+		ctx,
+		"docker",
+		[]string{
+			"service",
+			"ps",
+			"--no-trunc",
+			"--format",
+			"{{.CurrentState}}|{{.Error}}",
+			serviceName,
+		},
+		command.RunOptions{},
+	)
+	if err != nil {
+		return "", fmt.Errorf("inspect task diagnostics for service %q: %w", serviceName, err)
+	}
+
+	var lines []string
+	for _, line := range strings.Split(strings.TrimSpace(string(result.Output)), "\n") {
+		if line == "" {
+			continue
+		}
+		lines = append(lines, line)
+	}
+
+	return strings.Join(lines, "; "), nil
 }
