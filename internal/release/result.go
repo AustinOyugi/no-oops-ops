@@ -7,6 +7,7 @@ type Result struct {
 	ManifestPath  string
 	Image         string
 	RegistryImage string
+	Tag           string
 	Built         bool
 	Pushed        bool
 	Manifest      manifest.Manifest

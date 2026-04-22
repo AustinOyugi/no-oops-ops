@@ -302,6 +302,7 @@ func (a *App) runRelease(ctx context.Context, args []string) error {
 		"environment", result.Environment,
 		"name", manifest.Name,
 		"image", result.Image,
+		"tag", result.Tag,
 		"registry_image", result.RegistryImage,
 		"pushed", result.Pushed,
 		"source_context", manifest.Source.Context,

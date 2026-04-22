@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
@@ -40,7 +41,8 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 		return Result{}, err
 	}
 
-	image := fmt.Sprintf("%s:%s", m.Image.Repository, m.Image.Tag)
+	tag := releaseTag()
+	image := fmt.Sprintf("%s:%s", m.Image.Repository, tag)
 
 	baseDir := filepath.Dir(absPath)
 	contextDir := resolveSourcePath(baseDir, m.Source.Context)
@@ -70,6 +72,7 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 		Image:         image,
 		RegistryImage: registryImage,
 		Built:         true,
+		Tag:           tag,
 		Pushed:        true,
 		Manifest:      m,
 	}, nil
@@ -171,6 +174,10 @@ func (s *Service) tagImage(ctx context.Context, sourceImage string, targetImage 
 	}
 
 	return nil
+}
+
+func releaseTag() string {
+	return time.Now().UTC().Format("20060102-150405")
 }
 
 func (s *Service) pushImage(ctx context.Context, image string) error {
