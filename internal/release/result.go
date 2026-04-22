@@ -4,6 +4,7 @@ import "github.com/AustinOyugi/no-oops-ops/internal/manifest"
 
 type Result struct {
 	Environment   string
+	MetadataPath  string
 	ManifestPath  string
 	Image         string
 	RegistryImage string

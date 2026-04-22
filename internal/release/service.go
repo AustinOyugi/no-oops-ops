@@ -2,6 +2,7 @@ package release
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -66,8 +67,19 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 		return Result{}, err
 	}
 
+	metadataPath, err := writeMetadata(s.config, m.Name, Metadata{
+		Environment:   environment,
+		Image:         image,
+		RegistryImage: registryImage,
+		Tag:           tag,
+	})
+	if err != nil {
+		return Result{}, err
+	}
+
 	return Result{
 		Environment:   environment,
+		MetadataPath:  metadataPath,
 		ManifestPath:  absPath,
 		Image:         image,
 		RegistryImage: registryImage,
@@ -205,4 +217,33 @@ func (s *Service) pushImage(ctx context.Context, image string) error {
 	}
 
 	return nil
+}
+
+func appDir(cfg config.Config, appName string, environment string) string {
+	return filepath.Join(cfg.StateDir, "apps", appName, environment)
+}
+
+func releaseMetadataPath(cfg config.Config, appName string, environment string) string {
+	return filepath.Join(appDir(cfg, appName, environment), "release.json")
+}
+
+func writeMetadata(cfg config.Config, appName string, metadata Metadata) (string, error) {
+	dir := appDir(cfg, appName, metadata.Environment)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", fmt.Errorf("create app dir %q: %w", dir, err)
+	}
+
+	data, err := json.MarshalIndent(metadata, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("marshal release metadata: %w", err)
+	}
+
+	data = append(data, '\n')
+
+	path := releaseMetadataPath(cfg, appName, metadata.Environment)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return "", fmt.Errorf("write release metadata %q: %w", path, err)
+	}
+
+	return path, nil
 }
