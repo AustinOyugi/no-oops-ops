@@ -54,12 +54,24 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 		return Result{}, err
 	}
 
+	registryImage := registryImage(s.config, image)
+
+	if err := s.tagImage(ctx, image, registryImage); err != nil {
+		return Result{}, err
+	}
+
+	if err := s.pushImage(ctx, registryImage); err != nil {
+		return Result{}, err
+	}
+
 	return Result{
-		Environment:  environment,
-		ManifestPath: absPath,
-		Image:        image,
-		Built:        true,
-		Manifest:     m,
+		Environment:   environment,
+		ManifestPath:  absPath,
+		Image:         image,
+		RegistryImage: registryImage,
+		Built:         true,
+		Pushed:        true,
+		Manifest:      m,
 	}, nil
 }
 
@@ -129,4 +141,61 @@ func resolveSourcePath(baseDir string, value string) string {
 	}
 
 	return filepath.Join(baseDir, value)
+}
+
+func registryImage(cfg config.Config, image string) string {
+	return fmt.Sprintf("127.0.0.1:%s/%s", cfg.RegistryPort, image)
+}
+
+func (s *Service) tagImage(ctx context.Context, sourceImage string, targetImage string) error {
+	result, err := s.runner.Run(
+		ctx,
+		"docker",
+		[]string{
+			"tag",
+			sourceImage,
+			targetImage,
+		},
+		command.RunOptions{
+			LogCommand: true,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"tag image %q as %q: %w: %s",
+			sourceImage,
+			targetImage,
+			err,
+			strings.TrimSpace(string(result.Output)),
+		)
+	}
+
+	return nil
+}
+
+func (s *Service) pushImage(ctx context.Context, image string) error {
+	result, err := s.runner.Run(
+		ctx,
+		"docker",
+		[]string{
+			"push",
+			image,
+		},
+		command.RunOptions{
+			LogCommand:   true,
+			StreamOutput: true,
+			Stdout:       os.Stdout,
+			Stderr:       os.Stderr,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"push image %q: %w: %s",
+			image,
+			err,
+			strings.TrimSpace(string(result.Output)),
+		)
+	}
+
+	return nil
 }
