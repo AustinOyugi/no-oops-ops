@@ -2,11 +2,13 @@ package release
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
@@ -40,7 +42,8 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 		return Result{}, err
 	}
 
-	image := fmt.Sprintf("%s:%s", m.Image.Repository, m.Image.Tag)
+	tag := releaseTag()
+	image := fmt.Sprintf("%s:%s", m.Image.Repository, tag)
 
 	baseDir := filepath.Dir(absPath)
 	contextDir := resolveSourcePath(baseDir, m.Source.Context)
@@ -54,12 +57,36 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 		return Result{}, err
 	}
 
+	registryImage := registryImage(s.config, image)
+
+	if err := s.tagImage(ctx, image, registryImage); err != nil {
+		return Result{}, err
+	}
+
+	if err := s.pushImage(ctx, registryImage); err != nil {
+		return Result{}, err
+	}
+
+	metadataPath, err := writeMetadata(s.config, m.Name, Metadata{
+		Environment:   environment,
+		Image:         image,
+		RegistryImage: registryImage,
+		Tag:           tag,
+	})
+	if err != nil {
+		return Result{}, err
+	}
+
 	return Result{
-		Environment:  environment,
-		ManifestPath: absPath,
-		Image:        image,
-		Built:        true,
-		Manifest:     m,
+		Environment:   environment,
+		MetadataPath:  metadataPath,
+		ManifestPath:  absPath,
+		Image:         image,
+		RegistryImage: registryImage,
+		Built:         true,
+		Tag:           tag,
+		Pushed:        true,
+		Manifest:      m,
 	}, nil
 }
 
@@ -129,4 +156,94 @@ func resolveSourcePath(baseDir string, value string) string {
 	}
 
 	return filepath.Join(baseDir, value)
+}
+
+func registryImage(cfg config.Config, image string) string {
+	return fmt.Sprintf("127.0.0.1:%s/%s", cfg.RegistryPort, image)
+}
+
+func (s *Service) tagImage(ctx context.Context, sourceImage string, targetImage string) error {
+	result, err := s.runner.Run(
+		ctx,
+		"docker",
+		[]string{
+			"tag",
+			sourceImage,
+			targetImage,
+		},
+		command.RunOptions{
+			LogCommand: true,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"tag image %q as %q: %w: %s",
+			sourceImage,
+			targetImage,
+			err,
+			strings.TrimSpace(string(result.Output)),
+		)
+	}
+
+	return nil
+}
+
+func releaseTag() string {
+	return time.Now().UTC().Format("20060102-150405")
+}
+
+func (s *Service) pushImage(ctx context.Context, image string) error {
+	result, err := s.runner.Run(
+		ctx,
+		"docker",
+		[]string{
+			"push",
+			image,
+		},
+		command.RunOptions{
+			LogCommand:   true,
+			StreamOutput: true,
+			Stdout:       os.Stdout,
+			Stderr:       os.Stderr,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"push image %q: %w: %s",
+			image,
+			err,
+			strings.TrimSpace(string(result.Output)),
+		)
+	}
+
+	return nil
+}
+
+func appDir(cfg config.Config, appName string, environment string) string {
+	return filepath.Join(cfg.StateDir, "apps", appName, environment)
+}
+
+func releaseMetadataPath(cfg config.Config, appName string, environment string) string {
+	return filepath.Join(appDir(cfg, appName, environment), "release.json")
+}
+
+func writeMetadata(cfg config.Config, appName string, metadata Metadata) (string, error) {
+	dir := appDir(cfg, appName, metadata.Environment)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", fmt.Errorf("create app dir %q: %w", dir, err)
+	}
+
+	data, err := json.MarshalIndent(metadata, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("marshal release metadata: %w", err)
+	}
+
+	data = append(data, '\n')
+
+	path := releaseMetadataPath(cfg, appName, metadata.Environment)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return "", fmt.Errorf("write release metadata %q: %w", path, err)
+	}
+
+	return path, nil
 }
