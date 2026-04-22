@@ -219,6 +219,8 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 		"source_context", manifest.Source.Context,
 		"source_dockerfile", manifest.Source.Dockerfile,
 		"image", fmt.Sprintf("%s:%s", manifest.Image.Repository, manifest.Image.Tag),
+		"release_image", result.ReleaseImage,
+		"release_tag", result.ReleaseTag,
 		"internal_port", manifest.Service.InternalPort,
 		"replicas", manifest.Service.Replicas,
 		"network", manifest.Service.Network,

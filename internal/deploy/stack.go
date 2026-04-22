@@ -61,6 +61,10 @@ func swarmServiceName(environment string, appName string) string {
 	return stackName(environment, appName) + "_" + serviceName(environment, appName)
 }
 
+func releaseMetadataPath(cfg config.Config, name string, environment string) string {
+	return filepath.Join(appDir(cfg, name, environment), "release.json")
+}
+
 func writeEnvMap(cfg config.Config, appName string, environment string, values map[string]string) (string, error) {
 	dir := appDir(cfg, appName, environment)
 	if err := os.MkdirAll(dir, appDirMode); err != nil {
@@ -83,7 +87,7 @@ func writeEnvMap(cfg config.Config, appName string, environment string, values m
 	return path, nil
 }
 
-func writeStack(cfg config.Config, environment string, m manifest.Manifest) (string, error) {
+func writeStack(cfg config.Config, environment string, m manifest.Manifest, image string) (string, error) {
 	dir := appDir(cfg, m.Name, environment)
 	if err := os.MkdirAll(dir, appDirMode); err != nil {
 		return "", fmt.Errorf("create app dir %q: %w", dir, err)
@@ -91,7 +95,7 @@ func writeStack(cfg config.Config, environment string, m manifest.Manifest) (str
 
 	rendered, err := renderStackTemplate(stackTemplateData{
 		ServiceName:            serviceName(environment, m.Name),
-		Image:                  fmt.Sprintf("%s:%s", m.Image.Repository, m.Image.Tag),
+		Image:                  image,
 		Network:                m.Service.Network,
 		Replicas:               m.Service.Replicas,
 		HealthcheckTest:        m.Healthcheck.Test,

@@ -9,6 +9,8 @@ type Result struct {
 	Executed     bool
 	Verified     bool
 	RunningTasks int
+	ReleaseImage string
+	ReleaseTag   string
 	ManifestPath string
 	EnvFilePath  string
 	StackPath    string

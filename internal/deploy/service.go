@@ -53,7 +53,12 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 		return Result{}, err
 	}
 
-	stackPath, err := writeStack(s.config, environment, m)
+	releaseMetadata, err := readReleaseMetadata(releaseMetadataPath(s.config, m.Name, environment))
+	if err != nil {
+		return Result{}, err
+	}
+
+	stackPath, err := writeStack(s.config, environment, m, releaseMetadata.RegistryImage)
 	if err != nil {
 		return Result{}, err
 	}
@@ -87,6 +92,8 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 		Executed:     true,
 		Verified:     true,
 		RunningTasks: runningTasks,
+		ReleaseImage: releaseMetadata.RegistryImage,
+		ReleaseTag:   releaseMetadata.Tag,
 		ManifestPath: absPath,
 		StackPath:    stackPath,
 		EnvFilePath:  envFilePath,
