@@ -53,7 +53,13 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 		return Result{}, err
 	}
 
-	releaseMetadata, err := readReleaseMetadata(releaseMetadataPath(s.config, m.Name, environment))
+	currentReleaseMetadata, err := readCurrentRelease(releaseMetadataPath(s.config, m.Name, environment))
+	if err != nil {
+		return Result{}, err
+	}
+
+	releaseMetadata, err := readReleaseMetadata(releaseMetadataHistoryPath(s.config, m.Name, environment, currentReleaseMetadata.Tag))
+
 	if err != nil {
 		return Result{}, err
 	}

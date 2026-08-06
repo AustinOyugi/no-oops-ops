@@ -1,8 +1,8 @@
 name: lango
 
 source:
-  context: .
-  dockerfile: Dockerfile
+  context: "/Users/odu/Documents/alien/code-innate/enterprise/rolengi/security/lango-service"
+  dockerfile: "/Users/odu/Documents/alien/code-innate/enterprise/rolengi/security/lango-service/Dockerfile"
   build:
     command:
       - mvn
