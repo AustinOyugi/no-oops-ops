@@ -66,20 +66,31 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 	if err := s.pushImage(ctx, registryImage); err != nil {
 		return Result{}, err
 	}
+	
+	_, err = writeMetadata(s.config, m.Name, CurrentRelease{
+		Tag: tag,
+	}, environment)
 
-	metadataPath, err := writeMetadata(s.config, m.Name, Metadata{
+	if err != nil {
+		return Result{}, err
+	}
+
+	metadataHistoryPath, err := writeMetadataHistory(s.config, m.Name, Metadata{
+		App:           m.Name,
+		CreateAt:      time.Now().UTC(),
 		Environment:   environment,
 		Image:         image,
 		RegistryImage: registryImage,
 		Tag:           tag,
 	})
+
 	if err != nil {
 		return Result{}, err
 	}
 
 	return Result{
 		Environment:   environment,
-		MetadataPath:  metadataPath,
+		MetadataPath:  metadataHistoryPath,
 		ManifestPath:  absPath,
 		Image:         image,
 		RegistryImage: registryImage,
@@ -88,66 +99,6 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 		Pushed:        true,
 		Manifest:      m,
 	}, nil
-}
-
-func (s *Service) buildImage(ctx context.Context, image string, dockerfile string, contextDir string) error {
-	result, err := s.runner.Run(
-		ctx,
-		"docker",
-		[]string{
-			"build",
-			"-t",
-			image,
-			"-f",
-			dockerfile,
-			contextDir,
-		},
-		command.RunOptions{
-			LogCommand:   true,
-			Workdir:      contextDir,
-			StreamOutput: true,
-			Stdout:       os.Stdout,
-			Stderr:       os.Stderr,
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("build image %q: %w: %s", image, err, strings.TrimSpace(string(result.Output)))
-	}
-
-	return nil
-}
-
-func (s *Service) runBuildCommand(ctx context.Context, contextDir string, commandArgs []string) error {
-	if len(commandArgs) == 0 {
-		return nil
-	}
-
-	name := commandArgs[0]
-	args := commandArgs[1:]
-
-	result, err := s.runner.Run(
-		ctx,
-		name,
-		args,
-		command.RunOptions{
-			LogCommand:   true,
-			Workdir:      contextDir,
-			StreamOutput: true,
-			Stdout:       os.Stdout,
-			Stderr:       os.Stderr,
-		},
-	)
-
-	if err != nil {
-		return fmt.Errorf(
-			"run build command %q: %w: %s",
-			strings.Join(commandArgs, " "),
-			err,
-			strings.TrimSpace(string(result.Output)),
-		)
-	}
-
-	return nil
 }
 
 func resolveSourcePath(baseDir string, value string) string {
@@ -160,32 +111,6 @@ func resolveSourcePath(baseDir string, value string) string {
 
 func registryImage(cfg config.Config, image string) string {
 	return fmt.Sprintf("127.0.0.1:%s/%s", cfg.RegistryPort, image)
-}
-
-func (s *Service) tagImage(ctx context.Context, sourceImage string, targetImage string) error {
-	result, err := s.runner.Run(
-		ctx,
-		"docker",
-		[]string{
-			"tag",
-			sourceImage,
-			targetImage,
-		},
-		command.RunOptions{
-			LogCommand: true,
-		},
-	)
-	if err != nil {
-		return fmt.Errorf(
-			"tag image %q as %q: %w: %s",
-			sourceImage,
-			targetImage,
-			err,
-			strings.TrimSpace(string(result.Output)),
-		)
-	}
-
-	return nil
 }
 
 func releaseTag() string {
@@ -227,8 +152,16 @@ func releaseMetadataPath(cfg config.Config, appName string, environment string) 
 	return filepath.Join(appDir(cfg, appName, environment), "release.json")
 }
 
-func writeMetadata(cfg config.Config, appName string, metadata Metadata) (string, error) {
-	dir := appDir(cfg, appName, metadata.Environment)
+func releaseHistoryMetadataDir(cfg config.Config, appName string, environment string) string {
+	return filepath.Join(appDir(cfg, appName, environment), "releases")
+}
+
+func releaseHistoryMetadataPath(path string, tag string) string {
+	return filepath.Join(path, tag+".json")
+}
+
+func writeMetadata(cfg config.Config, appName string, metadata CurrentRelease, environment string) (string, error) {
+	dir := appDir(cfg, appName, environment)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", fmt.Errorf("create app dir %q: %w", dir, err)
 	}
@@ -240,7 +173,29 @@ func writeMetadata(cfg config.Config, appName string, metadata Metadata) (string
 
 	data = append(data, '\n')
 
-	path := releaseMetadataPath(cfg, appName, metadata.Environment)
+	path := releaseMetadataPath(cfg, appName, environment)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return "", fmt.Errorf("write release metadata %q: %w", path, err)
+	}
+
+	return path, nil
+}
+
+func writeMetadataHistory(cfg config.Config, appName string, metadata Metadata) (string, error) {
+	dir := releaseHistoryMetadataDir(cfg, appName, metadata.Environment)
+
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", fmt.Errorf("create app dir %q: %w", dir, err)
+	}
+
+	data, err := json.MarshalIndent(metadata, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("marshal release history metadata: %w", err)
+	}
+
+	data = append(data, '\n')
+
+	path := releaseHistoryMetadataPath(dir, metadata.Tag)
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		return "", fmt.Errorf("write release metadata %q: %w", path, err)
 	}

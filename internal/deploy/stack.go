@@ -61,10 +61,6 @@ func swarmServiceName(environment string, appName string) string {
 	return stackName(environment, appName) + "_" + serviceName(environment, appName)
 }
 
-func releaseMetadataPath(cfg config.Config, name string, environment string) string {
-	return filepath.Join(appDir(cfg, name, environment), "release.json")
-}
-
 func writeEnvMap(cfg config.Config, appName string, environment string, values map[string]string) (string, error) {
 	dir := appDir(cfg, appName, environment)
 	if err := os.MkdirAll(dir, appDirMode); err != nil {
