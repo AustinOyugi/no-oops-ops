@@ -14,7 +14,13 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 	environment := args[0]
 	manifestPath := args[1]
 
-	result, err := a.deployer.Run(ctx, environment, manifestPath)
+	var optionalReleaseVersion string
+
+	if len(args) > 2 {
+		optionalReleaseVersion = args[2]
+	}
+
+	result, err := a.deployer.Run(ctx, environment, manifestPath, optionalReleaseVersion)
 	if err != nil {
 		a.logger.ErrorContext(ctx, "deploy failed", "environment", environment, "manifest_path", manifestPath, "reason", err.Error())
 		return err

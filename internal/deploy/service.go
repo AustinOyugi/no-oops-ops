@@ -26,13 +26,13 @@ func NewService(logger *slog.Logger, cfg config.Config) *Service {
 	}
 }
 
-func (s *Service) Run(ctx context.Context, environment string, path string) (Result, error) {
+func (s *Service) Run(ctx context.Context, environment string, path string, optionalReleaseVersion string) (Result, error) {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return Result{}, fmt.Errorf("resolve manifest path %q: %w", path, err)
 	}
 
-	s.logger.InfoContext(ctx, "starting deploy", "manifest", absPath, "environment", environment)
+	s.logger.InfoContext(ctx, "starting deploy", "manifest", absPath, "environment", environment, "version", optionalReleaseVersion)
 
 	m, err := manifest.Load(absPath)
 	if err != nil {
@@ -53,12 +53,19 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 		return Result{}, err
 	}
 
-	currentReleaseMetadata, err := readCurrentRelease(releaseMetadataPath(s.config, m.Name, environment))
-	if err != nil {
-		return Result{}, err
+	var releaseTag string
+
+	if optionalReleaseVersion != "" {
+		releaseTag = optionalReleaseVersion
+	} else {
+		currentReleaseMetadata, err := readCurrentRelease(releaseMetadataPath(s.config, m.Name, environment))
+		if err != nil {
+			return Result{}, err
+		}
+		releaseTag = currentReleaseMetadata.Tag
 	}
 
-	releaseMetadata, err := readReleaseMetadata(releaseMetadataHistoryPath(s.config, m.Name, environment, currentReleaseMetadata.Tag))
+	releaseMetadata, err := readReleaseMetadata(releaseMetadataHistoryPath(s.config, m.Name, environment, releaseTag))
 
 	if err != nil {
 		return Result{}, err
