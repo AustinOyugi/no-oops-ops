@@ -2,7 +2,6 @@ package release
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -66,16 +65,8 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 	if err := s.pushImage(ctx, registryImage); err != nil {
 		return Result{}, err
 	}
-	
-	_, err = writeMetadata(s.config, m.Name, CurrentRelease{
-		Tag: tag,
-	}, environment)
 
-	if err != nil {
-		return Result{}, err
-	}
-
-	metadataHistoryPath, err := writeMetadataHistory(s.config, m.Name, Metadata{
+	metadataHistoryPath, err := saveMetadataHistory(s.config, m.Name, Metadata{
 		App:           m.Name,
 		CreateAt:      time.Now().UTC(),
 		Environment:   environment,
@@ -148,57 +139,10 @@ func appDir(cfg config.Config, appName string, environment string) string {
 	return filepath.Join(cfg.StateDir, "apps", appName, environment)
 }
 
-func releaseMetadataPath(cfg config.Config, appName string, environment string) string {
-	return filepath.Join(appDir(cfg, appName, environment), "release.json")
-}
-
 func releaseHistoryMetadataDir(cfg config.Config, appName string, environment string) string {
 	return filepath.Join(appDir(cfg, appName, environment), "releases")
 }
 
 func releaseHistoryMetadataPath(path string, tag string) string {
 	return filepath.Join(path, tag+".json")
-}
-
-func writeMetadata(cfg config.Config, appName string, metadata CurrentRelease, environment string) (string, error) {
-	dir := appDir(cfg, appName, environment)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", fmt.Errorf("create app dir %q: %w", dir, err)
-	}
-
-	data, err := json.MarshalIndent(metadata, "", "  ")
-	if err != nil {
-		return "", fmt.Errorf("marshal release metadata: %w", err)
-	}
-
-	data = append(data, '\n')
-
-	path := releaseMetadataPath(cfg, appName, environment)
-	if err := os.WriteFile(path, data, 0o600); err != nil {
-		return "", fmt.Errorf("write release metadata %q: %w", path, err)
-	}
-
-	return path, nil
-}
-
-func writeMetadataHistory(cfg config.Config, appName string, metadata Metadata) (string, error) {
-	dir := releaseHistoryMetadataDir(cfg, appName, metadata.Environment)
-
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", fmt.Errorf("create app dir %q: %w", dir, err)
-	}
-
-	data, err := json.MarshalIndent(metadata, "", "  ")
-	if err != nil {
-		return "", fmt.Errorf("marshal release history metadata: %w", err)
-	}
-
-	data = append(data, '\n')
-
-	path := releaseHistoryMetadataPath(dir, metadata.Tag)
-	if err := os.WriteFile(path, data, 0o600); err != nil {
-		return "", fmt.Errorf("write release metadata %q: %w", path, err)
-	}
-
-	return path, nil
 }
