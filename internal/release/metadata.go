@@ -11,6 +11,6 @@ type Metadata struct {
 	Tag           string    `json:"tag"`
 }
 
-type CurrentRelease struct {
+type ActiveRelease struct {
 	Tag string `json:"tag"`
 }

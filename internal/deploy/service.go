@@ -6,6 +6,7 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
+	"github.com/AustinOyugi/no-oops-ops/internal/release"
 	"log/slog"
 	"path/filepath"
 	"strings"
@@ -58,14 +59,14 @@ func (s *Service) Run(ctx context.Context, environment string, path string, opti
 	if optionalReleaseVersion != "" {
 		releaseTag = optionalReleaseVersion
 	} else {
-		currentReleaseMetadata, err := readCurrentRelease(releaseMetadataPath(s.config, m.Name, environment))
+		currentReleaseMetadata, err := release.Latest(s.config, m.Name, environment)
 		if err != nil {
 			return Result{}, err
 		}
 		releaseTag = currentReleaseMetadata.Tag
 	}
 
-	releaseMetadata, err := readReleaseMetadata(releaseMetadataHistoryPath(s.config, m.Name, environment, releaseTag))
+	releaseMetadata, err := release.Find(s.config, m.Name, environment, releaseTag)
 
 	if err != nil {
 		return Result{}, err
@@ -95,6 +96,11 @@ func (s *Service) Run(ctx context.Context, environment string, path string, opti
 		timeout,
 		interval,
 	)
+	if err != nil {
+		return Result{}, err
+	}
+
+	err = release.SetLatest(s.config, m.Name, release.ActiveRelease{Tag: releaseTag}, environment)
 	if err != nil {
 		return Result{}, err
 	}
