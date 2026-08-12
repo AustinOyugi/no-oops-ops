@@ -12,6 +12,15 @@ The current implementation focuses on a practical local/server workflow:
 
 The goal is to keep simple deployments repeatable without building a full DevOps platform.
 
+## Requirements
+
+- Go 1.25 or later
+- Docker running locally
+- Docker configured to allow the local registry (see [Docker Registry](#docker-registry))
+
+Run commands from the repository root. By default, No Oops Ops stores its state in
+`.noops/`; set `NOOPS_STATE_DIR` to use another location.
+
 ## Current Workflow
 
 The current happy path is:
@@ -20,6 +29,12 @@ The current happy path is:
 go run ./cmd/noops install
 go run ./cmd/noops release prod examples/lango.app.yml
 go run ./cmd/noops deploy prod examples/lango.app.yml
+```
+
+To deploy a particular previously released version instead of the most recent one:
+
+```bash
+go run ./cmd/noops deploy prod examples/lango.app.yml 20260101-120000
 ```
 
 You can also inspect the platform:
@@ -66,24 +81,30 @@ Release currently does:
 - tags it with a generated timestamp tag
 - tags it for the internal registry
 - pushes it to the internal registry
-- writes release metadata
+- writes versioned release metadata
 
 Example generated metadata:
 
 ```text
-.noops/apps/lango/prod/release.json
+.noops/apps/lango/prod/releases/20260101-120000.json
 ```
 
-Deploy reads this file later, so the manifest does not need to be manually updated with a new image tag on every release.
+Each release is tagged with a UTC timestamp in the format `YYYYMMDD-HHMMSS`. Deploy
+reads this metadata later, so the manifest does not need to be manually updated with a
+new image tag on every release.
 
 ## Deploy
 
-Deploy consumes the latest release metadata for an app/environment.
+Deploy consumes the latest release metadata for an app/environment by default. Pass a
+release tag as the optional third argument to deploy a specific version.
 
 Run:
 
 ```bash
 go run ./cmd/noops deploy prod examples/lango.app.yml
+
+# deploy a specific release
+go run ./cmd/noops deploy prod examples/lango.app.yml 20260101-120000
 ```
 
 Deploy currently does:
@@ -93,7 +114,7 @@ Deploy currently does:
 - resolves environment-specific env values
 - writes `.env`
 - writes `stack.yml`
-- reads `release.json`
+- resolves the latest release metadata, or the supplied release tag
 - renders the stack with the released registry image
 - runs `docker stack deploy`
 - verifies the Swarm service exists
@@ -111,8 +132,37 @@ For example:
 ```text
 .noops/apps/lango/prod/.env
 .noops/apps/lango/prod/stack.yml
+.noops/apps/lango/prod/releases/20260101-120000.json
 .noops/apps/lango/prod/release.json
 ```
+
+`release.json` records the release most recently deployed for that app and environment;
+the versioned files under `releases/` are the release history.
+
+## Commands
+
+```text
+noops [install]
+noops doctor
+noops status
+noops release <environment> <manifest>
+noops deploy <environment> <manifest> [release-tag]
+```
+
+Running `noops` without a command runs `install`.
+
+## Configuration
+
+Settings can be supplied in a `.env.noops` file in the repository root or as environment
+variables:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `NOOPS_STATE_DIR` | `.noops` in this repository | Directory for install and app artifacts |
+| `NOOPS_INSTALL_VERSION` | `dev` | Version written to install metadata |
+| `NOOPS_NETWORK_NAME` | `noops-net` | Shared Docker Swarm network |
+| `NOOPS_REGISTRY_NAME` | `noops-registry` | Internal registry service name |
+| `NOOPS_REGISTRY_PORT` | `5000` | Internal registry port |
 
 ## App Manifest
 
@@ -226,8 +276,7 @@ curl http://127.0.0.1:5000/v2/
 ## Current Limitations
 
 - Router and TLS are not implemented yet.
-- Release history and rollback commands are not implemented yet.
-- Deploy consumes the latest `release.json` for the selected app/environment.
+- There is no dedicated release-list or rollback command yet; deploy a known release tag to return to an earlier version.
 - The internal registry currently uses an insecure local HTTP registry.
 - App readiness currently checks Swarm running tasks, not router-level HTTP availability.
 
@@ -235,8 +284,7 @@ curl http://127.0.0.1:5000/v2/
 
 The next major areas are:
 
-- release history
-- rollback
+- release-list and rollback commands
 - registry cleanup and GC policy
 - router/exposure
 - richer deploy status and app lifecycle commands
