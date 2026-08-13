@@ -3,27 +3,30 @@ package deploy
 import (
 	"context"
 	"fmt"
-	"github.com/AustinOyugi/no-oops-ops/internal/config"
-	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
-	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
-	"github.com/AustinOyugi/no-oops-ops/internal/release"
 	"log/slog"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/AustinOyugi/no-oops-ops/internal/config"
+	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
+	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
+	"github.com/AustinOyugi/no-oops-ops/internal/release"
 )
 
 type Service struct {
-	logger *slog.Logger
-	config config.Config
-	runner *command.Runner
+	logger   *slog.Logger
+	config   config.Config
+	runner   *command.Runner
+	releases release.Store
 }
 
 func NewService(logger *slog.Logger, cfg config.Config) *Service {
 	return &Service{
-		logger: logger,
-		config: cfg,
-		runner: command.NewRunner(logger),
+		logger:   logger,
+		config:   cfg,
+		runner:   command.NewRunner(logger),
+		releases: release.NewFilesystemStore(),
 	}
 }
 
@@ -59,13 +62,14 @@ func (s *Service) Run(ctx context.Context, environment string, path string, opti
 	if optionalReleaseVersion != "" {
 		releaseTag = optionalReleaseVersion
 	} else {
+		currentReleaseMetadata, err := s.releases.Latest(s.config, m.Name, environment)
 		if err != nil {
 			return Result{}, err
 		}
 		releaseTag = currentReleaseMetadata.Tag
 	}
 
-	releaseMetadata, err := release.Find(s.config, m.Name, environment, releaseTag)
+	releaseMetadata, err := s.releases.Find(s.config, m.Name, environment, releaseTag)
 
 	if err != nil {
 		return Result{}, err
@@ -99,7 +103,7 @@ func (s *Service) Run(ctx context.Context, environment string, path string, opti
 		return Result{}, err
 	}
 
-	err = release.SetLatest(s.config, m.Name, release.ActiveRelease{Tag: releaseTag}, environment)
+	err = s.releases.SetLatest(s.config, m.Name, release.ActiveRelease{Tag: releaseTag}, environment)
 	if err != nil {
 		return Result{}, err
 	}
