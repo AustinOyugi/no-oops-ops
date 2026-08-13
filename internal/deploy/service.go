@@ -59,7 +59,6 @@ func (s *Service) Run(ctx context.Context, environment string, path string, opti
 	if optionalReleaseVersion != "" {
 		releaseTag = optionalReleaseVersion
 	} else {
-		currentReleaseMetadata, err := release.Latest(s.config, m.Name, environment)
 		if err != nil {
 			return Result{}, err
 		}
