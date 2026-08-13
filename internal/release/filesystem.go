@@ -10,10 +10,10 @@ import (
 	"strings"
 )
 
-type Store interface {
-	Find(app, environment, tag string) (Metadata, error)
-	Latest(cfg config.Config, name string, environment string) (ActiveRelease, error)
-	SetLatest(app, environment, tag string) error
+type fileSystemStore struct{}
+
+func NewFilesystemStore() Store {
+	return fileSystemStore{}
 }
 
 func saveMetadataHistory(cfg config.Config, appName string, metadata Metadata) (string, error) {
@@ -38,7 +38,7 @@ func saveMetadataHistory(cfg config.Config, appName string, metadata Metadata) (
 	return path, nil
 }
 
-func SetLatest(cfg config.Config, appName string, metadata ActiveRelease, environment string) error {
+func (fileSystemStore) SetLatest(cfg config.Config, appName string, metadata ActiveRelease, environment string) error {
 	dir := appDir(cfg, appName, environment)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("create app dir %q: %w", dir, err)
@@ -59,12 +59,10 @@ func SetLatest(cfg config.Config, appName string, metadata ActiveRelease, enviro
 	return nil
 }
 
-func Latest(cfg config.Config, name string, environment string) (ActiveRelease, error) {
-
+func (fileSystemStore) Latest(cfg config.Config, name string, environment string) (ActiveRelease, error) {
 	releasesPath := releaseHistoryDir(cfg, name, environment)
 
 	files, err := os.ReadDir(releasesPath)
-
 	if err != nil {
 		return ActiveRelease{}, fmt.Errorf("read release history dir %q: %w", releasesPath, err)
 	}
@@ -99,11 +97,10 @@ func Latest(cfg config.Config, name string, environment string) (ActiveRelease, 
 	return ActiveRelease{strings.Replace(cleanedNames[latestTagName], ".json", "", -1)}, nil
 }
 
-func Find(cfg config.Config, name string, environment string, tag string) (Metadata, error) {
+func (fileSystemStore) Find(cfg config.Config, name string, environment string, tag string) (Metadata, error) {
 
 	path := releaseMetadataHistoryPath(cfg, name, environment, tag)
 	data, err := os.ReadFile(path)
-
 	if err != nil {
 		return Metadata{}, fmt.Errorf("read release metadata %q: %w", path, err)
 	}

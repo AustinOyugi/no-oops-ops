@@ -1,6 +1,9 @@
 package release
 
-import "time"
+import (
+	"github.com/AustinOyugi/no-oops-ops/internal/config"
+	"time"
+)
 
 type Metadata struct {
 	App           string    `json:"app"`
@@ -13,4 +16,10 @@ type Metadata struct {
 
 type ActiveRelease struct {
 	Tag string `json:"tag"`
+}
+
+type Store interface {
+	Find(cfg config.Config, name string, environment string, tag string) (Metadata, error)
+	Latest(cfg config.Config, name string, environment string) (ActiveRelease, error)
+	SetLatest(cfg config.Config, appName string, metadata ActiveRelease, environment string) error
 }
