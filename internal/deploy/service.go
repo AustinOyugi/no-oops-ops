@@ -112,6 +112,7 @@ func (s *Service) Run(ctx context.Context, environment string, path string, opti
 	runningTasks, err := s.waitForRunningTasks(
 		ctx,
 		swarmServiceName(environment, m.Name),
+		m.Service.Replicas,
 		timeout,
 		interval,
 	)

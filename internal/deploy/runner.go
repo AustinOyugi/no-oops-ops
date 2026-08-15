@@ -3,10 +3,19 @@ package deploy
 import (
 	"context"
 	"fmt"
-	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"strings"
 	"time"
+
+	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 )
+
+type TaskDiagnostic struct {
+	ID           string `json:"id"`
+	Node         string `json:"node"`
+	DesiredState string `json:"desired_state"`
+	CurrentState string `json:"current_state"`
+	Error        string `json:"error"`
+}
 
 func (s *Service) deployStack(ctx context.Context, stackPath string, stackName string) error {
 	_, err := s.runner.Run(
@@ -84,6 +93,7 @@ func (s *Service) runningTaskCount(ctx context.Context, serviceName string) (int
 func (s *Service) waitForRunningTasks(
 	ctx context.Context,
 	serviceName string,
+	desiredTasks int,
 	timeout time.Duration,
 	interval time.Duration,
 ) (int, error) {
@@ -93,6 +103,7 @@ func (s *Service) waitForRunningTasks(
 		ctx,
 		"waiting for service readiness",
 		"service", serviceName,
+		"desired_tasks", desiredTasks,
 		"timeout", timeout.String(),
 		"interval", interval.String(),
 	)
@@ -108,15 +119,17 @@ func (s *Service) waitForRunningTasks(
 			"readiness poll",
 			"service", serviceName,
 			"running_tasks", runningTasks,
+			"desired_tasks", desiredTasks,
 		)
 
-		if runningTasks > 0 {
+		if readinessSatisfied(runningTasks, desiredTasks) {
 
 			s.logger.InfoContext(
 				ctx,
 				"service ready",
 				"service", serviceName,
 				"running_tasks", runningTasks,
+				"desired_tasks", desiredTasks,
 			)
 
 			return runningTasks, nil
@@ -129,23 +142,29 @@ func (s *Service) waitForRunningTasks(
 					ctx,
 					"service readiness timed out",
 					"service", serviceName,
+					"running_tasks", runningTasks,
+					"desired_tasks", desiredTasks,
 					"timeout", timeout.String(),
 				)
-				return 0, fmt.Errorf("service %q did not reach a running state within %s", serviceName, timeout)
+				return 0, fmt.Errorf("service %q reached %d/%d running tasks within %s", serviceName, runningTasks, desiredTasks, timeout)
 			}
 
 			s.logger.ErrorContext(
 				ctx,
 				"service readiness timed out",
 				"service", serviceName,
+				"running_tasks", runningTasks,
+				"desired_tasks", desiredTasks,
 				"timeout", timeout.String(),
 				"diagnostics", diagnostics,
 			)
 			return 0, fmt.Errorf(
-				"service %q did not reach a running state within %s: %s",
+				"service %q reached %d/%d running tasks within %s: %s",
 				serviceName,
+				runningTasks,
+				desiredTasks,
 				timeout,
-				diagnostics,
+				formatTaskDiagnostics(diagnostics),
 			)
 		}
 
@@ -157,7 +176,11 @@ func (s *Service) waitForRunningTasks(
 	}
 }
 
-func (s *Service) taskDiagnostics(ctx context.Context, serviceName string) (string, error) {
+func readinessSatisfied(runningTasks int, desiredTasks int) bool {
+	return runningTasks >= desiredTasks
+}
+
+func (s *Service) taskDiagnostics(ctx context.Context, serviceName string) ([]TaskDiagnostic, error) {
 	result, err := s.runner.Run(
 		ctx,
 		"docker",
@@ -166,22 +189,48 @@ func (s *Service) taskDiagnostics(ctx context.Context, serviceName string) (stri
 			"ps",
 			"--no-trunc",
 			"--format",
-			"{{.CurrentState}}|{{.Error}}",
+			"{{.ID}}|{{.Node}}|{{.DesiredState}}|{{.CurrentState}}|{{.Error}}",
 			serviceName,
 		},
 		command.RunOptions{},
 	)
 	if err != nil {
-		return "", fmt.Errorf("inspect task diagnostics for service %q: %w", serviceName, err)
+		return nil, fmt.Errorf("inspect task diagnostics for service %q: %w", serviceName, err)
 	}
 
-	var lines []string
-	for _, line := range strings.Split(strings.TrimSpace(string(result.Output)), "\n") {
+	return parseTaskDiagnostics(string(result.Output)), nil
+}
+
+func parseTaskDiagnostics(output string) []TaskDiagnostic {
+	var diagnostics []TaskDiagnostic
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
 		if line == "" {
 			continue
 		}
-		lines = append(lines, line)
+
+		fields := strings.SplitN(line, "|", 5)
+		if len(fields) != 5 {
+			diagnostics = append(diagnostics, TaskDiagnostic{CurrentState: line})
+			continue
+		}
+
+		diagnostics = append(diagnostics, TaskDiagnostic{
+			ID:           fields[0],
+			Node:         fields[1],
+			DesiredState: fields[2],
+			CurrentState: fields[3],
+			Error:        fields[4],
+		})
 	}
 
-	return strings.Join(lines, "; "), nil
+	return diagnostics
+}
+
+func formatTaskDiagnostics(diagnostics []TaskDiagnostic) string {
+	parts := make([]string, 0, len(diagnostics))
+	for _, diagnostic := range diagnostics {
+		parts = append(parts, fmt.Sprintf("task=%s node=%s desired=%s current=%s error=%s", diagnostic.ID, diagnostic.Node, diagnostic.DesiredState, diagnostic.CurrentState, diagnostic.Error))
+	}
+
+	return strings.Join(parts, "; ")
 }
