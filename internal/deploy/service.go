@@ -15,18 +15,20 @@ import (
 )
 
 type Service struct {
-	logger   *slog.Logger
-	config   config.Config
-	runner   *command.Runner
-	releases release.Store
+	logger      *slog.Logger
+	config      config.Config
+	runner      *command.Runner
+	releases    release.Store
+	deployments deploymentStore
 }
 
 func NewService(logger *slog.Logger, cfg config.Config) *Service {
 	return &Service{
-		logger:   logger,
-		config:   cfg,
-		runner:   command.NewRunner(logger),
-		releases: release.NewFilesystemStore(),
+		logger:      logger,
+		config:      cfg,
+		runner:      command.NewRunner(logger),
+		releases:    release.NewFilesystemStore(),
+		deployments: newFilesystemDeploymentStore(),
 	}
 }
 
@@ -36,7 +38,7 @@ func (s *Service) Run(ctx context.Context, environment string, path string, opti
 		return Result{}, fmt.Errorf("resolve manifest path %q: %w", path, err)
 	}
 
-	s.logger.InfoContext(ctx, "starting deploy", "manifest", absPath, "environment", environment, "version", optionalReleaseVersion)
+	s.logger.InfoContext(ctx, "starting deploy", "environment", environment, "version", optionalReleaseVersion)
 
 	m, err := manifest.Load(absPath)
 	if err != nil {
@@ -66,7 +68,22 @@ func (s *Service) Run(ctx context.Context, environment string, path string, opti
 		if err != nil {
 			return Result{}, err
 		}
-		releaseTag = currentReleaseMetadata.Tag
+
+		if currentReleaseMetadata.IsAvailable {
+			releaseTag = currentReleaseMetadata.Tag
+		} else {
+			return Result{
+				Environment:  environment,
+				ServiceName:  serviceName(environment, m.Name),
+				Executed:     false,
+				Verified:     false,
+				ManifestPath: absPath,
+				EnvFilePath:  envFilePath,
+				StackName:    stackName(environment, m.Name),
+				EnvPath:      envPath,
+				Manifest:     m,
+			}, nil
+		}
 	}
 
 	releaseMetadata, err := s.releases.Find(s.config, m.Name, environment, releaseTag)
@@ -103,26 +120,58 @@ func (s *Service) Run(ctx context.Context, environment string, path string, opti
 		return Result{}, err
 	}
 
-	err = s.releases.SetLatest(s.config, m.Name, release.ActiveRelease{Tag: releaseTag}, environment)
+	deploymentPath, err := s.deployments.Save(s.config, Deployment{
+		App:          m.Name,
+		CreatedAt:    time.Now().UTC(),
+		Environment:  environment,
+		ReleaseImage: releaseMetadata.RegistryImage,
+		ReleaseTag:   releaseMetadata.Tag,
+	})
+	if err != nil {
+		return Result{}, err
+	}
+
+	err = s.releases.SetLatest(s.config, m.Name, release.ActiveRelease{Tag: releaseTag, IsAvailable: true}, environment)
 	if err != nil {
 		return Result{}, err
 	}
 
 	return Result{
-		Environment:  environment,
-		ServiceName:  serviceName(environment, m.Name),
-		Executed:     true,
-		Verified:     true,
-		RunningTasks: runningTasks,
-		ReleaseImage: releaseMetadata.RegistryImage,
-		ReleaseTag:   releaseMetadata.Tag,
-		ManifestPath: absPath,
-		StackPath:    stackPath,
-		EnvFilePath:  envFilePath,
-		StackName:    stackName(environment, m.Name),
-		EnvPath:      envPath,
-		Manifest:     m,
+		DeploymentPath: deploymentPath,
+		Environment:    environment,
+		ServiceName:    serviceName(environment, m.Name),
+		Executed:       true,
+		Verified:       true,
+		RunningTasks:   runningTasks,
+		ReleaseImage:   releaseMetadata.RegistryImage,
+		ReleaseTag:     releaseMetadata.Tag,
+		ManifestPath:   absPath,
+		StackPath:      stackPath,
+		EnvFilePath:    envFilePath,
+		StackName:      stackName(environment, m.Name),
+		EnvPath:        envPath,
+		Manifest:       m,
 	}, nil
+}
+
+func (s *Service) Rollback(ctx context.Context, environment string, path string) (Result, error) {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return Result{}, fmt.Errorf("resolve manifest path %q: %w", path, err)
+	}
+
+	m, err := manifest.Load(absPath)
+	if err != nil {
+		return Result{}, err
+	}
+
+	previous, err := s.deployments.Previous(s.config, m.Name, environment)
+	if err != nil {
+		return Result{}, err
+	}
+
+	s.logger.InfoContext(ctx, "starting rollback", "manifest", absPath, "environment", environment, "release_tag", previous.ReleaseTag)
+	return s.Run(ctx, environment, absPath, previous.ReleaseTag)
 }
 
 func resolveEnvFilePath(manifestPath string, envFile string) string {

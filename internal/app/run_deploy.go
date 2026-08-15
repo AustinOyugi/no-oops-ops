@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	"github.com/AustinOyugi/no-oops-ops/internal/doctor"
 )
 
 func (a *App) runDeploy(ctx context.Context, args []string) error {
@@ -20,10 +22,31 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 		optionalReleaseVersion = args[2]
 	}
 
+	if err := a.runDeployPreflight(ctx); err != nil {
+		return err
+	}
+
 	result, err := a.deployer.Run(ctx, environment, manifestPath, optionalReleaseVersion)
 	if err != nil {
 		a.logger.ErrorContext(ctx, "deploy failed", "environment", environment, "manifest_path", manifestPath, "reason", err.Error())
 		return err
+	}
+
+	if result.Verified == false && result.Executed == false {
+		_, err := a.releaser.Run(ctx, environment, manifestPath)
+		if err != nil {
+			return err
+		}
+
+		result, err := a.deployer.Run(ctx, environment, manifestPath, optionalReleaseVersion)
+		if err != nil {
+			a.logger.ErrorContext(ctx, "deploy failed", "environment", environment, "manifest_path", manifestPath, "reason", err.Error())
+			return err
+		}
+
+		if result.Verified == false && result.Executed == false {
+			return fmt.Errorf("failed to run deploy")
+		}
 	}
 
 	manifest := result.Manifest
@@ -92,9 +115,47 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 
 	a.logger.InfoContext(
 		ctx,
+		"deploy history",
+		"deployment_path", result.DeploymentPath,
+	)
+
+	a.logger.InfoContext(
+		ctx,
 		"deploy env artifact",
 		"env_path", result.EnvPath,
 	)
+
+	return nil
+}
+
+func (a *App) runDeployPreflight(ctx context.Context) error {
+	result, err := a.doctor.RunProfile(ctx, doctor.ProfileDeployReadiness)
+	if err != nil {
+		return fmt.Errorf("run deploy preflight: %w", err)
+	}
+
+	for _, check := range result.Checks {
+		switch check.Status {
+		case doctor.StatusFail:
+			a.logger.ErrorContext(ctx, "deploy preflight check",
+				"name", check.Name,
+				"status", check.Status,
+				"message", check.Message,
+				"remediation", check.Remediation,
+			)
+		case doctor.StatusSkip:
+			a.logger.WarnContext(ctx, "deploy preflight check",
+				"name", check.Name,
+				"status", check.Status,
+				"message", check.Message,
+				"remediation", check.Remediation,
+			)
+		}
+	}
+
+	if result.Failed() {
+		return fmt.Errorf("deploy preflight failed: %s", result.FirstRemediation())
+	}
 
 	return nil
 }

@@ -29,6 +29,7 @@ The current happy path is:
 go run ./cmd/noops install
 go run ./cmd/noops release prod examples/lango.app.yml
 go run ./cmd/noops deploy prod examples/lango.app.yml
+go run ./cmd/noops rollback prod examples/lango.app.yml
 ```
 
 To deploy a particular previously released version instead of the most recent one:
@@ -134,19 +135,34 @@ For example:
 .noops/apps/lango/prod/stack.yml
 .noops/apps/lango/prod/releases/20260101-120000.json
 .noops/apps/lango/prod/release.json
+.noops/apps/lango/prod/deployments/20260101-120500.json
 ```
 
 `release.json` records the release most recently deployed for that app and environment;
 the versioned files under `releases/` are the release history.
+
+Each successful rollout is also written to `deployments/`. This history is distinct from
+released images: it records what was actually deployed. Roll back the current deployment
+to the immediately preceding successful deployment with:
+
+```bash
+go run ./cmd/noops rollback prod examples/lango.app.yml
+```
+
+The rollback performs the normal deployment checks and is itself recorded, so a later
+rollback can restore the version it replaced. At least two successful deployments are
+required before rollback is available.
 
 ## Commands
 
 ```text
 noops [install]
 noops doctor
+noops doctor --deploy-ready
 noops status
 noops release <environment> <manifest>
 noops deploy <environment> <manifest> [release-tag]
+noops rollback <environment> <manifest>
 ```
 
 Running `noops` without a command runs `install`.
@@ -156,13 +172,13 @@ Running `noops` without a command runs `install`.
 Settings can be supplied in a `.env.noops` file in the repository root or as environment
 variables:
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `NOOPS_STATE_DIR` | `.noops` in this repository | Directory for install and app artifacts |
-| `NOOPS_INSTALL_VERSION` | `dev` | Version written to install metadata |
-| `NOOPS_NETWORK_NAME` | `noops-net` | Shared Docker Swarm network |
-| `NOOPS_REGISTRY_NAME` | `noops-registry` | Internal registry service name |
-| `NOOPS_REGISTRY_PORT` | `5000` | Internal registry port |
+| Variable                | Default                     | Purpose                                 |
+|-------------------------|-----------------------------|-----------------------------------------|
+| `NOOPS_STATE_DIR`       | `.noops` in this repository | Directory for install and app artifacts |
+| `NOOPS_INSTALL_VERSION` | `dev`                       | Version written to install metadata     |
+| `NOOPS_NETWORK_NAME`    | `noops-net`                 | Shared Docker Swarm network             |
+| `NOOPS_REGISTRY_NAME`   | `noops-registry`            | Internal registry service name          |
+| `NOOPS_REGISTRY_PORT`   | `5000`                      | Internal registry port                  |
 
 ## App Manifest
 
@@ -276,7 +292,7 @@ curl http://127.0.0.1:5000/v2/
 ## Current Limitations
 
 - Router and TLS are not implemented yet.
-- There is no dedicated release-list or rollback command yet; deploy a known release tag to return to an earlier version.
+- There is no dedicated release-list command yet.
 - The internal registry currently uses an insecure local HTTP registry.
 - App readiness currently checks Swarm running tasks, not router-level HTTP availability.
 
@@ -284,11 +300,12 @@ curl http://127.0.0.1:5000/v2/
 
 The next major areas are:
 
-- release-list and rollback commands
+- release-list command
 - registry cleanup and GC policy
 - router/exposure
 - richer deploy status and app lifecycle commands
 
 ## License
 
-This project is licensed under the terms in [`LICENSE`](/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/LICENSE).
+This project is licensed under the terms in [
+`LICENSE`](/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/LICENSE).

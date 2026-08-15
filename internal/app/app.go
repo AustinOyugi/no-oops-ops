@@ -19,10 +19,19 @@ type App struct {
 	logger    *slog.Logger
 	config    config.Config
 	installer *install.Installer
-	deployer  *deploy.Service
+	deployer  deployer
 	releaser  *release.Service
-	doctor    *doctor.Service
+	doctor    doctorRunner
 	status    *status.Service
+}
+
+type deployer interface {
+	Run(ctx context.Context, environment string, path string, optionalReleaseVersion string) (deploy.Result, error)
+	Rollback(ctx context.Context, environment string, path string) (deploy.Result, error)
+}
+
+type doctorRunner interface {
+	RunProfile(ctx context.Context, profile doctor.Profile) (doctor.Result, error)
 }
 
 func New(cfg config.Config) (*App, error) {
@@ -52,7 +61,7 @@ func New(cfg config.Config) (*App, error) {
 
 func (a *App) Run(ctx context.Context, args []string) error {
 	if len(args) > 0 && args[0] == "doctor" {
-		return a.runDoctor(ctx)
+		return a.runDoctor(ctx, args[1:])
 	}
 
 	if len(args) > 0 && args[0] == "status" {
@@ -65,6 +74,10 @@ func (a *App) Run(ctx context.Context, args []string) error {
 
 	if len(args) > 0 && args[0] == "deploy" {
 		return a.runDeploy(ctx, args[1:])
+	}
+
+	if len(args) > 0 && args[0] == "rollback" {
+		return a.runRollback(ctx, args[1:])
 	}
 
 	if len(args) > 0 && args[0] == "release" {
