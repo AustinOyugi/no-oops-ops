@@ -3,11 +3,15 @@ package command
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"os/exec"
+	"strings"
 	"time"
 )
+
+const maxLoggedOutput = 4096
 
 type Runner struct {
 	logger *slog.Logger
@@ -68,16 +72,43 @@ func (r *Runner) Run(ctx context.Context, name string, args []string, opts RunOp
 	err := cmd.Run()
 
 	if opts.LogCommand {
-		r.logger.InfoContext(
-			ctx,
-			"command finished",
-			"command", name,
-			"args", args,
-			"duration", time.Since(start).String(),
-		)
+		duration := time.Since(start).String()
+		if err != nil {
+			attrs := []any{
+				"command", name,
+				"args", args,
+				"duration", duration,
+				"error", err.Error(),
+				"output", logOutput(output.String()),
+			}
+
+			var exitError *exec.ExitError
+			if errors.As(err, &exitError) {
+				attrs = append(attrs, "exit_code", exitError.ExitCode())
+			}
+
+			r.logger.ErrorContext(ctx, "command failed", attrs...)
+		} else {
+			r.logger.InfoContext(
+				ctx,
+				"command completed",
+				"command", name,
+				"args", args,
+				"duration", duration,
+			)
+		}
 	}
 
 	return Result{
 		Output: output.Bytes(),
 	}, err
+}
+
+func logOutput(output string) string {
+	output = strings.TrimSpace(output)
+	if len(output) <= maxLoggedOutput {
+		return output
+	}
+
+	return output[:maxLoggedOutput] + "… (truncated)"
 }
