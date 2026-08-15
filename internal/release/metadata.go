@@ -15,7 +15,8 @@ type Metadata struct {
 }
 
 type ActiveRelease struct {
-	Tag string `json:"tag"`
+	Tag         string `json:"tag"`
+	IsAvailable bool   `json:"is_available"`
 }
 
 type Store interface {

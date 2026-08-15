@@ -62,9 +62,13 @@ func (fileSystemStore) SetLatest(cfg config.Config, appName string, metadata Act
 func (fileSystemStore) Latest(cfg config.Config, name string, environment string) (ActiveRelease, error) {
 	releasesPath := releaseHistoryDir(cfg, name, environment)
 
+	if err := os.MkdirAll(releasesPath, 0o700); err != nil {
+		return ActiveRelease{}, fmt.Errorf("create release dir %q: %w", releasesPath, err)
+	}
+
 	files, err := os.ReadDir(releasesPath)
 	if err != nil {
-		return ActiveRelease{}, fmt.Errorf("read release history dir %q: %w", releasesPath, err)
+		return ActiveRelease{"", false}, nil
 	}
 
 	cleanedNames := make(map[string]string)
@@ -79,7 +83,7 @@ func (fileSystemStore) Latest(cfg config.Config, name string, environment string
 	}
 
 	if len(cleanedNames) == 0 {
-		return ActiveRelease{}, fmt.Errorf("no releases found %q: %w", releasesPath, err)
+		return ActiveRelease{"", false}, nil
 	}
 
 	keys := make([]string, 0, len(cleanedNames))
@@ -94,7 +98,8 @@ func (fileSystemStore) Latest(cfg config.Config, name string, environment string
 
 	latestTagName := keys[0]
 
-	return ActiveRelease{strings.Replace(cleanedNames[latestTagName], ".json", "", -1)}, nil
+	return ActiveRelease{
+		strings.Replace(cleanedNames[latestTagName], ".json", "", -1), true}, nil
 }
 
 func (fileSystemStore) Find(cfg config.Config, name string, environment string, tag string) (Metadata, error) {
