@@ -36,13 +36,6 @@ func (s *Service) checks(profile Profile) ([]checkDefinition, error) {
 			remediation: "Run noops install on a Swarm manager",
 			run:         s.checkRegistryService,
 		},
-		{
-			name:        "registry_reachable",
-			requires:    []string{"registry_service"},
-			skipMessage: "requires the registry service",
-			remediation: "Run noops install to deploy the registry",
-			run:         s.checkRegistryReachability,
-		},
 	}
 
 	if profile == ProfileDeployReadiness {

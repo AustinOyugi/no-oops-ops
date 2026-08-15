@@ -13,7 +13,6 @@ type Host interface {
 	InspectSwarmManager(ctx context.Context) error
 	InspectSharedNetwork(ctx context.Context) error
 	InspectRegistryService(ctx context.Context) error
-	InspectRegistryReachability(ctx context.Context) error
 }
 
 type Service struct {

@@ -93,23 +93,6 @@ func (s *Service) checkRegistryService(ctx context.Context) Check {
 		Message: fmt.Sprintf("service %s exists", s.config.RegistryName+"_registry")}
 }
 
-func (s *Service) checkRegistryReachability(ctx context.Context) Check {
-	if err := s.host.InspectRegistryReachability(ctx); err != nil {
-		return Check{
-			Name:        "registry_reachable",
-			Status:      StatusFail,
-			Message:     "registry API is unreachable",
-			Remediation: "Run noops install to redeploy the registry",
-		}
-	}
-
-	return Check{
-		Name:    "registry_reachable",
-		Status:  StatusOK,
-		Message: "registry API is reachable",
-	}
-}
-
 func (s *Service) checkInstallMetadata(context.Context) Check {
 	return s.checkFile(
 		"install_metadata",
