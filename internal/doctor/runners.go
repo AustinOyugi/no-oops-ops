@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 func (s *Service) checkDocker(ctx context.Context) Check {
@@ -73,6 +74,30 @@ func (s *Service) checkRegistryService(ctx context.Context) Check {
 		Name:    "registry_service",
 		Status:  StatusOK,
 		Message: fmt.Sprintf("service %s exists", s.config.RegistryName+"_registry")}
+}
+
+func (s *Service) checkInstallMetadata(context.Context) Check {
+	return s.checkFile(
+		"install_metadata",
+		filepath.Join(s.config.StateDir, "install.json"),
+		"Run noops install to create installation metadata",
+	)
+}
+
+func (s *Service) checkRegistryConfig(context.Context) Check {
+	return s.checkFile(
+		"registry_config",
+		filepath.Join(s.config.StateDir, "registry", "config.yml"),
+		"Run noops install to recreate the registry configuration",
+	)
+}
+
+func (s *Service) checkRegistryStack(context.Context) Check {
+	return s.checkFile(
+		"registry_stack",
+		filepath.Join(s.config.StateDir, "registry", "stack.yml"),
+		"Run noops install to recreate the registry stack",
+	)
 }
 
 func (s *Service) checkFile(name string, path string, remediation string) Check {

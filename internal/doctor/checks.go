@@ -1,10 +1,5 @@
 package doctor
 
-import (
-	"context"
-	"path/filepath"
-)
-
 func (s *Service) checks() []checkDefinition {
 	return []checkDefinition{
 		{
@@ -34,34 +29,21 @@ func (s *Service) checks() []checkDefinition {
 		},
 		{
 			name: "install_metadata",
-			run: func(context.Context) Check {
-				return s.checkFile(
-					"install_metadata",
-					filepath.Join(s.config.StateDir, "install.json"),
-					"Run noops install to create installation metadata")
-			}},
+			run:  s.checkInstallMetadata,
+		},
 		{
 			name:        "registry_config",
 			requires:    []string{"install_metadata"},
 			skipMessage: "installation artifacts are absent",
-			remediation: "Run noops install", run: func(context.Context) Check {
-				return s.checkFile(
-					"registry_config",
-					filepath.Join(s.config.StateDir, "registry", "config.yml"),
-					"Run noops install to recreate the registry configuration")
-			},
+			remediation: "Run noops install",
+			run:         s.checkRegistryConfig,
 		},
 		{
 			name:        "registry_stack",
 			requires:    []string{"install_metadata"},
 			skipMessage: "installation artifacts are absent",
 			remediation: "Run noops install",
-			run: func(context.Context) Check {
-				return s.checkFile(
-					"registry_stack",
-					filepath.Join(s.config.StateDir, "registry", "stack.yml"),
-					"Run noops install to recreate the registry stack")
-			},
+			run:         s.checkRegistryStack,
 		},
 	}
 }
