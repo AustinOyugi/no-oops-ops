@@ -14,8 +14,10 @@ type fakeHost struct {
 	dockerErr          error
 	swarmState         string
 	swarmErr           error
+	swarmManagerErr    error
 	sharedNetworkCalls int
 	registryCalls      int
+	registryReachCalls int
 }
 
 func (h *fakeHost) VerifyDocker(context.Context) error {
@@ -26,6 +28,10 @@ func (h *fakeHost) InspectSwarmState(context.Context) (string, error) {
 	return h.swarmState, h.swarmErr
 }
 
+func (h *fakeHost) InspectSwarmManager(context.Context) error {
+	return h.swarmManagerErr
+}
+
 func (h *fakeHost) InspectSharedNetwork(context.Context) error {
 	h.sharedNetworkCalls++
 	return nil
@@ -33,6 +39,11 @@ func (h *fakeHost) InspectSharedNetwork(context.Context) error {
 
 func (h *fakeHost) InspectRegistryService(context.Context) error {
 	h.registryCalls++
+	return nil
+}
+
+func (h *fakeHost) InspectRegistryReachability(context.Context) error {
+	h.registryReachCalls++
 	return nil
 }
 
@@ -61,7 +72,7 @@ func TestRunInactiveSwarmSkipsSwarmDependentChecks(t *testing.T) {
 	if got := checks["swarm"].Status; got != StatusFail {
 		t.Errorf("swarm status = %q, want %q", got, StatusFail)
 	}
-	for _, name := range []string{"shared_network", "registry_service", "registry_config", "registry_stack"} {
+	for _, name := range []string{"swarm_manager", "shared_network", "registry_service", "registry_reachable", "registry_config", "registry_stack"} {
 		if got := checks[name].Status; got != StatusSkip {
 			t.Errorf("%s status = %q, want %q", name, got, StatusSkip)
 		}
@@ -89,7 +100,53 @@ func TestRunDockerUnavailableSkipsDockerDependentChecks(t *testing.T) {
 	if result.Count(StatusFail) != 2 {
 		t.Errorf("failed checks = %d, want 2", result.Count(StatusFail))
 	}
-	if result.Count(StatusSkip) != 5 {
-		t.Errorf("skipped checks = %d, want 5", result.Count(StatusSkip))
+	if result.Count(StatusSkip) != 7 {
+		t.Errorf("skipped checks = %d, want 7", result.Count(StatusSkip))
+	}
+}
+
+func TestRunNonManagerSkipsManagerDependentChecks(t *testing.T) {
+	host := &fakeHost{swarmState: "active", swarmManagerErr: errors.New("not a manager")}
+	service := NewService(slog.New(slog.NewTextHandler(io.Discard, nil)), config.Config{StateDir: t.TempDir()}, host)
+
+	result, err := service.Run(context.Background())
+	if err != nil {
+		t.Fatalf("run doctor: %v", err)
+	}
+
+	if host.sharedNetworkCalls != 0 || host.registryCalls != 0 || host.registryReachCalls != 0 {
+		t.Fatalf("manager-dependent checks were run: network=%d registry=%d reachability=%d", host.sharedNetworkCalls, host.registryCalls, host.registryReachCalls)
+	}
+
+	checks := map[string]Check{}
+	for _, check := range result.Checks {
+		checks[check.Name] = check
+	}
+	if got := checks["swarm_manager"].Status; got != StatusFail {
+		t.Errorf("swarm_manager status = %q, want %q", got, StatusFail)
+	}
+	for _, name := range []string{"shared_network", "registry_service", "registry_reachable"} {
+		if got := checks[name].Status; got != StatusSkip {
+			t.Errorf("%s status = %q, want %q", name, got, StatusSkip)
+		}
+	}
+}
+
+func TestRunDeployReadinessExcludesInstallationArtifactChecks(t *testing.T) {
+	host := &fakeHost{swarmState: "active"}
+	service := NewService(slog.New(slog.NewTextHandler(io.Discard, nil)), config.Config{StateDir: t.TempDir()}, host)
+
+	result, err := service.RunProfile(context.Background(), ProfileDeployReadiness)
+	if err != nil {
+		t.Fatalf("run deploy-readiness doctor: %v", err)
+	}
+
+	if len(result.Checks) != 6 {
+		t.Fatalf("checks = %d, want 6", len(result.Checks))
+	}
+	for _, check := range result.Checks {
+		if check.Status != StatusOK {
+			t.Errorf("%s status = %q, want %q", check.Name, check.Status, StatusOK)
+		}
 	}
 }

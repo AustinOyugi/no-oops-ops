@@ -10,8 +10,10 @@ import (
 type Host interface {
 	VerifyDocker(ctx context.Context) error
 	InspectSwarmState(ctx context.Context) (string, error)
+	InspectSwarmManager(ctx context.Context) error
 	InspectSharedNetwork(ctx context.Context) error
 	InspectRegistryService(ctx context.Context) error
+	InspectRegistryReachability(ctx context.Context) error
 }
 
 type Service struct {
@@ -19,6 +21,13 @@ type Service struct {
 	config config.Config
 	host   Host
 }
+
+type Profile string
+
+const (
+	ProfileFull            Profile = "full"
+	ProfileDeployReadiness Profile = "deploy-readiness"
+)
 
 func NewService(logger *slog.Logger, cfg config.Config, host Host) *Service {
 	return &Service{
@@ -29,12 +38,21 @@ func NewService(logger *slog.Logger, cfg config.Config, host Host) *Service {
 }
 
 func (s *Service) Run(ctx context.Context) (Result, error) {
-	s.logger.InfoContext(ctx, "starting doctor")
+	return s.RunProfile(ctx, ProfileFull)
+}
+
+func (s *Service) RunProfile(ctx context.Context, profile Profile) (Result, error) {
+	s.logger.InfoContext(ctx, "starting doctor", "profile", profile)
+
+	definitions, err := s.checks(profile)
+	if err != nil {
+		return Result{}, err
+	}
 
 	result := Result{}
 	statuses := make(map[string]Status)
 
-	for _, definition := range s.checks() {
+	for _, definition := range definitions {
 		skipped := false
 		for _, prerequisite := range definition.requires {
 			status, ok := statuses[prerequisite]

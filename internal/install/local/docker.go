@@ -37,6 +37,23 @@ func (h *Host) InspectSwarmState(ctx context.Context) (string, error) {
 	return strings.TrimSpace(string(result.Output)), nil
 }
 
+func (h *Host) InspectSwarmManager(ctx context.Context) error {
+	result, err := h.runner.Run(
+		ctx,
+		"docker",
+		[]string{"info", "--format", "{{.Swarm.ControlAvailable}}"},
+		command.RunOptions{},
+	)
+	if err != nil {
+		return fmt.Errorf("inspect swarm manager role: %w: %s", err, strings.TrimSpace(string(result.Output)))
+	}
+	if strings.TrimSpace(string(result.Output)) != "true" {
+		return fmt.Errorf("this node is not a swarm manager")
+	}
+
+	return nil
+}
+
 func (h *Host) VerifyDocker(ctx context.Context) error {
 	h.logger.InfoContext(ctx, "checking docker installation")
 

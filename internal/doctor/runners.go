@@ -46,6 +46,23 @@ func (s *Service) checkSwarm(ctx context.Context) Check {
 		Message: "swarm is active"}
 }
 
+func (s *Service) checkSwarmManager(ctx context.Context) Check {
+	if err := s.host.InspectSwarmManager(ctx); err != nil {
+		return Check{
+			Name:        "swarm_manager",
+			Status:      StatusFail,
+			Message:     "this node is not a Docker Swarm manager",
+			Remediation: "Run noops install on a Swarm manager",
+		}
+	}
+
+	return Check{
+		Name:    "swarm_manager",
+		Status:  StatusOK,
+		Message: "this node is a Docker Swarm manager",
+	}
+}
+
 func (s *Service) checkSharedNetwork(ctx context.Context) Check {
 	if err := s.host.InspectSharedNetwork(ctx); err != nil {
 		return Check{
@@ -74,6 +91,23 @@ func (s *Service) checkRegistryService(ctx context.Context) Check {
 		Name:    "registry_service",
 		Status:  StatusOK,
 		Message: fmt.Sprintf("service %s exists", s.config.RegistryName+"_registry")}
+}
+
+func (s *Service) checkRegistryReachability(ctx context.Context) Check {
+	if err := s.host.InspectRegistryReachability(ctx); err != nil {
+		return Check{
+			Name:        "registry_reachable",
+			Status:      StatusFail,
+			Message:     "registry API is unreachable",
+			Remediation: "Run noops install to redeploy the registry",
+		}
+	}
+
+	return Check{
+		Name:    "registry_reachable",
+		Status:  StatusOK,
+		Message: "registry API is reachable",
+	}
 }
 
 func (s *Service) checkInstallMetadata(context.Context) Check {
