@@ -1,0 +1,101 @@
+package doctor
+
+import (
+	"context"
+	"fmt"
+	"os"
+)
+
+func (s *Service) checkDocker(ctx context.Context) Check {
+	if err := s.host.VerifyDocker(ctx); err != nil {
+		return Check{
+			Name:        "docker",
+			Status:      StatusFail,
+			Message:     "docker is unavailable",
+			Remediation: "Start Docker and run noops doctor again"}
+	}
+
+	return Check{
+		Name:    "docker",
+		Status:  StatusOK,
+		Message: "docker is available"}
+}
+
+func (s *Service) checkSwarm(ctx context.Context) Check {
+	state, err := s.host.InspectSwarmState(ctx)
+	if err != nil {
+		return Check{
+			Name:        "swarm",
+			Status:      StatusFail,
+			Message:     "could not determine Docker Swarm state",
+			Remediation: "Run docker swarm init, then run noops install"}
+	}
+
+	if state != "active" {
+		return Check{
+			Name:        "swarm",
+			Status:      StatusFail,
+			Message:     fmt.Sprintf("Docker Swarm is %s", state),
+			Remediation: "Run noops install to initialize Docker Swarm"}
+	}
+
+	return Check{
+		Name:    "swarm",
+		Status:  StatusOK,
+		Message: "swarm is active"}
+}
+
+func (s *Service) checkSharedNetwork(ctx context.Context) Check {
+	if err := s.host.InspectSharedNetwork(ctx); err != nil {
+		return Check{
+			Name:        "shared_network",
+			Status:      StatusFail,
+			Message:     fmt.Sprintf("network %s is missing", s.config.NetworkName),
+			Remediation: "Run noops install to create the shared network"}
+	}
+
+	return Check{
+		Name:    "shared_network",
+		Status:  StatusOK,
+		Message: fmt.Sprintf("network %s exists", s.config.NetworkName)}
+}
+
+func (s *Service) checkRegistryService(ctx context.Context) Check {
+	if err := s.host.InspectRegistryService(ctx); err != nil {
+		return Check{
+			Name:        "registry_service",
+			Status:      StatusFail,
+			Message:     fmt.Sprintf("service %s is missing", s.config.RegistryName+"_registry"),
+			Remediation: "Run noops install to deploy the registry"}
+	}
+
+	return Check{
+		Name:    "registry_service",
+		Status:  StatusOK,
+		Message: fmt.Sprintf("service %s exists", s.config.RegistryName+"_registry")}
+}
+
+func (s *Service) checkFile(name string, path string, remediation string) Check {
+	_, err := os.Stat(path)
+
+	if err != nil {
+		if os.IsNotExist(err) {
+			return Check{
+				Name:        name,
+				Status:      StatusFail,
+				Message:     fmt.Sprintf("%s is missing", path),
+				Remediation: remediation}
+		} else {
+			return Check{
+				Name:        name,
+				Status:      StatusFail,
+				Message:     fmt.Sprintf("cannot read %s", path),
+				Remediation: remediation}
+		}
+	}
+
+	return Check{
+		Name:    name,
+		Status:  StatusOK,
+		Message: fmt.Sprintf("%s exists", path)}
+}

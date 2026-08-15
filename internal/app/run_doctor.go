@@ -16,14 +16,21 @@ func (a *App) runDoctor(ctx context.Context) error {
 
 	for _, check := range result.Checks {
 		if check.Status == doctor.StatusFail {
-			a.logger.ErrorContext(ctx, "doctor check", "name", check.Name, "status", check.Status, "message", check.Message)
+			a.logger.ErrorContext(ctx, "doctor check", "name", check.Name, "status", check.Status, "message", check.Message, "remediation", check.Remediation)
 			continue
 		}
 
-		a.logger.InfoContext(ctx, "doctor check", "name", check.Name, "status", check.Status, "message", check.Message)
+		a.logger.InfoContext(ctx, "doctor check", "name", check.Name, "status", check.Status, "message", check.Message, "remediation", check.Remediation)
 	}
 
+	a.logger.InfoContext(ctx, "doctor summary",
+		"passed", result.Count(doctor.StatusOK),
+		"failed", result.Count(doctor.StatusFail),
+		"skipped", result.Count(doctor.StatusSkip),
+	)
+
 	if result.Failed() {
+		a.logger.ErrorContext(ctx, "doctor remediation", "next_step", result.FirstRemediation())
 		return errors.New("doctor failed")
 	}
 
