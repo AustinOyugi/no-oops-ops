@@ -29,7 +29,6 @@ The current happy path is:
 go run ./cmd/noops install
 go run ./cmd/noops release prod examples/lango.app.yml
 go run ./cmd/noops deploy prod examples/lango.app.yml
-go run ./cmd/noops rollback prod examples/lango.app.yml
 ```
 
 To deploy a particular previously released version instead of the most recent one:
@@ -42,6 +41,7 @@ You can also inspect the platform:
 
 ```bash
 go run ./cmd/noops doctor
+go run ./cmd/noops doctor --deploy-ready
 go run ./cmd/noops status
 ```
 
@@ -78,9 +78,7 @@ Release currently does:
 
 - loads the app manifest
 - runs the optional pre-build command from `source.build.command`
-- builds the Docker image
-- tags it with a generated timestamp tag
-- tags it for the internal registry
+- builds the Docker image directly with the internal registry name and a generated timestamp tag
 - pushes it to the internal registry
 - writes versioned release metadata
 
@@ -93,6 +91,12 @@ Example generated metadata:
 Each release is tagged with a UTC timestamp in the format `YYYYMMDD-HHMMSS`. Deploy
 reads this metadata later, so the manifest does not need to be manually updated with a
 new image tag on every release.
+
+For example, a release of `lango-service` is built and pushed as:
+
+```text
+127.0.0.1:5000/lango-service:20260101-120000
+```
 
 ## Deploy
 
@@ -110,6 +114,7 @@ go run ./cmd/noops deploy prod examples/lango.app.yml 20260101-120000
 
 Deploy currently does:
 
+- runs the deploy-readiness preflight checks
 - loads the app manifest
 - loads the referenced env YAML file
 - resolves environment-specific env values
@@ -149,9 +154,20 @@ to the immediately preceding successful deployment with:
 go run ./cmd/noops rollback prod examples/lango.app.yml
 ```
 
-The rollback performs the normal deployment checks and is itself recorded, so a later
+Rollback redeploys the previous recorded release and is itself recorded, so a later
 rollback can restore the version it replaced. At least two successful deployments are
-required before rollback is available.
+required before rollback is available. Unlike `deploy`, rollback does not currently run
+the deploy-readiness preflight automatically.
+
+## Doctor
+
+`doctor` reports whether the local platform is healthy. It has two profiles:
+
+- `noops doctor` runs the full diagnostic profile, including installation artifacts.
+- `noops doctor --deploy-ready` runs only the runtime prerequisites required before a deployment: Docker, Swarm, manager authority, the shared network, and the registry service.
+
+`deploy` runs the deploy-readiness profile automatically and stops before applying a
+stack when it finds a blocking failure.
 
 ## Commands
 
@@ -267,7 +283,7 @@ Resolution rules:
 
 ## Docker Registry
 
-The internal registry is currently exposed at:
+The Docker registry endpoint used for builds and pushes is configured as:
 
 ```text
 127.0.0.1:5000
@@ -283,11 +299,9 @@ For Docker Desktop, configure it as an insecure registry because the current reg
 
 Then restart Docker Desktop.
 
-You can verify the registry with:
-
-```bash
-curl http://127.0.0.1:5000/v2/
-```
+On Docker Desktop, a host process can occupy port `5000` even while the Swarm registry
+service is healthy inside Docker's network. Use `noops doctor` to inspect the registry
+service rather than treating a host-level `curl` request as a definitive health check.
 
 ## Current Limitations
 
@@ -307,5 +321,4 @@ The next major areas are:
 
 ## License
 
-This project is licensed under the terms in [
-`LICENSE`](/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/LICENSE).
+This project is licensed under the terms in [`LICENSE`](LICENSE).
