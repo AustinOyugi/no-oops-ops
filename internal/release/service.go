@@ -43,6 +43,7 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 
 	tag := releaseTag()
 	image := fmt.Sprintf("%s:%s", m.Image.Repository, tag)
+	registryImage := registryImage(s.config, image)
 
 	baseDir := filepath.Dir(absPath)
 	contextDir := resolveSourcePath(baseDir, m.Source.Context)
@@ -52,13 +53,7 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 		return Result{}, err
 	}
 
-	if err := s.buildImage(ctx, image, dockerfile, contextDir); err != nil {
-		return Result{}, err
-	}
-
-	registryImage := registryImage(s.config, image)
-
-	if err := s.tagImage(ctx, image, registryImage); err != nil {
+	if err := s.buildImage(ctx, registryImage, dockerfile, contextDir); err != nil {
 		return Result{}, err
 	}
 
