@@ -34,3 +34,5 @@ go.work.sum
 /docs/
 /.idea/
 /.noops/
+# Added by goreleaser init:
+dist/
