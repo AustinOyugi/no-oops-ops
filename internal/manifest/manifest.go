@@ -10,7 +10,6 @@ type Manifest struct {
 	Expose      Expose      `yaml:"expose"`
 	Env         Env         `yaml:"env"`
 	DependsOn   []string    `yaml:"depends_on"`
-	Secrets     []string    `yaml:"secrets"`
 	Volumes     []string    `yaml:"volumes"`
 }
 

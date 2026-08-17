@@ -16,9 +16,10 @@ type EnvSection struct {
 }
 
 type EnvItem struct {
-	Key    string            `yaml:"key"`
-	Value  string            `yaml:"value"`
-	Values map[string]string `yaml:"values"`
+	Key        string            `yaml:"key"`
+	Value      string            `yaml:"value"`
+	Values     map[string]string `yaml:"values"`
+	FromSecret string            `yaml:"from_secret"`
 }
 
 func LoadEnvFile(path string) (EnvFile, error) {

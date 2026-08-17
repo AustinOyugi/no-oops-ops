@@ -35,6 +35,7 @@ func main() {
 	}
 
 	if err := application.Run(ctx, os.Args[1:]); err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }

@@ -21,28 +21,49 @@ The goal is to keep simple deployments repeatable without building a full DevOps
 Run commands from the repository root. By default, No Oops Ops stores its state in
 `.noops/`; set `NOOPS_STATE_DIR` to use another location.
 
+## Install the CLI
+
+Build a repository-local command:
+
+```bash
+make build
+./.bin/noops status
+```
+
+Or install it with one command, then use `noops` from any directory:
+
+```bash
+make install
+noops status
+```
+
+This installs into Go's standard binary directory (for example,
+`/Users/odu/go/bin`) without requiring the user to specify it. After pulling or
+changing the code, rerun `make install` to update the command.
+
 ## Current Workflow
 
 The current happy path is:
 
 ```bash
-go run ./cmd/noops install
-go run ./cmd/noops release prod examples/lango.app.yml
-go run ./cmd/noops deploy prod examples/lango.app.yml
+noops install
+noops secret set prod AUTH_SERVER_API_CLIENT_SECRET
+noops release prod examples/lango.app.yml
+noops deploy prod examples/lango.app.yml
 ```
 
 To deploy a particular previously released version instead of the most recent one:
 
 ```bash
-go run ./cmd/noops deploy prod examples/lango.app.yml 20260101-120000
+noops deploy prod examples/lango.app.yml 20260101-120000
 ```
 
 You can also inspect the platform:
 
 ```bash
-go run ./cmd/noops doctor
-go run ./cmd/noops doctor --deploy-ready
-go run ./cmd/noops status
+noops doctor
+noops doctor --deploy-ready
+noops status
 ```
 
 ## Install
@@ -59,7 +80,7 @@ Install prepares the local platform pieces:
 Run:
 
 ```bash
-go run ./cmd/noops install
+noops install
 ```
 
 The install state is written under `.noops/`.
@@ -71,7 +92,7 @@ Release builds and publishes an immutable image for an app/environment.
 Run:
 
 ```bash
-go run ./cmd/noops release prod examples/lango.app.yml
+noops release prod examples/lango.app.yml
 ```
 
 Release currently does:
@@ -106,10 +127,10 @@ release tag as the optional third argument to deploy a specific version.
 Run:
 
 ```bash
-go run ./cmd/noops deploy prod examples/lango.app.yml
+noops deploy prod examples/lango.app.yml
 
 # deploy a specific release
-go run ./cmd/noops deploy prod examples/lango.app.yml 20260101-120000
+noops deploy prod examples/lango.app.yml 20260101-120000
 ```
 
 Deploy currently does:
@@ -124,7 +145,7 @@ Deploy currently does:
 - renders the stack with the released registry image
 - runs `docker stack deploy`
 - verifies the Swarm service exists
-- waits for running tasks
+- waits for running tasks and Docker health checks to pass
 - prints task diagnostics on readiness timeout
 
 Generated app artifacts are written under:
@@ -151,7 +172,7 @@ released images: it records what was actually deployed. Roll back the current de
 to the immediately preceding successful deployment with:
 
 ```bash
-go run ./cmd/noops rollback prod examples/lango.app.yml
+noops rollback prod examples/lango.app.yml
 ```
 
 Rollback redeploys the previous recorded release and is itself recorded, so a later
@@ -179,9 +200,35 @@ noops status
 noops release <environment> <manifest>
 noops deploy <environment> <manifest> [release-tag]
 noops rollback <environment> <manifest>
+noops secret set <environment> <key>
+noops secret list <environment>
 ```
 
 Running `noops` without a command runs `install`.
+
+## Secrets
+
+Secrets are environment-scoped Docker Swarm secrets. `secret set` uses a hidden
+terminal prompt or accepts a piped standard-input value, sends it directly to
+Docker, and never stores it in `.noops`.
+
+```bash
+printf '%s' "$DATABASE_URL" | noops secret set prod DATABASE_URL
+# Or enter the value at a hidden prompt:
+noops secret set prod DATABASE_URL
+noops secret list prod
+```
+
+Each update creates an immutable, versioned Swarm secret (for example,
+`noops_prod_DATABASE_URL_v2`). `secret list` displays metadata only; there is no
+command to retrieve a stored secret value. This first slice manages the shared
+secret registry only; manifest references and service mounting are the next step.
+Reference a shared secret from an app environment file with `from_secret`:
+
+```yaml
+- key: AUTH_SERVER_API_CLIENT_SECRET
+  from_secret: AUTH_SERVER_API_CLIENT_SECRET
+```
 
 ## Configuration
 
@@ -308,7 +355,7 @@ service rather than treating a host-level `curl` request as a definitive health 
 - Router and TLS are not implemented yet.
 - There is no dedicated release-list command yet.
 - The internal registry currently uses an insecure local HTTP registry.
-- App readiness currently checks Swarm running tasks, not router-level HTTP availability.
+- App readiness checks Docker container health, not router-level HTTP availability.
 
 ## Direction
 

@@ -97,7 +97,6 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 		ctx,
 		"deploy inputs",
 		"depends_on", manifest.DependsOn,
-		"secrets", manifest.Secrets,
 		"volumes", manifest.Volumes,
 	)
 

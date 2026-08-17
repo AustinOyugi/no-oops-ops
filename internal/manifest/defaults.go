@@ -98,10 +98,6 @@ func (m *Manifest) applyDefaults() {
 		m.DependsOn = []string{}
 	}
 
-	if m.Secrets == nil {
-		m.Secrets = []string{}
-	}
-
 	if m.Volumes == nil {
 		m.Volumes = []string{}
 	}
