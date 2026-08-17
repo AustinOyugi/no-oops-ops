@@ -114,25 +114,40 @@ func (s *Service) waitForRunningTasks(
 			return 0, err
 		}
 
-		s.logger.InfoContext(
-			ctx,
-			"readiness poll",
-			"service", serviceName,
-			"running_tasks", runningTasks,
-			"desired_tasks", desiredTasks,
-		)
-
 		if readinessSatisfied(runningTasks, desiredTasks) {
+			healthStatuses, err := s.containerHealthStatuses(ctx, serviceName)
+			if err != nil {
+				return 0, err
+			}
 
 			s.logger.InfoContext(
 				ctx,
-				"service ready",
+				"readiness poll",
+				"service", serviceName,
+				"running_tasks", runningTasks,
+				"desired_tasks", desiredTasks,
+				"health_statuses", healthStatuses,
+			)
+
+			if healthChecksSatisfied(healthStatuses, desiredTasks) {
+				s.logger.InfoContext(
+					ctx,
+					"service ready",
+					"service", serviceName,
+					"running_tasks", runningTasks,
+					"desired_tasks", desiredTasks,
+					"health_statuses", healthStatuses,
+				)
+				return runningTasks, nil
+			}
+		} else {
+			s.logger.InfoContext(
+				ctx,
+				"readiness poll",
 				"service", serviceName,
 				"running_tasks", runningTasks,
 				"desired_tasks", desiredTasks,
 			)
-
-			return runningTasks, nil
 		}
 
 		if time.Now().After(deadline) {
@@ -174,6 +189,59 @@ func (s *Service) waitForRunningTasks(
 		case <-time.After(interval):
 		}
 	}
+}
+
+func (s *Service) containerHealthStatuses(ctx context.Context, serviceName string) ([]string, error) {
+	containers, err := s.runner.Run(
+		ctx,
+		"docker",
+		[]string{
+			"ps",
+			"--filter", "label=com.docker.swarm.service.name=" + serviceName,
+			"--format", "{{.ID}}",
+		},
+		command.RunOptions{},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("find containers for service %q: %w", serviceName, err)
+	}
+
+	containerIDs := outputLines(string(containers.Output))
+	if len(containerIDs) == 0 {
+		return []string{}, nil
+	}
+
+	args := append([]string{"inspect", "--format", "{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}"}, containerIDs...)
+	health, err := s.runner.Run(ctx, "docker", args, command.RunOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("inspect health for service %q: %w", serviceName, err)
+	}
+
+	return outputLines(string(health.Output)), nil
+}
+
+func healthChecksSatisfied(statuses []string, desiredTasks int) bool {
+	if len(statuses) < desiredTasks {
+		return false
+	}
+
+	for _, status := range statuses {
+		if status != "healthy" {
+			return false
+		}
+	}
+
+	return true
+}
+
+func outputLines(output string) []string {
+	var lines []string
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		if line != "" {
+			lines = append(lines, line)
+		}
+	}
+	return lines
 }
 
 func readinessSatisfied(runningTasks int, desiredTasks int) bool {

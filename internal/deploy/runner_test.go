@@ -11,6 +11,34 @@ func TestReadinessSatisfiedRequiresAllDesiredTasks(t *testing.T) {
 	}
 }
 
+func TestHealthChecksSatisfiedRequiresEveryContainerToBeHealthy(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		statuses []string
+		desired  int
+		want     bool
+	}{
+		{name: "all healthy", statuses: []string{"healthy", "healthy"}, desired: 2, want: true},
+		{name: "not enough containers", statuses: []string{"healthy"}, desired: 2, want: false},
+		{name: "starting", statuses: []string{"healthy", "starting"}, desired: 2, want: false},
+		{name: "unhealthy", statuses: []string{"unhealthy"}, desired: 1, want: false},
+		{name: "missing healthcheck", statuses: []string{"missing"}, desired: 1, want: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := healthChecksSatisfied(test.statuses, test.desired); got != test.want {
+				t.Errorf("healthChecksSatisfied(%v, %d) = %t, want %t", test.statuses, test.desired, got, test.want)
+			}
+		})
+	}
+}
+
+func TestOutputLines(t *testing.T) {
+	got := outputLines("\nabc\n\ndef\n")
+	if len(got) != 2 || got[0] != "abc" || got[1] != "def" {
+		t.Errorf("outputLines = %v", got)
+	}
+}
+
 func TestParseTaskDiagnostics(t *testing.T) {
 	diagnostics := parseTaskDiagnostics("abc123|node-1|Running|Rejected 4 seconds ago|No such image\n")
 	if len(diagnostics) != 1 {

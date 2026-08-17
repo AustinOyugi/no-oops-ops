@@ -1,6 +1,6 @@
 BIN_DIR ?= .bin
 BIN := $(BIN_DIR)/noops
-INSTALL_DIR ?= $(HOME)/.local/bin
+INSTALL_DIR ?= $(shell go env GOPATH)/bin
 INSTALL_BIN := $(INSTALL_DIR)/noops
 
 .PHONY: build install install-cli test
