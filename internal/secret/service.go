@@ -61,21 +61,9 @@ func (s *Service) Set(ctx context.Context, environment string, key string, value
 	}
 
 	version := nextVersion(items, key)
-	metadata := Metadata{
-		CreatedAt:   s.now().UTC(),
-		Environment: environment,
-		Key:         key,
-		SwarmName:   swarmName(environment, key, version),
-		Version:     version,
-	}
-
-	s.logger.InfoContext(ctx, "creating secret", "environment", environment, "key", key, "version", version)
-	result, err := s.runner.Run(ctx, "docker", []string{"secret", "create", metadata.SwarmName, "-"}, command.RunOptions{Stdin: bytes.NewReader(secretValue)})
+	metadata, err := s.createNextVersion(ctx, environment, key, version, secretValue)
 	if err != nil {
-		if output := strings.TrimSpace(string(result.Output)); output != "" {
-			return Metadata{}, fmt.Errorf("create Docker Swarm secret %q: %w: %s", metadata.SwarmName, err, output)
-		}
-		return Metadata{}, fmt.Errorf("create Docker Swarm secret %q: %w", metadata.SwarmName, err)
+		return Metadata{}, err
 	}
 
 	if _, err := s.store.Save(s.config.StateDir, metadata); err != nil {
@@ -85,6 +73,36 @@ func (s *Service) Set(ctx context.Context, environment string, key string, value
 	return metadata, nil
 }
 
+func (s *Service) createNextVersion(ctx context.Context, environment string, key string, version int, value []byte) (Metadata, error) {
+	for attempt := 0; attempt < 100; attempt++ {
+		metadata := Metadata{
+			CreatedAt:   s.now().UTC(),
+			Environment: environment,
+			Key:         key,
+			SwarmName:   swarmName(environment, key, version),
+			Version:     version,
+		}
+
+		s.logger.InfoContext(ctx, "creating secret", "environment", environment, "key", key, "version", version)
+		result, err := s.runner.Run(ctx, "docker", []string{"secret", "create", metadata.SwarmName, "-"}, command.RunOptions{Stdin: bytes.NewReader(value)})
+		if err == nil {
+			return metadata, nil
+		}
+
+		output := strings.TrimSpace(string(result.Output))
+		if strings.Contains(strings.ToLower(output), "already exists") {
+			version++
+			continue
+		}
+		if output != "" {
+			return Metadata{}, fmt.Errorf("create Docker Swarm secret %q: %w: %s", metadata.SwarmName, err, output)
+		}
+		return Metadata{}, fmt.Errorf("create Docker Swarm secret %q: %w", metadata.SwarmName, err)
+	}
+
+	return Metadata{}, fmt.Errorf("create Docker Swarm secret for %q: no available version found", key)
+}
+
 func (s *Service) List(ctx context.Context, environment string) ([]Metadata, error) {
 	if err := validateIdentifier("environment", environment); err != nil {
 		return nil, err
@@ -92,6 +110,33 @@ func (s *Service) List(ctx context.Context, environment string) ([]Metadata, err
 
 	s.logger.InfoContext(ctx, "listing secrets", "environment", environment)
 	return s.store.List(s.config.StateDir, environment)
+}
+
+func (s *Service) Latest(ctx context.Context, environment string, key string) (Metadata, error) {
+	if err := validateIdentifier("environment", environment); err != nil {
+		return Metadata{}, err
+	}
+	if err := validateIdentifier("secret key", key); err != nil {
+		return Metadata{}, err
+	}
+
+	items, err := s.store.List(s.config.StateDir, environment)
+	if err != nil {
+		return Metadata{}, err
+	}
+
+	var latest Metadata
+	for _, item := range items {
+		if item.Key == key && item.Version > latest.Version {
+			latest = item
+		}
+	}
+	if latest.Version == 0 {
+		return Metadata{}, fmt.Errorf("secret %q was not found in environment %q", key, environment)
+	}
+
+	s.logger.InfoContext(ctx, "resolved secret", "environment", environment, "key", key, "version", latest.Version)
+	return latest, nil
 }
 
 func validateIdentifier(label string, value string) error {

@@ -3,6 +3,7 @@ package secret
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"testing"
@@ -13,17 +14,23 @@ import (
 )
 
 type recordingRunner struct {
-	args  []string
-	stdin string
+	args          []string
+	stdin         string
+	runs          int
+	failFirstWith string
 }
 
 func (r *recordingRunner) Run(_ context.Context, _ string, args []string, opts command.RunOptions) (command.Result, error) {
 	r.args = append([]string(nil), args...)
+	r.runs++
 	data, err := io.ReadAll(opts.Stdin)
 	if err != nil {
 		return command.Result{}, err
 	}
 	r.stdin = string(data)
+	if r.runs == 1 && r.failFirstWith != "" {
+		return command.Result{Output: []byte(r.failFirstWith)}, errors.New("exit status 1")
+	}
 	return command.Result{}, nil
 }
 
@@ -80,6 +87,36 @@ func TestSetIncrementsExistingSecretVersion(t *testing.T) {
 	}
 	if result.Version != 2 || result.SwarmName != "noops_prod_DATABASE_URL_v2" {
 		t.Errorf("result = %#v", result)
+	}
+
+	latest, err := service.Latest(context.Background(), "prod", "DATABASE_URL")
+	if err != nil {
+		t.Fatalf("Latest returned error: %v", err)
+	}
+	if latest.Version != 2 || latest.SwarmName != "noops_prod_DATABASE_URL_v2" {
+		t.Errorf("latest = %#v", latest)
+	}
+}
+
+func TestSetSkipsSwarmSecretVersionsMissingFromLocalMetadata(t *testing.T) {
+	runner := &recordingRunner{failFirstWith: "secret noops_prod_DATABASE_URL_v1 already exists"}
+	service := &Service{
+		config: config.Config{StateDir: t.TempDir()},
+		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		runner: runner,
+		store:  newFilesystemStore(),
+		now:    time.Now,
+	}
+
+	result, err := service.Set(context.Background(), "prod", "DATABASE_URL", bytes.NewBufferString("rotated"))
+	if err != nil {
+		t.Fatalf("Set returned error: %v", err)
+	}
+	if result.Version != 2 || result.SwarmName != "noops_prod_DATABASE_URL_v2" {
+		t.Errorf("result = %#v", result)
+	}
+	if runner.runs != 2 {
+		t.Errorf("docker runs = %d, want 2", runner.runs)
 	}
 }
 

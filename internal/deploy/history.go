@@ -13,11 +13,12 @@ import (
 )
 
 type Deployment struct {
-	App          string    `json:"app"`
-	CreatedAt    time.Time `json:"created_at"`
-	Environment  string    `json:"environment"`
-	ReleaseImage string    `json:"release_image"`
-	ReleaseTag   string    `json:"release_tag"`
+	App            string          `json:"app"`
+	CreatedAt      time.Time       `json:"created_at"`
+	Environment    string          `json:"environment"`
+	ReleaseImage   string          `json:"release_image"`
+	ReleaseTag     string          `json:"release_tag"`
+	SecretBindings []SecretBinding `json:"secret_bindings,omitempty"`
 }
 
 type deploymentStore interface {

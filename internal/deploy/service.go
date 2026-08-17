@@ -11,6 +11,7 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"github.com/AustinOyugi/no-oops-ops/internal/release"
+	"github.com/AustinOyugi/no-oops-ops/internal/secret"
 )
 
 type Service struct {
@@ -19,6 +20,7 @@ type Service struct {
 	runner      *command.Runner
 	releases    release.Store
 	deployments deploymentStore
+	secrets     *secret.Service
 }
 
 func NewService(logger *slog.Logger, cfg config.Config) *Service {
@@ -28,10 +30,15 @@ func NewService(logger *slog.Logger, cfg config.Config) *Service {
 		runner:      command.NewRunner(logger),
 		releases:    release.NewFilesystemStore(),
 		deployments: newFilesystemDeploymentStore(),
+		secrets:     secret.NewService(logger, cfg),
 	}
 }
 
 func (s *Service) Run(ctx context.Context, environment string, path string, optionalReleaseVersion string) (Result, error) {
+	return s.run(ctx, environment, path, optionalReleaseVersion, nil)
+}
+
+func (s *Service) run(ctx context.Context, environment string, path string, optionalReleaseVersion string, pinnedSecrets []SecretBinding) (Result, error) {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return Result{}, fmt.Errorf("resolve manifest path %q: %w", path, err)
@@ -52,8 +59,15 @@ func (s *Service) Run(ctx context.Context, environment string, path string, opti
 	}
 
 	resolvedEnv := ResolveEnvFile(envFile, environment)
+	secretBindings, err := s.resolveSecretBindings(ctx, environment, resolvedEnv.SecretRefs, pinnedSecrets)
+	if err != nil {
+		return Result{}, err
+	}
+	for _, binding := range secretBindings {
+		resolvedEnv.Values[binding.EnvKey+"_FILE"] = "/run/secrets/" + binding.EnvKey
+	}
 
-	envPath, err := writeEnvMap(s.config, m.Name, environment, resolvedEnv)
+	envPath, err := writeEnvMap(s.config, m.Name, environment, resolvedEnv.Values)
 	if err != nil {
 		return Result{}, err
 	}
@@ -91,7 +105,7 @@ func (s *Service) Run(ctx context.Context, environment string, path string, opti
 		return Result{}, err
 	}
 
-	stackPath, err := writeStack(s.config, environment, m, releaseMetadata.RegistryImage)
+	stackPath, err := writeStack(s.config, environment, m, releaseMetadata.RegistryImage, secretBindings)
 	if err != nil {
 		return Result{}, err
 	}
@@ -121,11 +135,12 @@ func (s *Service) Run(ctx context.Context, environment string, path string, opti
 	}
 
 	deploymentPath, err := s.deployments.Save(s.config, Deployment{
-		App:          m.Name,
-		CreatedAt:    time.Now().UTC(),
-		Environment:  environment,
-		ReleaseImage: releaseMetadata.RegistryImage,
-		ReleaseTag:   releaseMetadata.Tag,
+		App:            m.Name,
+		CreatedAt:      time.Now().UTC(),
+		Environment:    environment,
+		ReleaseImage:   releaseMetadata.RegistryImage,
+		ReleaseTag:     releaseMetadata.Tag,
+		SecretBindings: secretBindings,
 	})
 	if err != nil {
 		return Result{}, err
@@ -171,7 +186,35 @@ func (s *Service) Rollback(ctx context.Context, environment string, path string)
 	}
 
 	s.logger.InfoContext(ctx, "starting rollback", "manifest", absPath, "environment", environment, "release_tag", previous.ReleaseTag)
-	return s.Run(ctx, environment, absPath, previous.ReleaseTag)
+	return s.run(ctx, environment, absPath, previous.ReleaseTag, previous.SecretBindings)
+}
+
+func (s *Service) resolveSecretBindings(ctx context.Context, environment string, refs []EnvSecretRef, pinned []SecretBinding) ([]SecretBinding, error) {
+	pinnedByKey := make(map[string]SecretBinding, len(pinned))
+	for _, binding := range pinned {
+		pinnedByKey[binding.EnvKey] = binding
+	}
+
+	bindings := make([]SecretBinding, 0, len(refs))
+	for _, ref := range refs {
+		if binding, ok := pinnedByKey[ref.Key]; ok {
+			bindings = append(bindings, binding)
+			continue
+		}
+
+		metadata, err := s.secrets.Latest(ctx, environment, ref.SecretName)
+		if err != nil {
+			return nil, fmt.Errorf("resolve secret for environment key %q: %w", ref.Key, err)
+		}
+		bindings = append(bindings, SecretBinding{
+			EnvKey:     ref.Key,
+			SecretName: metadata.Key,
+			SwarmName:  metadata.SwarmName,
+			Version:    metadata.Version,
+		})
+	}
+
+	return bindings, nil
 }
 
 func resolveEnvFilePath(manifestPath string, envFile string) string {

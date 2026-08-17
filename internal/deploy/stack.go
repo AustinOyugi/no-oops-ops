@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"bytes"
+	_ "embed"
 	"fmt"
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
@@ -16,6 +17,9 @@ const (
 	envFileMode      = 0o600
 	appStackTemplate = "internal/deploy/templates/app-stack.yml.tmpl"
 )
+
+//go:embed templates/app-stack.yml.tmpl
+var appStackTemplateContents string
 
 type stackTemplateData struct {
 	ServiceName            string
@@ -35,6 +39,14 @@ type stackTemplateData struct {
 	RestartDelay           string
 	RestartMaxAttempts     int
 	RestartWindow          string
+	Secrets                []SecretBinding
+}
+
+type SecretBinding struct {
+	EnvKey     string `json:"env_key"`
+	SecretName string `json:"secret_name"`
+	SwarmName  string `json:"swarm_name"`
+	Version    int    `json:"version"`
 }
 
 func appDir(cfg config.Config, name string, environment string) string {
@@ -83,7 +95,7 @@ func writeEnvMap(cfg config.Config, appName string, environment string, values m
 	return path, nil
 }
 
-func writeStack(cfg config.Config, environment string, m manifest.Manifest, image string) (string, error) {
+func writeStack(cfg config.Config, environment string, m manifest.Manifest, image string, secrets []SecretBinding) (string, error) {
 	dir := appDir(cfg, m.Name, environment)
 	if err := os.MkdirAll(dir, appDirMode); err != nil {
 		return "", fmt.Errorf("create app dir %q: %w", dir, err)
@@ -107,6 +119,7 @@ func writeStack(cfg config.Config, environment string, m manifest.Manifest, imag
 		RestartDelay:           m.Rollout.RestartDelay,
 		RestartMaxAttempts:     m.Rollout.RestartMaxAttempts,
 		RestartWindow:          m.Rollout.RestartWindow,
+		Secrets:                secrets,
 	})
 	if err != nil {
 		return "", err
@@ -123,12 +136,7 @@ func writeStack(cfg config.Config, environment string, m manifest.Manifest, imag
 }
 
 func renderStackTemplate(data stackTemplateData) ([]byte, error) {
-	tplBytes, err := os.ReadFile(appStackTemplate)
-	if err != nil {
-		return nil, fmt.Errorf("read stack template %q: %w", appStackTemplate, err)
-	}
-
-	tpl, err := template.New(appStackTemplate).Parse(string(tplBytes))
+	tpl, err := template.New(appStackTemplate).Parse(appStackTemplateContents)
 	if err != nil {
 		return nil, fmt.Errorf("parse stack template %q: %w", appStackTemplate, err)
 	}

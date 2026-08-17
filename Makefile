@@ -1,19 +1,19 @@
 BIN_DIR ?= .bin
 BIN := $(BIN_DIR)/noops
-INSTALL_DIR ?= $(shell go env GOPATH)/bin
+INSTALL_DIR ?= $(HOME)/.local/bin
 INSTALL_BIN := $(INSTALL_DIR)/noops
 
 .PHONY: build install install-cli test
 
 build:
 	mkdir -p $(BIN_DIR)
-	go build -o $(BIN) ./cmd/noops
+	go build -a -o $(BIN) ./cmd/noops
 
-install: install-cli
-
-install-cli:
+install: build
 	mkdir -p $(INSTALL_DIR)
-	go build -o $(INSTALL_BIN) ./cmd/noops
+	install -m 0755 $(BIN) $(INSTALL_BIN)
+
+install-cli: install
 
 test:
 	go test ./...

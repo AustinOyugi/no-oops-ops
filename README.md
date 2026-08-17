@@ -37,9 +37,9 @@ make install
 noops status
 ```
 
-This installs into Go's standard binary directory (for example,
-`/Users/odu/go/bin`) without requiring the user to specify it. After pulling or
-changing the code, rerun `make install` to update the command.
+This installs into `~/.local/bin`, which is the user-facing command location on
+this setup. After pulling or changing the code, rerun `make install` to force a
+fresh rebuild and replace the installed command.
 
 ## Current Workflow
 
@@ -221,14 +221,18 @@ noops secret list prod
 
 Each update creates an immutable, versioned Swarm secret (for example,
 `noops_prod_DATABASE_URL_v2`). `secret list` displays metadata only; there is no
-command to retrieve a stored secret value. This first slice manages the shared
-secret registry only; manifest references and service mounting are the next step.
-Reference a shared secret from an app environment file with `from_secret`:
+command to retrieve a stored secret value. Reference a shared secret from an app
+environment file with `from_secret`:
 
 ```yaml
 - key: AUTH_SERVER_API_CLIENT_SECRET
   from_secret: AUTH_SERVER_API_CLIENT_SECRET
 ```
+
+During deployment, No Oops Ops mounts the referenced Swarm secret at
+`/run/secrets/AUTH_SERVER_API_CLIENT_SECRET` and supplies
+`AUTH_SERVER_API_CLIENT_SECRET_FILE` with that path. Applications must read the
+`*_FILE` variable; secret values are never written to `.env`.
 
 ## Configuration
 
