@@ -41,6 +41,21 @@ This installs into `~/.local/bin`, which is the user-facing command location on
 this setup. After pulling or changing the code, rerun `make install` to force a
 fresh rebuild and replace the installed command.
 
+## Releases
+
+GoReleaser creates archives for macOS, Linux, and Windows. Validate the release
+configuration locally with:
+
+```bash
+make release-check
+make release-snapshot
+```
+
+`release-snapshot` writes unpublished artifacts to `dist/`. Pushing a tag such
+as `v0.1.0` runs the GitHub Actions release workflow and publishes the archives
+and checksums to the matching GitHub Release. Until that first tag, GitHub
+Actions builds snapshots only; it does not create a public release.
+
 ## Current Workflow
 
 The current happy path is:

@@ -3,7 +3,7 @@ BIN := $(BIN_DIR)/noops
 INSTALL_DIR ?= $(HOME)/.local/bin
 INSTALL_BIN := $(INSTALL_DIR)/noops
 
-.PHONY: build install install-cli test
+.PHONY: build install install-cli release-check release-snapshot test
 
 build:
 	mkdir -p $(BIN_DIR)
@@ -17,3 +17,9 @@ install-cli: install
 
 test:
 	go test ./...
+
+release-check:
+	goreleaser check
+
+release-snapshot:
+	goreleaser release --snapshot --clean
