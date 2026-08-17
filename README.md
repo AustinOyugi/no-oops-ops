@@ -43,7 +43,7 @@ fresh rebuild and replace the installed command.
 
 ## Releases
 
-GoReleaser creates archives for macOS, Linux, and Windows. Validate the release
+GoReleaser creates archives for macOS and Linux. Validate the release
 configuration locally with:
 
 ```bash
