@@ -46,7 +46,7 @@ func Load() (Config, error) {
 		AppName:        defaultAppName,
 		StateDir:       envOrDefault("NOOPS_STATE_DIR", stateDir),
 		DataDir:        envOrDefault("NOOPS_DATA_DIR", dataDir),
-		InstallVersion: envOrDefault("NOOPS_INSTALL_VERSION", Version),
+		InstallVersion: Version,
 		NetworkName:    envOrDefault("NOOPS_NETWORK_NAME", defaultNetworkName),
 		RegistryName:   envOrDefault("NOOPS_REGISTRY_NAME", defaultRegistryName),
 		RegistryPort:   envOrDefault("NOOPS_REGISTRY_PORT", defaultRegistryPort),

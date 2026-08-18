@@ -9,6 +9,8 @@ The current implementation focuses on a practical local/server workflow:
 - generate deployment artifacts from manifests
 - deploy apps with Docker Stack
 - wait for service readiness and surface useful diagnostics
+- manage environment-scoped, versioned Docker Swarm secrets
+- retain release and deployment history, including rollback to the prior deployment
 
 The goal is to keep simple deployments repeatable without building a full DevOps platform.
 
@@ -18,8 +20,9 @@ The goal is to keep simple deployments repeatable without building a full DevOps
 - Docker running locally
 - Docker configured to allow the local registry (see [Docker Registry](#docker-registry))
 
-Run commands from the repository root. By default, No Oops Ops stores its state in
-`.noops/`; set `NOOPS_STATE_DIR` to use another location.
+Run commands from the repository root. By default, No Oops Ops stores state in the
+platform XDG state directory under `noops`; set `NOOPS_STATE_DIR` to use another
+location.
 
 ## Install the CLI
 
@@ -98,7 +101,7 @@ Run:
 noops install
 ```
 
-The install state is written under `.noops/`.
+The install state is written under the configured state directory.
 
 ## Release
 
@@ -209,6 +212,7 @@ stack when it finds a blocking failure.
 
 ```text
 noops [install]
+noops version
 noops doctor
 noops doctor --deploy-ready
 noops status
@@ -251,13 +255,12 @@ During deployment, No Oops Ops mounts the referenced Swarm secret at
 
 ## Configuration
 
-Settings can be supplied in a `.env.noops` file in the repository root or as environment
-variables:
+Settings can be supplied as environment variables or in
+`$XDG_CONFIG_HOME/noops/.env.noops` (normally `~/.config/noops/.env.noops`):
 
 | Variable                | Default                     | Purpose                                 |
 |-------------------------|-----------------------------|-----------------------------------------|
-| `NOOPS_STATE_DIR`       | `.noops` in this repository | Directory for install and app artifacts |
-| `NOOPS_INSTALL_VERSION` | `dev`                       | Version written to install metadata     |
+| `NOOPS_STATE_DIR`       | XDG state directory / `noops` | Directory for install and app artifacts |
 | `NOOPS_NETWORK_NAME`    | `noops-net`                 | Shared Docker Swarm network             |
 | `NOOPS_REGISTRY_NAME`   | `noops-registry`            | Internal registry service name          |
 | `NOOPS_REGISTRY_PORT`   | `5000`                      | Internal registry port                  |
