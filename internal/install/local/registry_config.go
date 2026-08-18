@@ -2,12 +2,19 @@ package local
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/install"
 )
+
+//go:embed assets/registry-config.yml
+var registryConfigContents []byte
+
+//go:embed templates/registry-stack.yml.tmpl
+var registryStackTemplateContents string
 
 func (h *Host) registryDir() string {
 	return filepath.Join(h.stateDir, "registry")
@@ -22,14 +29,7 @@ func (h *Host) registryStackPath() string {
 }
 
 func (h *Host) registryDataPath() string {
-	return filepath.Join(h.registryDir(), "data")
-}
-
-func (h *Host) registryStackTemplatePath() string {
-	return "internal/install/local/templates/registry-stack.yml.tmpl"
-}
-func (h *Host) registryConfigAssetPath() string {
-	return "internal/install/local/assets/registry-config.yml"
+	return filepath.Join(h.dataDir, "data")
 }
 
 type registryStackTemplateData struct {
@@ -52,16 +52,7 @@ func (h *Host) WriteRegistryConfig(ctx context.Context) error {
 		}
 	}
 
-	configBytes, err := os.ReadFile(h.registryConfigAssetPath())
-
-	if err != nil {
-		return install.PrerequisiteError{
-			Check: install.StepWriteRegistryConfig,
-			Err:   fmt.Errorf("write registry config %q: %w", h.registryConfigAssetPath(), err),
-		}
-	}
-
-	if err := os.WriteFile(path, configBytes, installMetadataFileMode); err != nil {
+	if err := os.WriteFile(path, registryConfigContents, installMetadataFileMode); err != nil {
 		return install.PrerequisiteError{
 			Check: install.StepWriteRegistryConfig,
 			Err:   fmt.Errorf("write registry config %q: %w", path, err),
@@ -85,7 +76,8 @@ func (h *Host) WriteRegistryStack(ctx context.Context) error {
 	}
 
 	rendered, err := renderTemplate(
-		h.registryStackTemplatePath(),
+		"registry-stack.yml.tmpl",
+		registryStackTemplateContents,
 		registryStackTemplateData{
 			RegistryPort: h.registryPort,
 			NetworkName:  h.networkName,
@@ -93,6 +85,7 @@ func (h *Host) WriteRegistryStack(ctx context.Context) error {
 			DataPath:     dataDir,
 		},
 	)
+
 	if err != nil {
 		return install.PrerequisiteError{
 			Check: install.StepWriteRegistryStack,
