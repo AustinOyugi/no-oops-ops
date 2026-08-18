@@ -15,17 +15,19 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/logging"
 	"github.com/AustinOyugi/no-oops-ops/internal/secret"
 	"github.com/AustinOyugi/no-oops-ops/internal/status"
+	"github.com/AustinOyugi/no-oops-ops/internal/uninstall"
 )
 
 type App struct {
-	logger    *slog.Logger
-	config    config.Config
-	installer *install.Installer
-	deployer  deployer
-	releaser  *release.Service
-	doctor    doctorRunner
-	status    *status.Service
-	secrets   secretRunner
+	logger      *slog.Logger
+	config      config.Config
+	installer   *install.Installer
+	uninstaller *uninstall.Service
+	deployer    deployer
+	releaser    *release.Service
+	doctor      doctorRunner
+	status      *status.Service
+	secrets     secretRunner
 }
 
 type deployer interface {
@@ -55,16 +57,21 @@ func New(cfg config.Config) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	uninstaller, err := uninstall.New(localHost)
+	if err != nil {
+		return nil, err
+	}
 
 	return &App{
-		logger:    logger,
-		config:    cfg,
-		installer: installer,
-		deployer:  deploy.NewService(logger, cfg),
-		releaser:  release.NewService(logger, cfg),
-		doctor:    doctor.NewService(logger, cfg, localHost),
-		status:    status.NewService(logger, cfg, localHost),
-		secrets:   secret.NewService(logger, cfg),
+		logger:      logger,
+		config:      cfg,
+		installer:   installer,
+		uninstaller: uninstaller,
+		deployer:    deploy.NewService(logger, cfg),
+		releaser:    release.NewService(logger, cfg),
+		doctor:      doctor.NewService(logger, cfg, localHost),
+		status:      status.NewService(logger, cfg, localHost),
+		secrets:     secret.NewService(logger, cfg),
 	}, nil
 }
 
@@ -84,6 +91,10 @@ func (a *App) Run(ctx context.Context, args []string) error {
 
 	if len(args) > 0 && args[0] == "install" {
 		return a.runInstall(ctx)
+	}
+
+	if len(args) > 0 && args[0] == "uninstall" {
+		return a.runUninstall(ctx, args[1:])
 	}
 
 	if len(args) > 0 && args[0] == "deploy" {

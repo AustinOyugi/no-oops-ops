@@ -213,6 +213,7 @@ stack when it finds a blocking failure.
 ```text
 noops [install]
 noops version
+noops uninstall [--purge]
 noops doctor
 noops doctor --deploy-ready
 noops status
@@ -224,6 +225,23 @@ noops secret list <environment>
 ```
 
 Running `noops` without a command runs `install`.
+
+## Uninstall
+
+`noops uninstall` removes the No Oops Ops-managed application stacks, registry
+stack, shared network, generated state, and installation metadata. It does not remove
+the CLI executable and preserves `dataDir`, including registry data, by default.
+
+Use `--purge` only when persistent data should be deleted as well:
+
+```bash
+noops uninstall --purge
+```
+
+Both commands are safe to retry: resources already removed are skipped. If a runtime
+removal fails, installation metadata remains so the command can be run again. The
+shared network is removed only when Docker permits it; a network still in use is left
+in place and reported as an error.
 
 ## Secrets
 

@@ -40,6 +40,8 @@ func (h *Host) WriteInstallMetadata(ctx context.Context) error {
 	data, err := json.MarshalIndent(metadata{
 		Version:     h.installVersion,
 		InstalledAt: time.Now().UTC().Format(time.RFC3339),
+		StateDir:    h.stateDir,
+		DataDir:     h.dataDir,
 		Swarm: swarmMetadata{
 			Initialized:    h.swarmInitialized,
 			LocalNodeState: h.swarmNodeState,

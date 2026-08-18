@@ -3,6 +3,8 @@ package local
 type metadata struct {
 	Version     string           `json:"version"`
 	InstalledAt string           `json:"installed_at"`
+	StateDir    string           `json:"state_dir"`
+	DataDir     string           `json:"data_dir"`
 	Swarm       swarmMetadata    `json:"swarm"`
 	Network     networkMetadata  `json:"network"`
 	Registry    registryMetadata `json:"registry"`
