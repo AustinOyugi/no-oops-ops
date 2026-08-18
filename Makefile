@@ -4,7 +4,7 @@ INSTALL_DIR ?= $(HOME)/.local/bin
 INSTALL_BIN := $(INSTALL_DIR)/noops
 VERSION ?= 0.0.1
 
-.PHONY: build install install-cli release-check release-snapshot test
+.PHONY: build install install-cli uninstall release-check release-snapshot test
 
 build:
 	mkdir -p $(BIN_DIR)
@@ -19,6 +19,10 @@ install: build
 	install -m 0755 $(BIN) $(INSTALL_BIN)
 
 install-cli: install
+
+uninstall: build
+	$(BIN) uninstall $(UNINSTALL_ARGS)
+	rm -f $(BIN)
 
 test:
 	go test ./...

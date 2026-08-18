@@ -232,10 +232,23 @@ Running `noops` without a command runs `install`.
 stack, shared network, generated state, and installation metadata. It does not remove
 the CLI executable and preserves `dataDir`, including registry data, by default.
 
+From a source checkout, the same conservative operation is available through Make:
+
+```bash
+make uninstall
+```
+
+This removes the repository-local `.bin/noops` build artifact after the runtime
+teardown succeeds. It does not remove a separately installed CLI, such as
+`~/.local/bin/noops`.
+
 Use `--purge` only when persistent data should be deleted as well:
 
 ```bash
 noops uninstall --purge
+
+# From a source checkout:
+make uninstall UNINSTALL_ARGS=--purge
 ```
 
 Both commands are safe to retry: resources already removed are skipped. If a runtime
