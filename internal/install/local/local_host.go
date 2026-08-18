@@ -9,6 +9,7 @@ type Host struct {
 	runner           *command.Runner
 	logger           *slog.Logger
 	stateDir         string
+	dataDir          string
 	installVersion   string
 	swarmInitialized bool
 	swarmNodeState   string
@@ -23,6 +24,7 @@ type Host struct {
 func NewHost(
 	logger *slog.Logger,
 	stateDir string,
+	dataDir string,
 	installVersion string,
 	networkName string,
 	registryName string,
@@ -31,6 +33,7 @@ func NewHost(
 		runner:          command.NewRunner(logger),
 		logger:          logger,
 		stateDir:        stateDir,
+		dataDir:         dataDir,
 		installVersion:  installVersion,
 		networkName:     networkName,
 		registryName:    registryName,

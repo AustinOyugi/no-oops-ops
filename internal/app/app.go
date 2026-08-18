@@ -47,7 +47,7 @@ func New(cfg config.Config) (*App, error) {
 	logger := logging.New()
 
 	localHost := local.NewHost(
-		logger, cfg.StateDir, cfg.InstallVersion,
+		logger, cfg.StateDir, cfg.DataDir, cfg.InstallVersion,
 		cfg.NetworkName, cfg.RegistryName, cfg.RegistryPort)
 
 	installer, err := install.New(logger, localHost)

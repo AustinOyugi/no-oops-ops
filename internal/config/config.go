@@ -1,13 +1,16 @@
 package config
 
 import (
+	"github.com/adrg/xdg"
 	"github.com/joho/godotenv"
 	"os"
+	"path/filepath"
 )
 
 type Config struct {
 	AppName        string
 	StateDir       string
+	DataDir        string
 	InstallVersion string
 
 	NetworkName string
@@ -18,7 +21,6 @@ type Config struct {
 
 const defaultAppName = "noops"
 const defaultInstallVersion = "dev"
-const defaultStateDir = "/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/.noops"
 
 const defaultNetworkName = "noops-net"
 
@@ -26,11 +28,17 @@ const defaultRegistryName = "noops-registry"
 const defaultRegistryPort = "5000"
 
 func Load() (Config, error) {
-	_ = godotenv.Load(".env.noops")
+
+	configDir := filepath.Join(xdg.ConfigHome, defaultAppName)
+	stateDir := filepath.Join(xdg.StateHome, defaultAppName)
+	dataDir := filepath.Join(xdg.DataHome, defaultAppName)
+
+	_ = godotenv.Load(filepath.Join(configDir, ".env.noops"))
 
 	return Config{
 		AppName:        defaultAppName,
-		StateDir:       envOrDefault("NOOPS_STATE_DIR", defaultStateDir),
+		StateDir:       envOrDefault("NOOPS_STATE_DIR", stateDir),
+		DataDir:        envOrDefault("NOOPS_DATA_DIR", dataDir),
 		InstallVersion: envOrDefault("NOOPS_INSTALL_VERSION", defaultInstallVersion),
 		NetworkName:    envOrDefault("NOOPS_NETWORK_NAME", defaultNetworkName),
 		RegistryName:   envOrDefault("NOOPS_REGISTRY_NAME", defaultRegistryName),
