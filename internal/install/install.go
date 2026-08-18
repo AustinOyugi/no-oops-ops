@@ -68,9 +68,11 @@ func (i *Installer) runStep(
 
 	if err := fn(ctx); err != nil {
 		result.SetStep(step, StatusFailed, err.Error())
+		i.logger.ErrorContext(ctx, "install step failed", "step", step, "error", err)
 		return err
 	}
 
 	result.SetStep(step, StatusCompleted, "")
+	i.logger.InfoContext(ctx, "install step completed", "step", step)
 	return nil
 }

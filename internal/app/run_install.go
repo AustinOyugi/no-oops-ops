@@ -24,22 +24,10 @@ func (a *App) runInstall(ctx context.Context) error {
 		return err
 	}
 
-	lastStep, ok := result.LastStep()
-	if ok {
-		a.logger.InfoContext(
-			ctx,
-			"install last step",
-			"name", lastStep.Name,
-			"status", lastStep.Status,
-		)
-	}
-
 	a.logger.InfoContext(
 		ctx,
 		"install completed",
 		"completed_steps", result.CompletedCount(),
-		"failed", result.Failed(),
-		"steps", result.Steps,
 	)
 
 	return nil
