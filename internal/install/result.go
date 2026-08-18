@@ -11,7 +11,6 @@ const (
 	StepEnsureRegistry         Step = "ensure_registry"
 
 	StepPrepareStateDir      Step = "prepare_state_dir"
-	StepInitializeLocalState Step = "initialize_local_state"
 	StepWriteInstallMetadata Step = "write_install_metadata"
 )
 

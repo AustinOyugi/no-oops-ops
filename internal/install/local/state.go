@@ -28,25 +28,6 @@ func (h *Host) PrepareStateDir(ctx context.Context) error {
 	return nil
 }
 
-func (h *Host) stateDataDir() string {
-	return filepath.Join(h.stateDir, "data")
-}
-
-func (h *Host) InitializeLocalState(ctx context.Context) error {
-	path := h.stateDataDir()
-
-	h.logger.InfoContext(ctx, "initializing local state", "path", path)
-
-	if err := os.MkdirAll(path, stateDirMode); err != nil {
-		return install.PrerequisiteError{
-			Check: install.StepInitializeLocalState,
-			Err:   fmt.Errorf("initialize local state %q: %w", path, err),
-		}
-	}
-
-	return nil
-}
-
 func (h *Host) installMetadataPath() string {
 	return filepath.Join(h.stateDir, "install.json")
 }
