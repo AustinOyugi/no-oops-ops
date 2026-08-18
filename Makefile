@@ -2,12 +2,17 @@ BIN_DIR ?= .bin
 BIN := $(BIN_DIR)/noops
 INSTALL_DIR ?= $(HOME)/.local/bin
 INSTALL_BIN := $(INSTALL_DIR)/noops
+VERSION ?= 0.0.1
 
 .PHONY: build install install-cli release-check release-snapshot test
 
 build:
 	mkdir -p $(BIN_DIR)
-	go build -a -o $(BIN) ./cmd/noops
+	go build \
+      -ldflags "-X github.com/AustinOyugi/no-oops-ops/internal/config.Version=$(VERSION)" \
+      -a \
+      -o $(BIN) \
+      ./cmd/noops
 
 install: build
 	mkdir -p $(INSTALL_DIR)
