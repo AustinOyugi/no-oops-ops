@@ -27,5 +27,20 @@ func (m Manifest) Validate() error {
 		return fmt.Errorf("source.dockerfile is required")
 	}
 
+	if m.Env.Secrets != nil {
+		if err := m.Env.Secrets.Validate(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *EnvSecrets) Validate() error {
+	switch s.Resolution {
+	case "env", "file":
+	default:
+		return fmt.Errorf("env.secrets.resolution must be \"env\" or \"file\", got %q", s.Resolution)
+	}
 	return nil
 }

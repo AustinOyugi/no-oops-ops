@@ -3,13 +3,28 @@ version: "3.9"
 services:
   {{ .ServiceName }}:
     image: {{ .Image }}
+{{- if .UseWrapper }}
+    entrypoint: ["/bin/sh", "/bootstrap.sh"]
+    command: []
+    labels:
+      com.noops.original.entrypoint: '{{ .OriginalEntrypoint }}'
+      com.noops.original.cmd: '{{ .OriginalCmd }}'
+    environment:
+{{- range .Secrets }}
+      - {{ .EnvKey }}_FILE=/run/secrets/{{ .SecretName }}
+{{- end }}
+{{- end }}
     env_file:
       - .env
 {{- if .Secrets }}
     secrets:
 {{- range .Secrets }}
       - source: {{ .SwarmName }}
+{{- if $.UseWrapper }}
+        target: {{ .SecretName }}
+{{- else }}
         target: {{ .EnvKey }}
+{{- end }}
         mode: 0400
 {{- end }}
 {{- end }}

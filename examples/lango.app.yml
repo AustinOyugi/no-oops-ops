@@ -29,6 +29,13 @@ healthcheck:
 env:
   file: lango.env.yml
 
+  secrets:
+    resolution: env
+
+    resolvable:
+      - REDIS_PASSWORD
+      - AUTH_SERVER_API_CLIENT_SECRET
+
 rollout:
   parallelism: 1
   delay: 10s

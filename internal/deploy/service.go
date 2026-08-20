@@ -58,13 +58,24 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		return Result{}, err
 	}
 
-	resolvedEnv := ResolveEnvFile(envFile, environment)
+	var resolvable []string
+	if m.Env.Secrets != nil {
+		resolvable = m.Env.Secrets.Resolvable
+	}
+	resolvedEnv := ResolveEnvFile(envFile, environment, resolvable)
+
+	if err := ValidateResolvableKeys(m, envFile); err != nil {
+		return Result{}, err
+	}
+
 	secretBindings, err := s.resolveSecretBindings(ctx, environment, resolvedEnv.SecretRefs, pinnedSecrets)
 	if err != nil {
 		return Result{}, err
 	}
-	for _, binding := range secretBindings {
-		resolvedEnv.Values[binding.EnvKey+"_FILE"] = "/run/secrets/" + binding.EnvKey
+
+	resolutionMode := ""
+	if m.Env.Secrets != nil {
+		resolutionMode = m.Env.Secrets.Resolution
 	}
 
 	envPath, err := writeEnvMap(s.config, m.Name, environment, resolvedEnv.Values)
@@ -105,7 +116,25 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		return Result{}, err
 	}
 
-	stackPath, err := writeStack(s.config, environment, m, releaseMetadata.RegistryImage, secretBindings)
+	var wrapperCfg WrapperConfig
+
+	if resolutionMode == "env" && len(secretBindings) > 0 {
+		imgMeta, err := inspectImage(ctx, s.runner, releaseMetadata.RegistryImage)
+		if err != nil {
+			return Result{}, fmt.Errorf("inspect application image: %w", err)
+		}
+		wrapperCfg = BuildWrapperConfig(resolutionMode, releaseMetadata.RegistryImage, imgMeta, m, secretBindings, s.config.WrapperImage)
+	} else {
+		for _, binding := range secretBindings {
+			resolvedEnv.Values[binding.EnvKey+"_FILE"] = "/run/secrets/" + binding.EnvKey
+		}
+		envPath, err = writeEnvMap(s.config, m.Name, environment, resolvedEnv.Values)
+		if err != nil {
+			return Result{}, err
+		}
+	}
+
+	stackPath, err := writeStack(s.config, environment, m, releaseMetadata.RegistryImage, secretBindings, wrapperCfg)
 	if err != nil {
 		return Result{}, err
 	}

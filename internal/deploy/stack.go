@@ -40,6 +40,11 @@ type stackTemplateData struct {
 	RestartMaxAttempts     int
 	RestartWindow          string
 	Secrets                []SecretBinding
+	UseWrapper             bool
+	WrapperImage           string
+	OriginalEntrypoint     string
+	OriginalCmd            string
+	SecretMappingsJSON     string
 }
 
 type SecretBinding struct {
@@ -95,15 +100,20 @@ func writeEnvMap(cfg config.Config, appName string, environment string, values m
 	return path, nil
 }
 
-func writeStack(cfg config.Config, environment string, m manifest.Manifest, image string, secrets []SecretBinding) (string, error) {
+func writeStack(cfg config.Config, environment string, m manifest.Manifest, image string, secrets []SecretBinding, wrapperCfg WrapperConfig) (string, error) {
 	dir := appDir(cfg, m.Name, environment)
 	if err := os.MkdirAll(dir, appDirMode); err != nil {
 		return "", fmt.Errorf("create app dir %q: %w", dir, err)
 	}
 
+	stackImage := image
+	if wrapperCfg.UseWrapper {
+		stackImage = wrapperCfg.WrapperImage
+	}
+
 	rendered, err := renderStackTemplate(stackTemplateData{
 		ServiceName:            serviceName(environment, m.Name),
-		Image:                  image,
+		Image:                  stackImage,
 		Network:                m.Service.Network,
 		Replicas:               m.Service.Replicas,
 		HealthcheckTest:        m.Healthcheck.Test,
@@ -120,6 +130,11 @@ func writeStack(cfg config.Config, environment string, m manifest.Manifest, imag
 		RestartMaxAttempts:     m.Rollout.RestartMaxAttempts,
 		RestartWindow:          m.Rollout.RestartWindow,
 		Secrets:                secrets,
+		UseWrapper:             wrapperCfg.UseWrapper,
+		WrapperImage:           wrapperCfg.WrapperImage,
+		OriginalEntrypoint:     jsonStringSlice(wrapperCfg.EffectiveExec.Entrypoint),
+		OriginalCmd:            jsonStringSlice(wrapperCfg.EffectiveExec.Cmd),
+		SecretMappingsJSON:     secretMappingsString(wrapperCfg.SecretMappings),
 	})
 	if err != nil {
 		return "", err

@@ -62,5 +62,11 @@ type Expose struct {
 }
 
 type Env struct {
-	File string `yaml:"file"`
+	File    string      `yaml:"file"`
+	Secrets *EnvSecrets `yaml:"secrets"`
+}
+
+type EnvSecrets struct {
+	Resolution string   `yaml:"resolution"`
+	Resolvable []string `yaml:"resolvable"`
 }
