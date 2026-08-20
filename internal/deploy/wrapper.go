@@ -1,12 +1,14 @@
 package deploy
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"strings"
 
-	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
+	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 )
 
@@ -26,11 +28,19 @@ type SecretMapping struct {
 }
 
 type WrapperConfig struct {
-	UseWrapper      bool
-	WrapperImage    string
-	OriginalImage   string
-	EffectiveExec   EffectiveExecution
-	SecretMappings  []SecretMapping
+	UseWrapper     bool
+	WrapperImage   string
+	OriginalImage  string
+	EffectiveExec  EffectiveExecution
+	SecretMappings []SecretMapping
+}
+
+func pullImage(ctx context.Context, runner *command.Runner, imageRef string) error {
+	result, err := runner.Run(ctx, "docker", []string{"pull", imageRef}, command.RunOptions{})
+	if err != nil {
+		return fmt.Errorf("pull image %q: %w: %s", imageRef, err, strings.TrimSpace(string(result.Output)))
+	}
+	return nil
 }
 
 func inspectImage(ctx context.Context, runner *command.Runner, imageRef string) (ImageMetadata, error) {
@@ -83,7 +93,6 @@ func BuildWrapperConfig(
 	resolutionMode string,
 	imageRef string,
 	imgMeta ImageMetadata,
-	m manifest.Manifest,
 	secretBindings []SecretBinding,
 	wrapperImage string,
 ) WrapperConfig {
@@ -92,6 +101,9 @@ func BuildWrapperConfig(
 	}
 
 	execution := ResolveEffectiveExecution(imgMeta, nil, nil)
+	if len(execution.Entrypoint) == 0 && len(execution.Cmd) == 0 {
+		return WrapperConfig{}
+	}
 
 	mappings := make([]SecretMapping, len(secretBindings))
 	for i, binding := range secretBindings {
@@ -119,9 +131,29 @@ func jsonStringSlice(s []string) string {
 }
 
 func secretMappingsString(mappings []SecretMapping) string {
-	parts := make([]string, len(mappings))
-	for i, m := range mappings {
-		parts[i] = m.EnvKey + "=" + m.SecretName
+	data, _ := json.Marshal(mappings)
+	return string(data)
+}
+
+func wrappedImageRef(cfg config.Config, applicationImage, wrapperImage string) string {
+	sum := sha256.Sum256([]byte(applicationImage + "\x00" + wrapperImage))
+	return fmt.Sprintf("127.0.0.1:%s/noops-runtime:%x", cfg.RegistryPort, sum[:12])
+}
+
+func wrappedImageDockerfile(applicationImage, wrapperImage string) string {
+	return fmt.Sprintf("FROM %s\nCOPY --from=%s /bootstrap.sh /bootstrap.sh\n", applicationImage, wrapperImage)
+}
+
+func (s *Service) buildWrappedImage(ctx context.Context, applicationImage, wrapperImage string) (string, error) {
+	image := wrappedImageRef(s.config, applicationImage, wrapperImage)
+	dockerfile := wrappedImageDockerfile(applicationImage, wrapperImage)
+	result, err := s.runner.Run(ctx, "docker", []string{"build", "--pull", "-t", image, "-f", "-", "."}, command.RunOptions{Stdin: bytes.NewBufferString(dockerfile)})
+	if err != nil {
+		return "", fmt.Errorf("build %q: %w: %s", image, err, strings.TrimSpace(string(result.Output)))
 	}
-	return strings.Join(parts, ",")
+	result, err = s.runner.Run(ctx, "docker", []string{"push", image}, command.RunOptions{})
+	if err != nil {
+		return "", fmt.Errorf("push %q: %w: %s", image, err, strings.TrimSpace(string(result.Output)))
+	}
+	return image, nil
 }

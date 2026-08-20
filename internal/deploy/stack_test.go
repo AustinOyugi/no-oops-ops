@@ -11,8 +11,9 @@ func TestRenderStackTemplateMountsExternalSecrets(t *testing.T) {
 		Image:       "registry/lango:v1",
 		Network:     "noops-net",
 		Secrets: []SecretBinding{{
-			EnvKey:    "DATABASE_URL",
-			SwarmName: "noops_prod_DATABASE_URL_v2",
+			EnvKey:     "DATABASE_URL",
+			SecretName: "DATABASE_URL_SECRET",
+			SwarmName:  "noops_prod_DATABASE_URL_v2",
 		}},
 	})
 	if err != nil {
@@ -22,7 +23,7 @@ func TestRenderStackTemplateMountsExternalSecrets(t *testing.T) {
 	output := string(rendered)
 	for _, want := range []string{
 		"source: noops_prod_DATABASE_URL_v2",
-		"target: DATABASE_URL",
+		"target: DATABASE_URL_SECRET",
 		"noops_prod_DATABASE_URL_v2:",
 		"external: true",
 	} {
@@ -41,6 +42,7 @@ func TestRenderStackTemplateWrapperMode(t *testing.T) {
 		WrapperImage:       "ghcr.io/austinoyugi/noops-wrapper:latest",
 		OriginalEntrypoint: `["java","-jar"]`,
 		OriginalCmd:        `["app.jar"]`,
+		SecretMappingsJSON: `[{"env_key":"REDIS_PASSWORD","secret_name":"REDIS_PASSWORD_SECRET"}]`,
 		Secrets: []SecretBinding{{
 			EnvKey:     "REDIS_PASSWORD",
 			SecretName: "REDIS_PASSWORD_SECRET",
@@ -55,9 +57,10 @@ func TestRenderStackTemplateWrapperMode(t *testing.T) {
 	for _, want := range []string{
 		`entrypoint: ["/bin/sh", "/bootstrap.sh"]`,
 		"command: []",
-		"com.noops.original.entrypoint:",
+		"NOOPS_ORIGINAL_ENTRYPOINT_JSON:",
 		`"java","-jar"`,
-		"REDIS_PASSWORD_FILE=/run/secrets/REDIS_PASSWORD_SECRET",
+		"NOOPS_SECRET_MAPPINGS_JSON:",
+		"REDIS_PASSWORD_FILE: /run/secrets/REDIS_PASSWORD_SECRET",
 		"source: noops_dev_REDIS_PASSWORD_SECRET_v1",
 		"target: REDIS_PASSWORD_SECRET",
 	} {
@@ -67,7 +70,7 @@ func TestRenderStackTemplateWrapperMode(t *testing.T) {
 	}
 }
 
-func TestRenderStackTemplateFileModeSecretTargetIsEnvKey(t *testing.T) {
+func TestRenderStackTemplateFileModeSecretTargetIsSecretName(t *testing.T) {
 	rendered, err := renderStackTemplate(stackTemplateData{
 		ServiceName: "prod-lango",
 		Image:       "registry/lango:v1",
@@ -87,10 +90,10 @@ func TestRenderStackTemplateFileModeSecretTargetIsEnvKey(t *testing.T) {
 	if strings.Contains(output, "entrypoint:") {
 		t.Error("file mode should not override entrypoint")
 	}
-	if !strings.Contains(output, "target: REDIS_PASSWORD") {
-		t.Errorf("file mode should mount secret to env key target, got:\n%s", output)
+	if !strings.Contains(output, "target: REDIS_PASSWORD_SECRET") {
+		t.Errorf("file mode should mount secret to its backing secret name, got:\n%s", output)
 	}
-	if strings.Contains(output, "target: REDIS_PASSWORD_SECRET") {
-		t.Errorf("file mode should not mount to secret name target, got:\n%s", output)
+	if strings.Contains(output, "REDIS_PASSWORD_FILE:") {
+		t.Errorf("file mode should not inject a _FILE environment variable, got:\n%s", output)
 	}
 }

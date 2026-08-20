@@ -8,7 +8,10 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
+
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -151,7 +154,9 @@ func writeStack(cfg config.Config, environment string, m manifest.Manifest, imag
 }
 
 func renderStackTemplate(data stackTemplateData) ([]byte, error) {
-	tpl, err := template.New(appStackTemplate).Parse(appStackTemplateContents)
+	tpl, err := template.New(appStackTemplate).Funcs(template.FuncMap{
+		"yamlString": yamlString,
+	}).Parse(appStackTemplateContents)
 	if err != nil {
 		return nil, fmt.Errorf("parse stack template %q: %w", appStackTemplate, err)
 	}
@@ -162,4 +167,12 @@ func renderStackTemplate(data stackTemplateData) ([]byte, error) {
 	}
 
 	return out.Bytes(), nil
+}
+
+func yamlString(value string) string {
+	data, err := yaml.Marshal(value)
+	if err != nil {
+		panic(err)
+	}
+	return strings.TrimSuffix(string(data), "\n")
 }

@@ -6,12 +6,12 @@ services:
 {{- if .UseWrapper }}
     entrypoint: ["/bin/sh", "/bootstrap.sh"]
     command: []
-    labels:
-      com.noops.original.entrypoint: '{{ .OriginalEntrypoint }}'
-      com.noops.original.cmd: '{{ .OriginalCmd }}'
     environment:
+      NOOPS_ORIGINAL_ENTRYPOINT_JSON: {{ yamlString .OriginalEntrypoint }}
+      NOOPS_ORIGINAL_CMD_JSON: {{ yamlString .OriginalCmd }}
+      NOOPS_SECRET_MAPPINGS_JSON: {{ yamlString .SecretMappingsJSON }}
 {{- range .Secrets }}
-      - {{ .EnvKey }}_FILE=/run/secrets/{{ .SecretName }}
+      {{ .EnvKey }}_FILE: {{ yamlString (printf "/run/secrets/%s" .SecretName) }}
 {{- end }}
 {{- end }}
     env_file:
@@ -23,7 +23,7 @@ services:
 {{- if $.UseWrapper }}
         target: {{ .SecretName }}
 {{- else }}
-        target: {{ .EnvKey }}
+        target: {{ .SecretName }}
 {{- end }}
         mode: 0400
 {{- end }}

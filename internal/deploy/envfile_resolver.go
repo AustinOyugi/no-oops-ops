@@ -17,7 +17,6 @@ func ResolveEnvFile(envFile EnvFile, environment string, resolvable []string) Re
 	for _, key := range resolvable {
 		allowset[key] = struct{}{}
 	}
-	hasAllowlist := resolvable != nil
 
 	for _, section := range envFile.Sections {
 		for _, item := range section.Items {
@@ -25,9 +24,7 @@ func ResolveEnvFile(envFile EnvFile, environment string, resolvable []string) Re
 				continue
 			}
 			if item.FromSecret != "" {
-				if !hasAllowlist {
-					resolved.SecretRefs = append(resolved.SecretRefs, EnvSecretRef{Key: item.Key, SecretName: item.FromSecret})
-				} else if _, ok := allowset[item.Key]; ok {
+				if _, ok := allowset[item.Key]; ok {
 					resolved.SecretRefs = append(resolved.SecretRefs, EnvSecretRef{Key: item.Key, SecretName: item.FromSecret})
 				}
 				continue

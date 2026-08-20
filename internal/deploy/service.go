@@ -58,7 +58,7 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		return Result{}, err
 	}
 
-	var resolvable []string
+	resolvable := []string{}
 	if m.Env.Secrets != nil {
 		resolvable = m.Env.Secrets.Resolvable
 	}
@@ -119,19 +119,22 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 	var wrapperCfg WrapperConfig
 
 	if resolutionMode == "env" && len(secretBindings) > 0 {
+		if err := pullImage(ctx, s.runner, releaseMetadata.RegistryImage); err != nil {
+			return Result{}, fmt.Errorf("pull application image: %w", err)
+		}
 		imgMeta, err := inspectImage(ctx, s.runner, releaseMetadata.RegistryImage)
 		if err != nil {
 			return Result{}, fmt.Errorf("inspect application image: %w", err)
 		}
-		wrapperCfg = BuildWrapperConfig(resolutionMode, releaseMetadata.RegistryImage, imgMeta, m, secretBindings, s.config.WrapperImage)
-	} else {
-		for _, binding := range secretBindings {
-			resolvedEnv.Values[binding.EnvKey+"_FILE"] = "/run/secrets/" + binding.EnvKey
+		wrapperCfg = BuildWrapperConfig(resolutionMode, releaseMetadata.RegistryImage, imgMeta, secretBindings, s.config.WrapperImage)
+		if !wrapperCfg.UseWrapper {
+			return Result{}, fmt.Errorf("application image %q has neither an entrypoint nor a command", releaseMetadata.RegistryImage)
 		}
-		envPath, err = writeEnvMap(s.config, m.Name, environment, resolvedEnv.Values)
+		wrappedImage, err := s.buildWrappedImage(ctx, releaseMetadata.RegistryImage, s.config.WrapperImage)
 		if err != nil {
-			return Result{}, err
+			return Result{}, fmt.Errorf("build wrapped application image: %w", err)
 		}
+		wrapperCfg.WrapperImage = wrappedImage
 	}
 
 	stackPath, err := writeStack(s.config, environment, m, releaseMetadata.RegistryImage, secretBindings, wrapperCfg)

@@ -7,7 +7,7 @@ func TestResolveEnvFileSeparatesValuesFromSecretReferences(t *testing.T) {
 		{Key: "APP_ENV", Value: "production"},
 		{Key: "DATABASE_URL", FromSecret: "PROD_DATABASE_URL"},
 		{Key: "LOG_LEVEL", Values: map[string]string{"prod": "info", "dev": "debug"}},
-	}}}}, "prod", nil)
+	}}}}, "prod", []string{"DATABASE_URL"})
 
 	if got, want := resolved.Values["APP_ENV"], "production"; got != want {
 		t.Errorf("APP_ENV = %q, want %q", got, want)
@@ -55,7 +55,7 @@ func TestResolveEnvFileAllowlistFiltersSecretRefs(t *testing.T) {
 	}
 }
 
-func TestResolveEnvFileNilAllowlistIncludesAllSecretRefs(t *testing.T) {
+func TestResolveEnvFileNilAllowlistExcludesAllSecretRefs(t *testing.T) {
 	envFile := EnvFile{Sections: []EnvSection{{Items: []EnvItem{
 		{Key: "A", FromSecret: "A_SECRET"},
 		{Key: "B", FromSecret: "B_SECRET"},
@@ -63,8 +63,8 @@ func TestResolveEnvFileNilAllowlistIncludesAllSecretRefs(t *testing.T) {
 
 	resolved := ResolveEnvFile(envFile, "dev", nil)
 
-	if len(resolved.SecretRefs) != 2 {
-		t.Fatalf("secret refs = %d, want 2", len(resolved.SecretRefs))
+	if len(resolved.SecretRefs) != 0 {
+		t.Fatalf("secret refs = %d, want 0", len(resolved.SecretRefs))
 	}
 }
 
