@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -67,7 +68,7 @@ func TestResolveEffectiveExecutionEmptyImage(t *testing.T) {
 }
 
 func TestBuildWrapperConfigNoSecretsReturnsNoWrapper(t *testing.T) {
-	cfg := BuildWrapperConfig("env", "myimage:v1", ImageMetadata{}, nil, "wrapper:v1")
+	cfg := BuildWrapperConfig("env", "myimage:v1", ImageMetadata{}, nil, nil)
 
 	if cfg.UseWrapper {
 		t.Error("expected UseWrapper=false when no secret bindings")
@@ -76,7 +77,7 @@ func TestBuildWrapperConfigNoSecretsReturnsNoWrapper(t *testing.T) {
 
 func TestBuildWrapperConfigFileModeReturnsNoWrapper(t *testing.T) {
 	bindings := []SecretBinding{{EnvKey: "REDIS_PASSWORD", SecretName: "REDIS_PASSWORD_SECRET"}}
-	cfg := BuildWrapperConfig("file", "myimage:v1", ImageMetadata{}, bindings, "wrapper:v1")
+	cfg := BuildWrapperConfig("file", "myimage:v1", ImageMetadata{}, nil, bindings)
 
 	if cfg.UseWrapper {
 		t.Error("expected UseWrapper=false when resolution is file")
@@ -93,13 +94,10 @@ func TestBuildWrapperConfigEnvModeReturnsWrapper(t *testing.T) {
 		{EnvKey: "AUTH_SECRET", SecretName: "AUTH_SECRET_SECRET"},
 	}
 
-	cfg := BuildWrapperConfig("env", "myimage:v1", img, bindings, "wrapper:v1")
+	cfg := BuildWrapperConfig("env", "myimage:v1", img, nil, bindings)
 
 	if !cfg.UseWrapper {
 		t.Fatal("expected UseWrapper=true")
-	}
-	if cfg.WrapperImage != "wrapper:v1" {
-		t.Errorf("WrapperImage = %q, want %q", cfg.WrapperImage, "wrapper:v1")
 	}
 	if cfg.OriginalImage != "myimage:v1" {
 		t.Errorf("OriginalImage = %q, want %q", cfg.OriginalImage, "myimage:v1")
@@ -137,23 +135,30 @@ func TestSecretMappingsString(t *testing.T) {
 		{EnvKey: "REDIS_PASSWORD", SecretName: "REDIS_PW_SECRET"},
 		{EnvKey: "AUTH_SECRET", SecretName: "AUTH_SECRET_SECRET"},
 	}
-	got := secretMappingsString(mappings)
-	want := `[{"env_key":"REDIS_PASSWORD","secret_name":"REDIS_PW_SECRET"},{"env_key":"AUTH_SECRET","secret_name":"AUTH_SECRET_SECRET"}]`
+	got := secretMappingsValue(mappings)
+	want := "REDIS_PASSWORD=/run/secrets/REDIS_PASSWORD,AUTH_SECRET=/run/secrets/AUTH_SECRET"
 	if got != want {
-		t.Errorf("secretMappingsString = %q, want %q", got, want)
+		t.Errorf("secretMappingsValue = %q, want %q", got, want)
 	}
 }
 
 func TestBuildWrapperConfigRejectsMissingExecutionContract(t *testing.T) {
-	cfg := BuildWrapperConfig("env", "myimage:v1", ImageMetadata{}, []SecretBinding{{EnvKey: "KEY", SecretName: "SECRET"}}, "wrapper:v1")
+	cfg := BuildWrapperConfig("env", "myimage:v1", ImageMetadata{}, nil, []SecretBinding{{EnvKey: "KEY", SecretName: "SECRET"}})
 	if cfg.UseWrapper {
 		t.Error("expected no wrapper when the image has no entrypoint or command")
 	}
 }
 
 func TestWrappedImageDockerfileUsesApplicationImageAsBase(t *testing.T) {
-	got := wrappedImageDockerfile("registry/app:v1", "registry/wrapper:v1")
-	if !strings.Contains(got, "FROM registry/app:v1") || !strings.Contains(got, "COPY --from=registry/wrapper:v1 /bootstrap.sh /bootstrap.sh") {
+	got := wrappedImageDockerfile("registry/app:v1")
+	if !strings.Contains(got, "FROM registry/app:v1") || !strings.Contains(got, "COPY bootstrap.sh /bootstrap.sh") {
 		t.Fatalf("unexpected Dockerfile:\n%s", got)
+	}
+}
+
+func TestBuildWrapperConfigUsesManifestCommand(t *testing.T) {
+	cfg := BuildWrapperConfig("env", "myimage:v1", ImageMetadata{Entrypoint: []string{"run"}, Cmd: []string{"default"}}, []string{"override"}, []SecretBinding{{EnvKey: "KEY", SecretName: "SECRET"}})
+	if got, want := cfg.EffectiveExec.Cmd, []string{"override"}; !slices.Equal(got, want) {
+		t.Errorf("command = %v, want %v", got, want)
 	}
 }

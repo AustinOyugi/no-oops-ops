@@ -1,0 +1,40 @@
+name: postgres
+
+image:
+  repository: docker.io/bitnamilegacy/postgresql
+  tag: 14
+  build: false
+
+service:
+  internal_port: 5432
+
+healthcheck:
+  test:
+    - CMD
+    - pg_isready
+    - -Upostgres
+  start_period: 60s
+  interval: 10s
+  timeout: 10s
+  retries: 3
+
+env:
+  file: postgres.env.yml
+
+  secrets:
+    resolution: file
+    resolvable:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+
+rollout:
+  parallelism: 1
+  delay: 10s
+  order: start-first
+  failure_action: rollback
+  restart_condition: on-failure
+  restart_delay: 10s
+  restart_max_attempts: 5
+  restart_window: 70s
+  readiness_timeout: 30s
+  readiness_interval: 2s

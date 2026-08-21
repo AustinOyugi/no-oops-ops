@@ -2,6 +2,10 @@ package manifest
 
 import "testing"
 
+func boolPtr(value bool) *bool {
+	return &value
+}
+
 func TestValidateAcceptsValidResolutionMode(t *testing.T) {
 	for _, mode := range []string{"env", "file"} {
 		secrets := &EnvSecrets{Resolution: mode, Resolvable: []string{"KEY"}}
@@ -47,6 +51,32 @@ func TestValidateAcceptsNilSecrets(t *testing.T) {
 
 	if err := m.Validate(); err != nil {
 		t.Errorf("nil secrets should be valid: %v", err)
+	}
+}
+
+func TestValidateAllowsExternalImageWithoutSource(t *testing.T) {
+	m := Manifest{
+		Name:        "test",
+		Image:       Image{Repository: "quay.io/example/app", Tag: "1.0", Build: boolPtr(false)},
+		Service:     Service{InternalPort: 8080},
+		Healthcheck: Healthcheck{Test: []string{"CMD", "true"}},
+	}
+
+	if err := m.Validate(); err != nil {
+		t.Fatalf("external image manifest should be valid: %v", err)
+	}
+}
+
+func TestValidateRequiresSourceForBuiltImage(t *testing.T) {
+	m := Manifest{
+		Name:        "test",
+		Image:       Image{Repository: "repo", Build: boolPtr(true)},
+		Service:     Service{InternalPort: 8080},
+		Healthcheck: Healthcheck{Test: []string{"CMD", "true"}},
+	}
+
+	if err := m.Validate(); err == nil {
+		t.Fatal("expected source validation error for built image")
 	}
 }
 

@@ -220,6 +220,7 @@ noops status
 noops release <environment> <manifest>
 noops deploy <environment> <manifest> [release-tag]
 noops rollback <environment> <manifest>
+noops remove <environment> <manifest>
 noops secret set <environment> <key>
 noops secret list <environment>
 ```
@@ -349,6 +350,7 @@ Notes:
 
 - `source.context` and `source.dockerfile` may be absolute paths or paths relative to the manifest file.
 - `source.build.command` is optional.
+- `volumes` accepts Docker's short mount syntax. Named volumes are created and scoped to the stack; absolute or relative host paths are bind mounts.
 - `rollout.readiness_timeout` and `rollout.readiness_interval` are `No Oops Ops` settings, not Docker Stack fields.
 - The Docker stack image is resolved from release metadata, not directly from `image.repository`.
 

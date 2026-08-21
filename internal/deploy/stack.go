@@ -43,11 +43,12 @@ type stackTemplateData struct {
 	RestartMaxAttempts     int
 	RestartWindow          string
 	Secrets                []SecretBinding
+	Volumes                []string
+	NamedVolumes           []string
 	UseWrapper             bool
 	WrapperImage           string
-	OriginalEntrypoint     string
-	OriginalCmd            string
-	SecretMappingsJSON     string
+	OriginalCommand        string
+	SecretMappings         string
 }
 
 type SecretBinding struct {
@@ -133,11 +134,12 @@ func writeStack(cfg config.Config, environment string, m manifest.Manifest, imag
 		RestartMaxAttempts:     m.Rollout.RestartMaxAttempts,
 		RestartWindow:          m.Rollout.RestartWindow,
 		Secrets:                secrets,
+		Volumes:                m.Volumes,
+		NamedVolumes:           namedVolumes(m.Volumes),
 		UseWrapper:             wrapperCfg.UseWrapper,
 		WrapperImage:           wrapperCfg.WrapperImage,
-		OriginalEntrypoint:     jsonStringSlice(wrapperCfg.EffectiveExec.Entrypoint),
-		OriginalCmd:            jsonStringSlice(wrapperCfg.EffectiveExec.Cmd),
-		SecretMappingsJSON:     secretMappingsString(wrapperCfg.SecretMappings),
+		OriginalCommand:        jsonStringSlice(append(wrapperCfg.EffectiveExec.Entrypoint, wrapperCfg.EffectiveExec.Cmd...)),
+		SecretMappings:         secretMappingsValue(wrapperCfg.SecretMappings),
 	})
 	if err != nil {
 		return "", err
@@ -151,6 +153,37 @@ func writeStack(cfg config.Config, environment string, m manifest.Manifest, imag
 	}
 
 	return path, nil
+}
+
+// namedVolumes returns the named sources from Docker's short volume syntax.
+// Host paths are bind mounts and must not be declared in the stack's top-level
+// volumes section.
+func namedVolumes(mounts []string) []string {
+	seen := make(map[string]struct{})
+	volumes := make([]string, 0, len(mounts))
+
+	for _, mount := range mounts {
+		source, _, hasTarget := strings.Cut(mount, ":")
+		if !hasTarget || isBindMountSource(source) {
+			continue
+		}
+		if _, exists := seen[source]; exists {
+			continue
+		}
+		seen[source] = struct{}{}
+		volumes = append(volumes, source)
+	}
+
+	return volumes
+}
+
+func isBindMountSource(source string) bool {
+	return source == "" ||
+		strings.HasPrefix(source, "/") ||
+		strings.HasPrefix(source, "./") ||
+		strings.HasPrefix(source, "../") ||
+		strings.HasPrefix(source, "~/") ||
+		strings.Contains(source, "/")
 }
 
 func renderStackTemplate(data stackTemplateData) ([]byte, error) {

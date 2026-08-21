@@ -5,27 +5,27 @@ services:
     image: {{ .Image }}
 {{- if .UseWrapper }}
     entrypoint: ["/bin/sh", "/bootstrap.sh"]
-    command: []
+    command: {{ .OriginalCommand }}
     environment:
-      NOOPS_ORIGINAL_ENTRYPOINT_JSON: {{ yamlString .OriginalEntrypoint }}
-      NOOPS_ORIGINAL_CMD_JSON: {{ yamlString .OriginalCmd }}
-      NOOPS_SECRET_MAPPINGS_JSON: {{ yamlString .SecretMappingsJSON }}
+      NOOPS_SECRET_MAPPINGS: {{ yamlString .SecretMappings }}
 {{- range .Secrets }}
-      {{ .EnvKey }}_FILE: {{ yamlString (printf "/run/secrets/%s" .SecretName) }}
+      {{ .EnvKey }}_FILE: {{ yamlString (printf "/run/secrets/%s" .EnvKey) }}
 {{- end }}
 {{- end }}
     env_file:
       - .env
+{{- if .Volumes }}
+    volumes:
+{{- range .Volumes }}
+      - {{ yamlString . }}
+{{- end }}
+{{- end }}
 {{- if .Secrets }}
     secrets:
 {{- range .Secrets }}
       - source: {{ .SwarmName }}
-{{- if $.UseWrapper }}
-        target: {{ .SecretName }}
-{{- else }}
-        target: {{ .SecretName }}
-{{- end }}
-        mode: 0400
+        target: {{ .EnvKey }}
+        mode: 0444
 {{- end }}
 {{- end }}
     healthcheck:
@@ -55,6 +55,13 @@ services:
 networks:
   {{ .Network }}:
     external: true
+{{- if .NamedVolumes }}
+
+volumes:
+{{- range .NamedVolumes }}
+  {{ yamlString . }}:
+{{- end }}
+{{- end }}
 {{- if .Secrets }}
 
 secrets:

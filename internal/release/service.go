@@ -45,16 +45,22 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 	image := fmt.Sprintf("%s:%s", m.Image.Repository, tag)
 	registryImage := registryImage(s.config, image)
 
-	baseDir := filepath.Dir(absPath)
-	contextDir := resolveSourcePath(baseDir, m.Source.Context)
-	dockerfile := resolveSourcePath(baseDir, m.Source.Dockerfile)
+	if m.Image.ShouldBuild() {
+		baseDir := filepath.Dir(absPath)
+		contextDir := resolveSourcePath(baseDir, m.Source.Context)
+		dockerfile := resolveSourcePath(baseDir, m.Source.Dockerfile)
 
-	if err := s.runBuildCommand(ctx, contextDir, m.Source.Build.Command); err != nil {
-		return Result{}, err
-	}
+		if err := s.runBuildCommand(ctx, contextDir, m.Source.Build.Command); err != nil {
+			return Result{}, err
+		}
 
-	if err := s.buildImage(ctx, registryImage, dockerfile, contextDir); err != nil {
-		return Result{}, err
+		if err := s.buildImage(ctx, registryImage, dockerfile, contextDir); err != nil {
+			return Result{}, err
+		}
+	} else {
+		if err := s.buildPulledImage(ctx, registryImage, m.Image.Repository, m.Image.Tag); err != nil {
+			return Result{}, err
+		}
 	}
 
 	if err := s.pushImage(ctx, registryImage); err != nil {
@@ -85,6 +91,33 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 		Pushed:        true,
 		Manifest:      m,
 	}, nil
+}
+
+func (s *Service) buildPulledImage(ctx context.Context, targetImage, repository, tag string) error {
+	contextDir, err := os.MkdirTemp("", "noops-release-*")
+	if err != nil {
+		return fmt.Errorf("create temporary Docker build context: %w", err)
+	}
+
+	defer func(path string) {
+		err := os.RemoveAll(path)
+		if err != nil {
+
+		}
+	}(contextDir)
+
+	dockerfile := filepath.Join(contextDir, "Dockerfile")
+	sourceImage := fmt.Sprintf("%s:%s", repository, tag)
+
+	if err := os.WriteFile(dockerfile, []byte(fmt.Sprintf("FROM %s\n", sourceImage)), 0o600); err != nil {
+		return fmt.Errorf("write temporary Dockerfile: %w", err)
+	}
+
+	if err := s.buildImage(ctx, targetImage, dockerfile, contextDir); err != nil {
+		return fmt.Errorf("build release image from %q: %w", sourceImage, err)
+	}
+
+	return nil
 }
 
 func resolveSourcePath(baseDir string, value string) string {

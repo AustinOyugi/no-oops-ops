@@ -19,12 +19,14 @@ func (m Manifest) Validate() error {
 		return fmt.Errorf("healthcheck.test is required")
 	}
 
-	if m.Source.Context == "" {
-		return fmt.Errorf("source.context is required")
-	}
+	if m.Image.ShouldBuild() {
+		if m.Source.Context == "" {
+			return fmt.Errorf("source.context is required when image.build is true")
+		}
 
-	if m.Source.Dockerfile == "" {
-		return fmt.Errorf("source.dockerfile is required")
+		if m.Source.Dockerfile == "" {
+			return fmt.Errorf("source.dockerfile is required when image.build is true")
+		}
 	}
 
 	if m.Env.Secrets != nil {

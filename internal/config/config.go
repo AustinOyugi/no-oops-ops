@@ -18,8 +18,6 @@ type Config struct {
 
 	RegistryName string
 	RegistryPort string
-
-	WrapperImage string
 }
 
 const defaultAppName = "noops"
@@ -28,7 +26,6 @@ const defaultNetworkName = "noops-net"
 
 const defaultRegistryName = "noops-registry"
 const defaultRegistryPort = "5000"
-const defaultWrapperImage = "ghcr.io/austinoyugi/noops-wrapper:latest"
 
 var Version = "dev"
 
@@ -53,7 +50,6 @@ func Load() (Config, error) {
 		NetworkName:    envOrDefault("NOOPS_NETWORK_NAME", defaultNetworkName),
 		RegistryName:   envOrDefault("NOOPS_REGISTRY_NAME", defaultRegistryName),
 		RegistryPort:   envOrDefault("NOOPS_REGISTRY_PORT", defaultRegistryPort),
-		WrapperImage:   envOrDefault("NOOPS_WRAPPER_IMAGE", defaultWrapperImage),
 	}, nil
 }
 

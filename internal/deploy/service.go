@@ -58,7 +58,7 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		return Result{}, err
 	}
 
-	resolvable := []string{}
+	var resolvable []string
 	if m.Env.Secrets != nil {
 		resolvable = m.Env.Secrets.Resolvable
 	}
@@ -84,7 +84,6 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 	}
 
 	var releaseTag string
-
 	if optionalReleaseVersion != "" {
 		releaseTag = optionalReleaseVersion
 	} else {
@@ -126,11 +125,11 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		if err != nil {
 			return Result{}, fmt.Errorf("inspect application image: %w", err)
 		}
-		wrapperCfg = BuildWrapperConfig(resolutionMode, releaseMetadata.RegistryImage, imgMeta, secretBindings, s.config.WrapperImage)
+		wrapperCfg = BuildWrapperConfig(resolutionMode, releaseMetadata.RegistryImage, imgMeta, m.Service.Command, secretBindings)
 		if !wrapperCfg.UseWrapper {
 			return Result{}, fmt.Errorf("application image %q has neither an entrypoint nor a command", releaseMetadata.RegistryImage)
 		}
-		wrappedImage, err := s.buildWrappedImage(ctx, releaseMetadata.RegistryImage, s.config.WrapperImage)
+		wrappedImage, err := s.buildWrappedImage(ctx, releaseMetadata.RegistryImage, m.Name)
 		if err != nil {
 			return Result{}, fmt.Errorf("build wrapped application image: %w", err)
 		}

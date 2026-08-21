@@ -1,11 +1,13 @@
 package deploy
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
+	_ "embed"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
@@ -34,6 +36,9 @@ type WrapperConfig struct {
 	EffectiveExec  EffectiveExecution
 	SecretMappings []SecretMapping
 }
+
+//go:embed templates/bootstrap.sh
+var bootstrapScript []byte
 
 func pullImage(ctx context.Context, runner *command.Runner, imageRef string) error {
 	result, err := runner.Run(ctx, "docker", []string{"pull", imageRef}, command.RunOptions{})
@@ -93,14 +98,14 @@ func BuildWrapperConfig(
 	resolutionMode string,
 	imageRef string,
 	imgMeta ImageMetadata,
+	manifestCmd []string,
 	secretBindings []SecretBinding,
-	wrapperImage string,
 ) WrapperConfig {
 	if resolutionMode != "env" || len(secretBindings) == 0 {
 		return WrapperConfig{UseWrapper: false}
 	}
 
-	execution := ResolveEffectiveExecution(imgMeta, nil, nil)
+	execution := ResolveEffectiveExecution(imgMeta, nil, manifestCmd)
 	if len(execution.Entrypoint) == 0 && len(execution.Cmd) == 0 {
 		return WrapperConfig{}
 	}
@@ -115,7 +120,6 @@ func BuildWrapperConfig(
 
 	return WrapperConfig{
 		UseWrapper:     true,
-		WrapperImage:   wrapperImage,
 		OriginalImage:  imageRef,
 		EffectiveExec:  execution,
 		SecretMappings: mappings,
@@ -130,30 +134,54 @@ func jsonStringSlice(s []string) string {
 	return string(data)
 }
 
-func secretMappingsString(mappings []SecretMapping) string {
-	data, _ := json.Marshal(mappings)
-	return string(data)
+func secretMappingsValue(mappings []SecretMapping) string {
+	values := make([]string, len(mappings))
+	for i, mapping := range mappings {
+		values[i] = mapping.EnvKey + "=/run/secrets/" + mapping.EnvKey
+	}
+	return strings.Join(values, ",")
 }
 
-func wrappedImageRef(cfg config.Config, applicationImage, wrapperImage string) string {
-	sum := sha256.Sum256([]byte(applicationImage + "\x00" + wrapperImage))
-	return fmt.Sprintf("127.0.0.1:%s/noops-runtime:%x", cfg.RegistryPort, sum[:12])
+func wrappedImageRef(cfg config.Config, applicationImage, applicationName string) string {
+	sum := sha256.Sum256(append([]byte(applicationImage+"\x00"), bootstrapScript...))
+	return fmt.Sprintf("127.0.0.1:%s/%s:%x", cfg.RegistryPort, applicationName, sum[:12])
 }
 
-func wrappedImageDockerfile(applicationImage, wrapperImage string) string {
-	return fmt.Sprintf("FROM %s\nCOPY --from=%s /bootstrap.sh /bootstrap.sh\n", applicationImage, wrapperImage)
+func wrappedImageDockerfile(applicationImage string) string {
+	return fmt.Sprintf("FROM %s\nCOPY bootstrap.sh /bootstrap.sh\n", applicationImage)
 }
 
-func (s *Service) buildWrappedImage(ctx context.Context, applicationImage, wrapperImage string) (string, error) {
-	image := wrappedImageRef(s.config, applicationImage, wrapperImage)
-	dockerfile := wrappedImageDockerfile(applicationImage, wrapperImage)
-	result, err := s.runner.Run(ctx, "docker", []string{"build", "--pull", "-t", image, "-f", "-", "."}, command.RunOptions{Stdin: bytes.NewBufferString(dockerfile)})
+func (s *Service) buildWrappedImage(ctx context.Context, applicationImage, applicationName string) (string, error) {
+	contextDir, err := os.MkdirTemp("", "noops-wrapper-*")
+	if err != nil {
+		return "", fmt.Errorf("create wrapper build context: %w", err)
+	}
+	defer func(path string) {
+		err := os.RemoveAll(path)
+		if err != nil {
+
+		}
+	}(contextDir)
+
+	dockerfilePath := filepath.Join(contextDir, "Dockerfile")
+	if err := os.WriteFile(dockerfilePath, []byte(wrappedImageDockerfile(applicationImage)), 0o644); err != nil {
+		return "", fmt.Errorf("write wrapper Dockerfile: %w", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(contextDir, "bootstrap.sh"), bootstrapScript, 0o644); err != nil {
+		return "", fmt.Errorf("write wrapper bootstrap script: %w", err)
+	}
+
+	image := wrappedImageRef(s.config, applicationImage, applicationName)
+	result, err := s.runner.Run(ctx, "docker", []string{"build", "-t", image, "-f", dockerfilePath, contextDir}, command.RunOptions{})
 	if err != nil {
 		return "", fmt.Errorf("build %q: %w: %s", image, err, strings.TrimSpace(string(result.Output)))
 	}
+
 	result, err = s.runner.Run(ctx, "docker", []string{"push", image}, command.RunOptions{})
 	if err != nil {
 		return "", fmt.Errorf("push %q: %w: %s", image, err, strings.TrimSpace(string(result.Output)))
 	}
+
 	return image, nil
 }
