@@ -10,8 +10,13 @@ type EnvSecretRef struct {
 	SecretName string
 }
 
-func ResolveEnvFile(envFile EnvFile, environment string) ResolvedEnv {
+func ResolveEnvFile(envFile EnvFile, environment string, resolvable []string) ResolvedEnv {
 	resolved := ResolvedEnv{Values: map[string]string{}}
+
+	allowset := make(map[string]struct{}, len(resolvable))
+	for _, key := range resolvable {
+		allowset[key] = struct{}{}
+	}
 
 	for _, section := range envFile.Sections {
 		for _, item := range section.Items {
@@ -19,7 +24,9 @@ func ResolveEnvFile(envFile EnvFile, environment string) ResolvedEnv {
 				continue
 			}
 			if item.FromSecret != "" {
-				resolved.SecretRefs = append(resolved.SecretRefs, EnvSecretRef{Key: item.Key, SecretName: item.FromSecret})
+				if _, ok := allowset[item.Key]; ok {
+					resolved.SecretRefs = append(resolved.SecretRefs, EnvSecretRef{Key: item.Key, SecretName: item.FromSecret})
+				}
 				continue
 			}
 

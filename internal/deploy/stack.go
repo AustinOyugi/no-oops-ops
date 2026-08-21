@@ -8,7 +8,10 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
+
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -40,6 +43,12 @@ type stackTemplateData struct {
 	RestartMaxAttempts     int
 	RestartWindow          string
 	Secrets                []SecretBinding
+	Volumes                []string
+	NamedVolumes           []string
+	UseWrapper             bool
+	WrapperImage           string
+	OriginalCommand        string
+	SecretMappings         string
 }
 
 type SecretBinding struct {
@@ -95,15 +104,20 @@ func writeEnvMap(cfg config.Config, appName string, environment string, values m
 	return path, nil
 }
 
-func writeStack(cfg config.Config, environment string, m manifest.Manifest, image string, secrets []SecretBinding) (string, error) {
+func writeStack(cfg config.Config, environment string, m manifest.Manifest, image string, secrets []SecretBinding, wrapperCfg WrapperConfig) (string, error) {
 	dir := appDir(cfg, m.Name, environment)
 	if err := os.MkdirAll(dir, appDirMode); err != nil {
 		return "", fmt.Errorf("create app dir %q: %w", dir, err)
 	}
 
+	stackImage := image
+	if wrapperCfg.UseWrapper {
+		stackImage = wrapperCfg.WrapperImage
+	}
+
 	rendered, err := renderStackTemplate(stackTemplateData{
 		ServiceName:            serviceName(environment, m.Name),
-		Image:                  image,
+		Image:                  stackImage,
 		Network:                m.Service.Network,
 		Replicas:               m.Service.Replicas,
 		HealthcheckTest:        m.Healthcheck.Test,
@@ -120,6 +134,12 @@ func writeStack(cfg config.Config, environment string, m manifest.Manifest, imag
 		RestartMaxAttempts:     m.Rollout.RestartMaxAttempts,
 		RestartWindow:          m.Rollout.RestartWindow,
 		Secrets:                secrets,
+		Volumes:                m.Volumes,
+		NamedVolumes:           namedVolumes(m.Volumes),
+		UseWrapper:             wrapperCfg.UseWrapper,
+		WrapperImage:           wrapperCfg.WrapperImage,
+		OriginalCommand:        jsonStringSlice(append(wrapperCfg.EffectiveExec.Entrypoint, wrapperCfg.EffectiveExec.Cmd...)),
+		SecretMappings:         secretMappingsValue(wrapperCfg.SecretMappings),
 	})
 	if err != nil {
 		return "", err
@@ -135,8 +155,41 @@ func writeStack(cfg config.Config, environment string, m manifest.Manifest, imag
 	return path, nil
 }
 
+// namedVolumes returns the named sources from Docker's short volume syntax.
+// Host paths are bind mounts and must not be declared in the stack's top-level
+// volumes section.
+func namedVolumes(mounts []string) []string {
+	seen := make(map[string]struct{})
+	volumes := make([]string, 0, len(mounts))
+
+	for _, mount := range mounts {
+		source, _, hasTarget := strings.Cut(mount, ":")
+		if !hasTarget || isBindMountSource(source) {
+			continue
+		}
+		if _, exists := seen[source]; exists {
+			continue
+		}
+		seen[source] = struct{}{}
+		volumes = append(volumes, source)
+	}
+
+	return volumes
+}
+
+func isBindMountSource(source string) bool {
+	return source == "" ||
+		strings.HasPrefix(source, "/") ||
+		strings.HasPrefix(source, "./") ||
+		strings.HasPrefix(source, "../") ||
+		strings.HasPrefix(source, "~/") ||
+		strings.Contains(source, "/")
+}
+
 func renderStackTemplate(data stackTemplateData) ([]byte, error) {
-	tpl, err := template.New(appStackTemplate).Parse(appStackTemplateContents)
+	tpl, err := template.New(appStackTemplate).Funcs(template.FuncMap{
+		"yamlString": yamlString,
+	}).Parse(appStackTemplateContents)
 	if err != nil {
 		return nil, fmt.Errorf("parse stack template %q: %w", appStackTemplate, err)
 	}
@@ -147,4 +200,12 @@ func renderStackTemplate(data stackTemplateData) ([]byte, error) {
 	}
 
 	return out.Bytes(), nil
+}
+
+func yamlString(value string) string {
+	data, err := yaml.Marshal(value)
+	if err != nil {
+		panic(err)
+	}
+	return strings.TrimSuffix(string(data), "\n")
 }

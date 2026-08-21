@@ -26,12 +26,19 @@ type SourceBuild struct {
 type Image struct {
 	Repository string `yaml:"repository"`
 	Tag        string `yaml:"tag"`
+	Build      *bool  `yaml:"build"`
+}
+
+func (i Image) ShouldBuild() bool {
+	return i.Build == nil || *i.Build
 }
 
 type Service struct {
-	InternalPort int    `yaml:"internal_port"`
-	Replicas     int    `yaml:"replicas"`
-	Network      string `yaml:"network"`
+	InternalPort int      `yaml:"internal_port"`
+	ExternalPort int      `yaml:"external_port"`
+	Replicas     int      `yaml:"replicas"`
+	Network      string   `yaml:"network"`
+	Command      []string `yaml:"command"`
 }
 
 type Healthcheck struct {
@@ -62,5 +69,11 @@ type Expose struct {
 }
 
 type Env struct {
-	File string `yaml:"file"`
+	File    string      `yaml:"file"`
+	Secrets *EnvSecrets `yaml:"secrets"`
+}
+
+type EnvSecrets struct {
+	Resolution string   `yaml:"resolution"`
+	Resolvable []string `yaml:"resolvable"`
 }

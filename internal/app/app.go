@@ -33,6 +33,7 @@ type App struct {
 type deployer interface {
 	Run(ctx context.Context, environment string, path string, optionalReleaseVersion string) (deploy.Result, error)
 	Rollback(ctx context.Context, environment string, path string) (deploy.Result, error)
+	Remove(ctx context.Context, environment string, path string) (deploy.RemoveResult, error)
 }
 
 type doctorRunner interface {
@@ -103,6 +104,10 @@ func (a *App) Run(ctx context.Context, args []string) error {
 
 	if len(args) > 0 && args[0] == "rollback" {
 		return a.runRollback(ctx, args[1:])
+	}
+
+	if len(args) > 0 && args[0] == "remove" {
+		return a.runRemove(ctx, args[1:])
 	}
 
 	if len(args) > 0 && args[0] == "release" {

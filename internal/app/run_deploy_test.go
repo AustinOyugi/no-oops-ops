@@ -33,6 +33,10 @@ func (d *recordingDeployer) Rollback(context.Context, string, string) (deploy.Re
 	return deploy.Result{}, nil
 }
 
+func (d *recordingDeployer) Remove(context.Context, string, string) (deploy.RemoveResult, error) {
+	return deploy.RemoveResult{}, nil
+}
+
 func TestRunDeployStopsBeforeDeployingWhenPreflightFails(t *testing.T) {
 	deployer := &recordingDeployer{}
 	application := &App{

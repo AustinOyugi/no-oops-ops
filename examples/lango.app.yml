@@ -11,6 +11,7 @@ source:
 
 image:
   repository: lango-service
+  replicas: 2
 
 service:
   internal_port: 8080
@@ -28,6 +29,13 @@ healthcheck:
 
 env:
   file: lango.env.yml
+
+  secrets:
+    resolution: env
+
+    resolvable:
+      - REDIS_PASSWORD
+      - AUTH_SERVER_API_CLIENT_SECRET
 
 rollout:
   parallelism: 1

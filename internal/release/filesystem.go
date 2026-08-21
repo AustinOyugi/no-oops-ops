@@ -16,6 +16,38 @@ func NewFilesystemStore() Store {
 	return fileSystemStore{}
 }
 
+// ListHistory returns all release records for an app environment. Missing
+// history is treated as empty so cleanup can safely be retried.
+func ListHistory(cfg config.Config, appName, environment string) ([]Metadata, error) {
+	dir := releaseHistoryDir(cfg, appName, environment)
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return []Metadata{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read release history %q: %w", dir, err)
+	}
+
+	metadata := make([]Metadata, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("read release metadata %q: %w", path, err)
+		}
+		var item Metadata
+		if err := json.Unmarshal(data, &item); err != nil {
+			return nil, fmt.Errorf("decode release metadata %q: %w", path, err)
+		}
+		metadata = append(metadata, item)
+	}
+
+	return metadata, nil
+}
+
 func saveMetadataHistory(cfg config.Config, appName string, metadata Metadata) (string, error) {
 	dir := releaseHistoryMetadataDir(cfg, appName, metadata.Environment)
 

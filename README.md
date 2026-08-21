@@ -11,6 +11,7 @@ The current implementation focuses on a practical local/server workflow:
 - wait for service readiness and surface useful diagnostics
 - manage environment-scoped, versioned Docker Swarm secrets
 - retain release and deployment history, including rollback to the prior deployment
+- remove an app environment along with its release artifacts
 
 The goal is to keep simple deployments repeatable without building a full DevOps platform.
 
@@ -116,8 +117,9 @@ noops release prod examples/lango.app.yml
 Release currently does:
 
 - loads the app manifest
-- runs the optional pre-build command from `source.build.command`
-- builds the Docker image directly with the internal registry name and a generated timestamp tag
+- for source builds, runs the optional pre-build command from `source.build.command` and builds the Docker image
+- for `image.build: false`, creates a temporary Dockerfile with `FROM <repository>:<tag>` to capture the upstream image
+- tags the result with the internal registry name and a generated timestamp tag
 - pushes it to the internal registry
 - writes versioned release metadata
 
@@ -198,12 +200,34 @@ rollback can restore the version it replaced. At least two successful deployment
 required before rollback is available. Unlike `deploy`, rollback does not currently run
 the deploy-readiness preflight automatically.
 
+## Remove an App
+
+Remove one app environment with its manifest:
+
+```bash
+noops remove dev examples/keycloak.app.yml
+```
+
+Removal is scoped to the manifest's app name and the supplied environment. It removes
+the Docker Stack (and therefore its Swarm service and tasks), deletes the recorded
+release and runtime-wrapper image manifests from the internal registry, and deletes:
+
+```text
+<state-dir>/apps/<app>/<environment>/
+```
+
+This removes generated `.env` and stack files, release metadata, and deployment
+history. It intentionally preserves named volumes and environment secrets. Removing a
+registry manifest makes its layers eligible for garbage collection; reclaiming that
+disk space requires a separate registry GC run while the registry is stopped.
+
 ## Doctor
 
 `doctor` reports whether the local platform is healthy. It has two profiles:
 
 - `noops doctor` runs the full diagnostic profile, including installation artifacts.
-- `noops doctor --deploy-ready` runs only the runtime prerequisites required before a deployment: Docker, Swarm, manager authority, the shared network, and the registry service.
+- `noops doctor --deploy-ready` runs only the runtime prerequisites required before a deployment: Docker, Swarm, manager
+  authority, the shared network, and the registry service.
 
 `deploy` runs the deploy-readiness profile automatically and stops before applying a
 stack when it finds a blocking failure.
@@ -220,6 +244,7 @@ noops status
 noops release <environment> <manifest>
 noops deploy <environment> <manifest> [release-tag]
 noops rollback <environment> <manifest>
+noops remove <environment> <manifest>
 noops secret set <environment> <key>
 noops secret list <environment>
 ```
@@ -289,12 +314,12 @@ During deployment, No Oops Ops mounts the referenced Swarm secret at
 Settings can be supplied as environment variables or in
 `$XDG_CONFIG_HOME/noops/.env.noops` (normally `~/.config/noops/.env.noops`):
 
-| Variable                | Default                     | Purpose                                 |
-|-------------------------|-----------------------------|-----------------------------------------|
-| `NOOPS_STATE_DIR`       | XDG state directory / `noops` | Directory for install and app artifacts |
-| `NOOPS_NETWORK_NAME`    | `noops-net`                 | Shared Docker Swarm network             |
-| `NOOPS_REGISTRY_NAME`   | `noops-registry`            | Internal registry service name          |
-| `NOOPS_REGISTRY_PORT`   | `5000`                      | Internal registry port                  |
+| Variable              | Default                       | Purpose                                 |
+|-----------------------|-------------------------------|-----------------------------------------|
+| `NOOPS_STATE_DIR`     | XDG state directory / `noops` | Directory for install and app artifacts |
+| `NOOPS_NETWORK_NAME`  | `noops-net`                   | Shared Docker Swarm network             |
+| `NOOPS_REGISTRY_NAME` | `noops-registry`              | Internal registry service name          |
+| `NOOPS_REGISTRY_PORT` | `5000`                        | Internal registry port                  |
 
 ## App Manifest
 
@@ -314,9 +339,16 @@ source:
 
 image:
   repository: lango-service
+  # Omit or set true to build from source. Set false to snapshot repository:tag.
+  build: true
 
 service:
   internal_port: 8080
+  replicas: 1
+
+volumes:
+  - lango-data:/var/lib/lango
+  - ./themes:/opt/lango/themes:ro
 
 healthcheck:
   test:
@@ -349,6 +381,11 @@ Notes:
 
 - `source.context` and `source.dockerfile` may be absolute paths or paths relative to the manifest file.
 - `source.build.command` is optional.
+- `image.build` defaults to `true`. With `false`, `source` is optional and the release snapshots `image.repository:image.tag`
+  into the internal registry under an immutable release tag.
+- `service.replicas` defaults to `1` and is rendered as Docker Swarm's `deploy.replicas`.
+- `volumes` accepts Docker's short mount syntax. Named volumes are created and scoped to the stack; absolute or relative
+  host paths are bind mounts.
 - `rollout.readiness_timeout` and `rollout.readiness_interval` are `No Oops Ops` settings, not Docker Stack fields.
 - The Docker stack image is resolved from release metadata, not directly from `image.repository`.
 
@@ -408,6 +445,7 @@ service rather than treating a host-level `curl` request as a definitive health 
 - Router and TLS are not implemented yet.
 - There is no dedicated release-list command yet.
 - The internal registry currently uses an insecure local HTTP registry.
+- Registry garbage collection is manual; app removal deletes image manifests but does not immediately reclaim layer storage.
 - App readiness checks Docker container health, not router-level HTTP availability.
 
 ## Direction
@@ -415,9 +453,9 @@ service rather than treating a host-level `curl` request as a definitive health 
 The next major areas are:
 
 - release-list command
-- registry cleanup and GC policy
+- registry GC policy
 - router/exposure
-- richer deploy status and app lifecycle commands
+- richer deploy status and app lifecycle commands beyond remove
 
 ## License
 
