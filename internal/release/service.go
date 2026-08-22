@@ -69,10 +69,12 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 
 	metadataHistoryPath, err := saveMetadataHistory(s.config, m.Name, Metadata{
 		App:           m.Name,
+		Build:         m.Image.ShouldBuild(),
 		CreateAt:      time.Now().UTC(),
 		Environment:   environment,
 		Image:         image,
 		RegistryImage: registryImage,
+		SourceTag:     sourceTag(m),
 		Tag:           tag,
 	})
 
@@ -134,6 +136,17 @@ func registryImage(cfg config.Config, image string) string {
 
 func releaseTag() string {
 	return time.Now().UTC().Format("20060102-150405")
+}
+
+// sourceTag records the mutable upstream tag that was snapshotted when an
+// external image release is requested. Source builds have no upstream image
+// tag to retain.
+func sourceTag(m manifest.Manifest) string {
+	if m.Image.ShouldBuild() {
+		return ""
+	}
+
+	return m.Image.Tag
 }
 
 func (s *Service) pushImage(ctx context.Context, image string) error {

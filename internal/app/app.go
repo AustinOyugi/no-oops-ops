@@ -77,10 +77,6 @@ func New(cfg config.Config) (*App, error) {
 }
 
 func (a *App) Run(ctx context.Context, args []string) error {
-	if len(args) > 0 && args[0] == "version" {
-		a.logger.InfoContext(ctx, "No Oops Ops", "version", a.config.InstallVersion)
-		return nil
-	}
 
 	if len(args) > 0 && args[0] == "doctor" {
 		return a.runDoctor(ctx, args[1:])
@@ -123,5 +119,10 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		return errors.New("unknown command")
 	}
 
-	return a.runInstall(ctx)
+	if len(args) > 0 && args[0] == "version" || len(args) == 0 {
+		a.logger.InfoContext(ctx, "No Oops Ops", "version", a.config.InstallVersion)
+		return nil
+	}
+
+	return nil
 }

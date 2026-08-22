@@ -131,7 +131,8 @@ Example generated metadata:
 
 Each release is tagged with a UTC timestamp in the format `YYYYMMDD-HHMMSS`. Deploy
 reads this metadata later, so the manifest does not need to be manually updated with a
-new image tag on every release.
+new image tag on every release. Metadata for external image snapshots also records
+`build: false` and the upstream `source_tag` used to create the immutable release.
 
 For example, a release of `lango-service` is built and pushed as:
 
