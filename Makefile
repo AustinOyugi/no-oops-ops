@@ -25,7 +25,7 @@ uninstall: build
 	rm -f $(BIN)
 
 test:
-	go test ./...
+	go clean -testcache && go test -v -count=1 ./...
 
 release-check:
 	goreleaser check

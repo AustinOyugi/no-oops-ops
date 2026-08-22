@@ -59,7 +59,7 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 		"executed", result.Executed,
 		"verified", result.Verified,
 		"running_tasks", result.RunningTasks,
-		"readiness_checked", true,
+		"swarm_outcome", result.SwarmOutcome,
 		"environment", result.Environment,
 		"name", manifest.Name,
 		"service_name", result.ServiceName,
@@ -89,6 +89,7 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 		"order", manifest.Rollout.Order,
 		"parallelism", manifest.Rollout.Parallelism,
 		"delay", manifest.Rollout.Delay,
+		"monitor", manifest.Rollout.Monitor,
 		"failure_action", manifest.Rollout.FailureAction,
 		"restart_condition", manifest.Rollout.RestartCondition,
 	)

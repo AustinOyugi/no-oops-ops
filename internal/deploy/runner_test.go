@@ -2,40 +2,19 @@ package deploy
 
 import "testing"
 
-func TestReadinessSatisfiedRequiresAllDesiredTasks(t *testing.T) {
-	if readinessSatisfied(1, 3) {
+func TestAllDesiredTasksRunningRequiresAllDesiredTasks(t *testing.T) {
+	if allDesiredTasksRunning(1, 3) {
 		t.Error("1 running task should not satisfy 3 desired tasks")
 	}
-	if !readinessSatisfied(3, 3) {
+	if !allDesiredTasksRunning(3, 3) {
 		t.Error("3 running tasks should satisfy 3 desired tasks")
 	}
 }
 
-func TestHealthChecksSatisfiedRequiresEveryContainerToBeHealthy(t *testing.T) {
-	for _, test := range []struct {
-		name     string
-		statuses []string
-		desired  int
-		want     bool
-	}{
-		{name: "all healthy", statuses: []string{"healthy", "healthy"}, desired: 2, want: true},
-		{name: "not enough containers", statuses: []string{"healthy"}, desired: 2, want: false},
-		{name: "starting", statuses: []string{"healthy", "starting"}, desired: 2, want: false},
-		{name: "unhealthy", statuses: []string{"unhealthy"}, desired: 1, want: false},
-		{name: "missing healthcheck", statuses: []string{"missing"}, desired: 1, want: false},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			if got := healthChecksSatisfied(test.statuses, test.desired); got != test.want {
-				t.Errorf("healthChecksSatisfied(%v, %d) = %t, want %t", test.statuses, test.desired, got, test.want)
-			}
-		})
-	}
-}
-
-func TestOutputLines(t *testing.T) {
-	got := outputLines("\nabc\n\ndef\n")
-	if len(got) != 2 || got[0] != "abc" || got[1] != "def" {
-		t.Errorf("outputLines = %v", got)
+func TestParseServiceUpdateStatus(t *testing.T) {
+	state, message, image := parseServiceUpdateStatus("rollback_completed|rollback completed|registry/lango:v1\n")
+	if state != "rollback_completed" || message != "rollback completed" || image != "registry/lango:v1" {
+		t.Errorf("parseServiceUpdateStatus() = (%q, %q, %q), want (%q, %q, %q)", state, message, image, "rollback_completed", "rollback completed", "registry/lango:v1")
 	}
 }
 

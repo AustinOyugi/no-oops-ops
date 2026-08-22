@@ -16,6 +16,8 @@ type Deployment struct {
 	App            string          `json:"app"`
 	CreatedAt      time.Time       `json:"created_at"`
 	Environment    string          `json:"environment"`
+	Outcome        SwarmOutcome    `json:"outcome,omitempty"`
+	Reason         string          `json:"reason,omitempty"`
 	ReleaseImage   string          `json:"release_image"`
 	ReleaseTag     string          `json:"release_tag"`
 	SecretBindings []SecretBinding `json:"secret_bindings,omitempty"`
@@ -69,23 +71,29 @@ func (filesystemDeploymentStore) Previous(cfg config.Config, appName string, env
 		}
 	}
 
-	if len(names) < 2 {
+	deployments := make([]Deployment, 0, len(names))
+	for _, name := range names {
+		data, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			return Deployment{}, fmt.Errorf("read deployment metadata %q: %w", name, err)
+		}
+		var deployment Deployment
+		if err := json.Unmarshal(data, &deployment); err != nil {
+			return Deployment{}, fmt.Errorf("decode deployment metadata %q: %w", name, err)
+		}
+		if deployment.Outcome == "" || deployment.Outcome == SwarmOutcomeCompleted {
+			deployments = append(deployments, deployment)
+		}
+	}
+
+	if len(deployments) < 2 {
 		return Deployment{}, fmt.Errorf("rollback requires at least two successful deployments for %q in %q", appName, environment)
 	}
 
-	sort.Sort(sort.Reverse(sort.StringSlice(names)))
-	path := filepath.Join(dir, names[1])
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return Deployment{}, fmt.Errorf("read deployment metadata %q: %w", path, err)
-	}
-
-	var deployment Deployment
-	if err := json.Unmarshal(data, &deployment); err != nil {
-		return Deployment{}, fmt.Errorf("decode deployment metadata %q: %w", path, err)
-	}
-
-	return deployment, nil
+	sort.Slice(deployments, func(i, j int) bool {
+		return deployments[i].CreatedAt.After(deployments[j].CreatedAt)
+	})
+	return deployments[1], nil
 }
 
 func deploymentHistoryDir(cfg config.Config, appName string, environment string) string {

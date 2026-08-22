@@ -127,3 +127,40 @@ func TestRenderStackTemplateRendersNamedVolumesAndBindMounts(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderStackTemplateRendersSwarmUpdateAndRollbackPolicies(t *testing.T) {
+	rendered, err := renderStackTemplate(stackTemplateData{
+		ServiceName:             "prod-lango",
+		Image:                   "registry/lango:v1",
+		Network:                 "noops-net",
+		Parallelism:             1,
+		RolloutDelay:            "10s",
+		RolloutOrder:            "start-first",
+		RolloutMonitor:          "1m50s",
+		MaxFailureRatio:         0,
+		FailureAction:           "rollback",
+		RollbackParallelism:     1,
+		RollbackDelay:           "0s",
+		RollbackOrder:           "start-first",
+		RollbackMonitor:         "1m50s",
+		RollbackMaxFailureRatio: 0,
+		RollbackFailureAction:   "pause",
+	})
+	if err != nil {
+		t.Fatalf("render stack: %v", err)
+	}
+
+	output := string(rendered)
+	for _, want := range []string{
+		"update_config:",
+		"monitor: 1m50s",
+		"max_failure_ratio: 0",
+		"failure_action: rollback",
+		"rollback_config:",
+		"failure_action: pause",
+	} {
+		if !strings.Contains(output, want) {
+			t.Errorf("rendered stack does not contain %q:\n%s", want, output)
+		}
+	}
+}

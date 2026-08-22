@@ -17,6 +17,32 @@ type TaskDiagnostic struct {
 	Error        string `json:"error"`
 }
 
+type SwarmOutcome string
+
+const (
+	SwarmOutcomeCompleted      SwarmOutcome = "completed"
+	SwarmOutcomeRolledBack     SwarmOutcome = "rolled_back"
+	SwarmOutcomePaused         SwarmOutcome = "paused"
+	SwarmOutcomeRollbackPaused SwarmOutcome = "rollback_paused"
+	SwarmOutcomeTimedOut       SwarmOutcome = "timed_out"
+	SwarmOutcomeFailed         SwarmOutcome = "failed"
+)
+
+const swarmObservationInterval = 2 * time.Second
+
+type swarmConvergenceError struct {
+	Outcome     SwarmOutcome
+	Diagnostics []TaskDiagnostic
+	Reason      string
+}
+
+func (e *swarmConvergenceError) Error() string {
+	if len(e.Diagnostics) == 0 {
+		return e.Reason
+	}
+	return fmt.Sprintf("%s: %s", e.Reason, formatTaskDiagnostics(e.Diagnostics))
+}
+
 func (s *Service) deployStack(ctx context.Context, stackPath string, stackName string) error {
 	_, err := s.runner.Run(
 		ctx,
@@ -90,161 +116,105 @@ func (s *Service) runningTaskCount(ctx context.Context, serviceName string) (int
 	return count, nil
 }
 
-func (s *Service) waitForRunningTasks(
+// waitForSwarmConvergence observes Swarm's update state instead of inspecting
+// individual container health. Swarm owns health checks, task replacement, and
+// rollback; No Oops Ops records the resulting deployment outcome.
+func (s *Service) waitForSwarmConvergence(
 	ctx context.Context,
 	serviceName string,
+	expectedImage string,
 	desiredTasks int,
 	timeout time.Duration,
-	interval time.Duration,
-) (int, error) {
+	initialMonitor time.Duration,
+) (SwarmOutcome, int, error) {
 	deadline := time.Now().Add(timeout)
+	var stableSince time.Time
 
 	s.logger.InfoContext(
 		ctx,
-		"waiting for service readiness",
+		"waiting for Swarm convergence",
 		"service", serviceName,
 		"desired_tasks", desiredTasks,
 		"timeout", timeout.String(),
-		"interval", interval.String(),
+		"monitor", initialMonitor.String(),
 	)
 
 	for {
+		state, message, image, err := s.serviceUpdateStatus(ctx, serviceName)
+		if err != nil {
+			return "", 0, err
+		}
+
+		switch state {
+		case "completed":
+			if strings.HasPrefix(image, expectedImage) {
+				return SwarmOutcomeCompleted, desiredTasks, nil
+			}
+		case "rollback_completed":
+			return SwarmOutcomeRolledBack, 0, s.convergenceError(ctx, serviceName, SwarmOutcomeRolledBack, message)
+		case "paused":
+			return SwarmOutcomePaused, 0, s.convergenceError(ctx, serviceName, SwarmOutcomePaused, message)
+		case "rollback_paused":
+			return SwarmOutcomeRollbackPaused, 0, s.convergenceError(ctx, serviceName, SwarmOutcomeRollbackPaused, message)
+		}
+
 		runningTasks, err := s.runningTaskCount(ctx, serviceName)
 		if err != nil {
-			return 0, err
+			return "", 0, err
 		}
 
-		if readinessSatisfied(runningTasks, desiredTasks) {
-			healthStatuses, err := s.containerHealthStatuses(ctx, serviceName)
-			if err != nil {
-				return 0, err
+		if state == "" && allDesiredTasksRunning(runningTasks, desiredTasks) {
+			if stableSince.IsZero() {
+				stableSince = time.Now()
 			}
-
-			s.logger.InfoContext(
-				ctx,
-				"readiness poll",
-				"service", serviceName,
-				"running_tasks", runningTasks,
-				"desired_tasks", desiredTasks,
-				"health_statuses", healthStatuses,
-			)
-
-			if healthChecksSatisfied(healthStatuses, desiredTasks) {
-				s.logger.InfoContext(
-					ctx,
-					"service ready",
-					"service", serviceName,
-					"running_tasks", runningTasks,
-					"desired_tasks", desiredTasks,
-					"health_statuses", healthStatuses,
-				)
-				return runningTasks, nil
+			if time.Since(stableSince) >= initialMonitor {
+				return SwarmOutcomeCompleted, runningTasks, nil
 			}
 		} else {
-			s.logger.InfoContext(
-				ctx,
-				"readiness poll",
-				"service", serviceName,
-				"running_tasks", runningTasks,
-				"desired_tasks", desiredTasks,
-			)
+			stableSince = time.Time{}
 		}
 
-		if time.Now().After(deadline) {
-			diagnostics, diagErr := s.taskDiagnostics(ctx, serviceName)
-			if diagErr != nil {
-				s.logger.ErrorContext(
-					ctx,
-					"service readiness timed out",
-					"service", serviceName,
-					"running_tasks", runningTasks,
-					"desired_tasks", desiredTasks,
-					"timeout", timeout.String(),
-				)
-				return 0, fmt.Errorf("service %q reached %d/%d running tasks within %s", serviceName, runningTasks, desiredTasks, timeout)
-			}
+		s.logger.InfoContext(ctx, "Swarm convergence poll", "service", serviceName, "update_state", state, "service_image", image, "running_tasks", runningTasks, "desired_tasks", desiredTasks)
 
-			s.logger.ErrorContext(
-				ctx,
-				"service readiness timed out",
-				"service", serviceName,
-				"running_tasks", runningTasks,
-				"desired_tasks", desiredTasks,
-				"timeout", timeout.String(),
-				"diagnostics", diagnostics,
-			)
-			return 0, fmt.Errorf(
-				"service %q reached %d/%d running tasks within %s: %s",
-				serviceName,
-				runningTasks,
-				desiredTasks,
-				timeout,
-				formatTaskDiagnostics(diagnostics),
-			)
+		if time.Now().After(deadline) {
+			return SwarmOutcomeTimedOut, runningTasks, s.convergenceError(ctx, serviceName, SwarmOutcomeTimedOut, fmt.Sprintf("service did not converge within %s", timeout))
 		}
 
 		select {
 		case <-ctx.Done():
-			return 0, ctx.Err()
-		case <-time.After(interval):
+			return "", 0, ctx.Err()
+		case <-time.After(swarmObservationInterval):
 		}
 	}
 }
 
-func (s *Service) containerHealthStatuses(ctx context.Context, serviceName string) ([]string, error) {
-	containers, err := s.runner.Run(
-		ctx,
-		"docker",
-		[]string{
-			"ps",
-			"--filter", "label=com.docker.swarm.service.name=" + serviceName,
-			"--format", "{{.ID}}",
-		},
-		command.RunOptions{},
-	)
+func (s *Service) serviceUpdateStatus(ctx context.Context, serviceName string) (string, string, string, error) {
+	result, err := s.runner.Run(ctx, "docker", []string{"service", "inspect", "--format", "{{if .UpdateStatus}}{{.UpdateStatus.State}}{{end}}|{{if .UpdateStatus}}{{.UpdateStatus.Message}}{{end}}|{{.Spec.TaskTemplate.ContainerSpec.Image}}", serviceName}, command.RunOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("find containers for service %q: %w", serviceName, err)
+		return "", "", "", fmt.Errorf("inspect Swarm update status for service %q: %w", serviceName, err)
 	}
 
-	containerIDs := outputLines(string(containers.Output))
-	if len(containerIDs) == 0 {
-		return []string{}, nil
-	}
+	state, message, image := parseServiceUpdateStatus(string(result.Output))
+	return state, message, image, nil
+}
 
-	args := append([]string{"inspect", "--format", "{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}"}, containerIDs...)
-	health, err := s.runner.Run(ctx, "docker", args, command.RunOptions{})
+func parseServiceUpdateStatus(output string) (string, string, string) {
+	parts := strings.SplitN(strings.TrimSpace(output), "|", 3)
+	for len(parts) < 3 {
+		parts = append(parts, "")
+	}
+	return parts[0], parts[1], parts[2]
+}
+
+func (s *Service) convergenceError(ctx context.Context, serviceName string, outcome SwarmOutcome, reason string) error {
+	diagnostics, err := s.taskDiagnostics(ctx, serviceName)
 	if err != nil {
-		return nil, fmt.Errorf("inspect health for service %q: %w", serviceName, err)
+		return fmt.Errorf("inspect diagnostics after Swarm outcome %q: %w", outcome, err)
 	}
-
-	return outputLines(string(health.Output)), nil
+	return &swarmConvergenceError{Outcome: outcome, Diagnostics: diagnostics, Reason: reason}
 }
 
-func healthChecksSatisfied(statuses []string, desiredTasks int) bool {
-	if len(statuses) < desiredTasks {
-		return false
-	}
-
-	for _, status := range statuses {
-		if status != "healthy" {
-			return false
-		}
-	}
-
-	return true
-}
-
-func outputLines(output string) []string {
-	var lines []string
-	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
-		if line != "" {
-			lines = append(lines, line)
-		}
-	}
-	return lines
-}
-
-func readinessSatisfied(runningTasks int, desiredTasks int) bool {
+func allDesiredTasksRunning(runningTasks int, desiredTasks int) bool {
 	return runningTasks >= desiredTasks
 }
 

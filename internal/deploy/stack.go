@@ -25,30 +25,38 @@ const (
 var appStackTemplateContents string
 
 type stackTemplateData struct {
-	ServiceName            string
-	Image                  string
-	Network                string
-	Replicas               int
-	HealthcheckTest        []string
-	HealthcheckInterval    string
-	HealthcheckTimeout     string
-	HealthcheckRetries     int
-	HealthcheckStartPeriod string
-	Parallelism            int
-	RolloutDelay           string
-	RolloutOrder           string
-	FailureAction          string
-	RestartCondition       string
-	RestartDelay           string
-	RestartMaxAttempts     int
-	RestartWindow          string
-	Secrets                []SecretBinding
-	Volumes                []string
-	NamedVolumes           []string
-	UseWrapper             bool
-	WrapperImage           string
-	OriginalCommand        string
-	SecretMappings         string
+	ServiceName             string
+	Image                   string
+	Network                 string
+	Replicas                int
+	HealthcheckTest         []string
+	HealthcheckInterval     string
+	HealthcheckTimeout      string
+	HealthcheckRetries      int
+	HealthcheckStartPeriod  string
+	Parallelism             int
+	RolloutDelay            string
+	RolloutOrder            string
+	RolloutMonitor          string
+	MaxFailureRatio         float64
+	FailureAction           string
+	RollbackDelay           string
+	RollbackOrder           string
+	RollbackMonitor         string
+	RollbackParallelism     int
+	RollbackMaxFailureRatio float64
+	RollbackFailureAction   string
+	RestartCondition        string
+	RestartDelay            string
+	RestartMaxAttempts      int
+	RestartWindow           string
+	Secrets                 []SecretBinding
+	Volumes                 []string
+	NamedVolumes            []string
+	UseWrapper              bool
+	WrapperImage            string
+	OriginalCommand         string
+	SecretMappings          string
 }
 
 type SecretBinding struct {
@@ -116,30 +124,38 @@ func writeStack(cfg config.Config, environment string, m manifest.Manifest, imag
 	}
 
 	rendered, err := renderStackTemplate(stackTemplateData{
-		ServiceName:            serviceName(environment, m.Name),
-		Image:                  stackImage,
-		Network:                m.Service.Network,
-		Replicas:               m.Service.Replicas,
-		HealthcheckTest:        m.Healthcheck.Test,
-		HealthcheckInterval:    m.Healthcheck.Interval,
-		HealthcheckTimeout:     m.Healthcheck.Timeout,
-		HealthcheckRetries:     m.Healthcheck.Retries,
-		HealthcheckStartPeriod: m.Healthcheck.StartPeriod,
-		Parallelism:            m.Rollout.Parallelism,
-		RolloutDelay:           m.Rollout.Delay,
-		RolloutOrder:           m.Rollout.Order,
-		FailureAction:          m.Rollout.FailureAction,
-		RestartCondition:       m.Rollout.RestartCondition,
-		RestartDelay:           m.Rollout.RestartDelay,
-		RestartMaxAttempts:     m.Rollout.RestartMaxAttempts,
-		RestartWindow:          m.Rollout.RestartWindow,
-		Secrets:                secrets,
-		Volumes:                m.Volumes,
-		NamedVolumes:           namedVolumes(m.Volumes),
-		UseWrapper:             wrapperCfg.UseWrapper,
-		WrapperImage:           wrapperCfg.WrapperImage,
-		OriginalCommand:        jsonStringSlice(append(wrapperCfg.EffectiveExec.Entrypoint, wrapperCfg.EffectiveExec.Cmd...)),
-		SecretMappings:         secretMappingsValue(wrapperCfg.SecretMappings),
+		ServiceName:             serviceName(environment, m.Name),
+		Image:                   stackImage,
+		Network:                 m.Service.Network,
+		Replicas:                m.Service.Replicas,
+		HealthcheckTest:         m.Healthcheck.Test,
+		HealthcheckInterval:     m.Healthcheck.Interval,
+		HealthcheckTimeout:      m.Healthcheck.Timeout,
+		HealthcheckRetries:      m.Healthcheck.Retries,
+		HealthcheckStartPeriod:  m.Healthcheck.StartPeriod,
+		Parallelism:             m.Rollout.Parallelism,
+		RolloutDelay:            m.Rollout.Delay,
+		RolloutOrder:            m.Rollout.Order,
+		RolloutMonitor:          m.Rollout.Monitor,
+		MaxFailureRatio:         m.Rollout.MaxFailureRatio,
+		FailureAction:           m.Rollout.FailureAction,
+		RollbackDelay:           m.Rollout.Rollback.Delay,
+		RollbackOrder:           m.Rollout.Rollback.Order,
+		RollbackMonitor:         m.Rollout.Rollback.Monitor,
+		RollbackParallelism:     m.Rollout.Rollback.Parallelism,
+		RollbackMaxFailureRatio: m.Rollout.Rollback.MaxFailureRatio,
+		RollbackFailureAction:   m.Rollout.Rollback.FailureAction,
+		RestartCondition:        m.Rollout.RestartCondition,
+		RestartDelay:            m.Rollout.RestartDelay,
+		RestartMaxAttempts:      m.Rollout.RestartMaxAttempts,
+		RestartWindow:           m.Rollout.RestartWindow,
+		Secrets:                 secrets,
+		Volumes:                 m.Volumes,
+		NamedVolumes:            namedVolumes(m.Volumes),
+		UseWrapper:              wrapperCfg.UseWrapper,
+		WrapperImage:            wrapperCfg.WrapperImage,
+		OriginalCommand:         jsonStringSlice(append(wrapperCfg.EffectiveExec.Entrypoint, wrapperCfg.EffectiveExec.Cmd...)),
+		SecretMappings:          secretMappingsValue(wrapperCfg.SecretMappings),
 	})
 	if err != nil {
 		return "", err

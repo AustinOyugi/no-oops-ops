@@ -50,16 +50,27 @@ type Healthcheck struct {
 }
 
 type Rollout struct {
-	Order              string `yaml:"order"`
-	Parallelism        int    `yaml:"parallelism"`
-	Delay              string `yaml:"delay"`
-	FailureAction      string `yaml:"failure_action"`
-	RestartCondition   string `yaml:"restart_condition"`
-	RestartDelay       string `yaml:"restart_delay"`
-	RestartMaxAttempts int    `yaml:"restart_max_attempts"`
-	RestartWindow      string `yaml:"restart_window"`
-	ReadinessTimeout   string `yaml:"readiness_timeout"`
-	ReadinessInterval  string `yaml:"readiness_interval"`
+	Order              string   `yaml:"order"`
+	Parallelism        int      `yaml:"parallelism"`
+	Delay              string   `yaml:"delay"`
+	Monitor            string   `yaml:"monitor"`
+	MaxFailureRatio    float64  `yaml:"max_failure_ratio"`
+	FailureAction      string   `yaml:"failure_action"`
+	RestartCondition   string   `yaml:"restart_condition"`
+	RestartDelay       string   `yaml:"restart_delay"`
+	RestartMaxAttempts int      `yaml:"restart_max_attempts"`
+	RestartWindow      string   `yaml:"restart_window"`
+	ConvergenceTimeout string   `yaml:"convergence_timeout"`
+	Rollback           Rollback `yaml:"rollback"`
+}
+
+type Rollback struct {
+	Order           string  `yaml:"order"`
+	Parallelism     int     `yaml:"parallelism"`
+	Delay           string  `yaml:"delay"`
+	Monitor         string  `yaml:"monitor"`
+	MaxFailureRatio float64 `yaml:"max_failure_ratio"`
+	FailureAction   string  `yaml:"failure_action"`
 }
 
 type Expose struct {

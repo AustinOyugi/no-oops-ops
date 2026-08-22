@@ -1,6 +1,9 @@
 package manifest
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 func (m Manifest) Validate() error {
 	if m.Name == "" {
@@ -17,6 +20,31 @@ func (m Manifest) Validate() error {
 
 	if len(m.Healthcheck.Test) == 0 {
 		return fmt.Errorf("healthcheck.test is required")
+	}
+
+	for name, value := range map[string]string{
+		"healthcheck.interval":        m.Healthcheck.Interval,
+		"healthcheck.timeout":         m.Healthcheck.Timeout,
+		"healthcheck.start_period":    m.Healthcheck.StartPeriod,
+		"rollout.delay":               m.Rollout.Delay,
+		"rollout.monitor":             m.Rollout.Monitor,
+		"rollout.convergence_timeout": m.Rollout.ConvergenceTimeout,
+		"rollout.rollback.delay":      m.Rollout.Rollback.Delay,
+		"rollout.rollback.monitor":    m.Rollout.Rollback.Monitor,
+	} {
+		if value == "" {
+			continue
+		}
+		if _, err := time.ParseDuration(value); err != nil {
+			return fmt.Errorf("%s must be a Go duration: %w", name, err)
+		}
+	}
+
+	if m.Rollout.MaxFailureRatio < 0 || m.Rollout.MaxFailureRatio > 1 {
+		return fmt.Errorf("rollout.max_failure_ratio must be between 0 and 1")
+	}
+	if m.Rollout.Rollback.MaxFailureRatio < 0 || m.Rollout.Rollback.MaxFailureRatio > 1 {
+		return fmt.Errorf("rollout.rollback.max_failure_ratio must be between 0 and 1")
 	}
 
 	if m.Image.ShouldBuild() {

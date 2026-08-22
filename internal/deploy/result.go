@@ -10,6 +10,7 @@ type Result struct {
 	Executed       bool
 	Verified       bool
 	RunningTasks   int
+	SwarmOutcome   SwarmOutcome
 	ReleaseImage   string
 	ReleaseTag     string
 	ManifestPath   string

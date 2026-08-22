@@ -8,7 +8,7 @@ The current implementation focuses on a practical local/server workflow:
 - build and publish immutable app images
 - generate deployment artifacts from manifests
 - deploy apps with Docker Stack
-- wait for service readiness and surface useful diagnostics
+- observe Swarm rollout convergence and surface useful diagnostics
 - manage environment-scoped, versioned Docker Swarm secrets
 - retain release and deployment history, including rollback to the prior deployment
 - remove an app environment along with its release artifacts
@@ -166,8 +166,8 @@ Deploy currently does:
 - renders the stack with the released registry image
 - runs `docker stack deploy`
 - verifies the Swarm service exists
-- waits for running tasks and Docker health checks to pass
-- prints task diagnostics on readiness timeout
+- waits for Docker Swarm to complete, roll back, pause, or time out
+- records the Swarm rollout outcome and task diagnostics
 
 Generated app artifacts are written under:
 
@@ -200,6 +200,24 @@ Rollback redeploys the previous recorded release and is itself recorded, so a la
 rollback can restore the version it replaced. At least two successful deployments are
 required before rollback is available. Unlike `deploy`, rollback does not currently run
 the deploy-readiness preflight automatically.
+
+## Rollout Ownership
+
+Docker Swarm owns task scheduling, container health checks, task replacement, and
+automatic rollback. No Oops Ops generates a conservative Swarm policy, creates immutable
+releases, and records the final Swarm outcome. It does not run a competing container
+health controller or issue a second rollback after Swarm has made its decision.
+
+The default update policy is one task at a time, `start-first`, zero tolerated update
+failures, and automatic rollback. Its monitor window is derived from the app healthcheck.
+Override rollout settings only for exceptional applications:
+
+```yaml
+rollout:
+  monitor: 2m
+  parallelism: 2
+  order: stop-first
+```
 
 ## Remove an App
 
@@ -365,17 +383,6 @@ healthcheck:
 env:
   file: lango.env.yml
 
-rollout:
-  parallelism: 1
-  delay: 10s
-  order: start-first
-  failure_action: rollback
-  restart_condition: on-failure
-  restart_delay: 10s
-  restart_max_attempts: 5
-  restart_window: 70s
-  readiness_timeout: 30s
-  readiness_interval: 2s
 ```
 
 Notes:
@@ -387,7 +394,8 @@ Notes:
 - `service.replicas` defaults to `1` and is rendered as Docker Swarm's `deploy.replicas`.
 - `volumes` accepts Docker's short mount syntax. Named volumes are created and scoped to the stack; absolute or relative
   host paths are bind mounts.
-- `rollout.readiness_timeout` and `rollout.readiness_interval` are `No Oops Ops` settings, not Docker Stack fields.
+- `rollout` is optional. No Oops Ops derives safe Swarm update and rollback settings from the healthcheck.
+- `rollout.convergence_timeout` limits how long No Oops Ops waits for Swarm to reach a final outcome; it does not replace Swarm health checks.
 - The Docker stack image is resolved from release metadata, not directly from `image.repository`.
 
 ## Env File
@@ -447,7 +455,7 @@ service rather than treating a host-level `curl` request as a definitive health 
 - There is no dedicated release-list command yet.
 - The internal registry currently uses an insecure local HTTP registry.
 - Registry garbage collection is manual; app removal deletes image manifests but does not immediately reclaim layer storage.
-- App readiness checks Docker container health, not router-level HTTP availability.
+- Swarm health checks protect service updates; No Oops Ops reports Swarm's final rollout state and task diagnostics.
 
 ## Direction
 

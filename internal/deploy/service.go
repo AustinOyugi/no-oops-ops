@@ -136,6 +136,11 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		wrapperCfg.WrapperImage = wrappedImage
 	}
 
+	deployedImage := releaseMetadata.RegistryImage
+	if wrapperCfg.UseWrapper {
+		deployedImage = wrapperCfg.WrapperImage
+	}
+
 	stackPath, err := writeStack(s.config, environment, m, releaseMetadata.RegistryImage, secretBindings, wrapperCfg)
 	if err != nil {
 		return Result{}, err
@@ -149,19 +154,36 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		return Result{}, err
 	}
 
-	timeout, interval, err := readinessConfig(m)
+	timeout, monitor, err := convergenceConfig(m)
 	if err != nil {
 		return Result{}, err
 	}
 
-	runningTasks, err := s.waitForRunningTasks(
+	outcome, runningTasks, err := s.waitForSwarmConvergence(
 		ctx,
 		swarmServiceName(environment, m.Name),
+		deployedImage,
 		m.Service.Replicas,
 		timeout,
-		interval,
+		monitor,
 	)
 	if err != nil {
+		if outcome == "" {
+			outcome = SwarmOutcomeFailed
+		}
+		failure := Deployment{
+			App:            m.Name,
+			CreatedAt:      time.Now().UTC(),
+			Environment:    environment,
+			Outcome:        outcome,
+			Reason:         err.Error(),
+			ReleaseImage:   releaseMetadata.RegistryImage,
+			ReleaseTag:     releaseMetadata.Tag,
+			SecretBindings: secretBindings,
+		}
+		if _, saveErr := s.deployments.Save(s.config, failure); saveErr != nil {
+			return Result{}, fmt.Errorf("%w; record deployment outcome: %v", err, saveErr)
+		}
 		return Result{}, err
 	}
 
@@ -169,6 +191,7 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		App:            m.Name,
 		CreatedAt:      time.Now().UTC(),
 		Environment:    environment,
+		Outcome:        outcome,
 		ReleaseImage:   releaseMetadata.RegistryImage,
 		ReleaseTag:     releaseMetadata.Tag,
 		SecretBindings: secretBindings,
@@ -189,6 +212,7 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		Executed:       true,
 		Verified:       true,
 		RunningTasks:   runningTasks,
+		SwarmOutcome:   outcome,
 		ReleaseImage:   releaseMetadata.RegistryImage,
 		ReleaseTag:     releaseMetadata.Tag,
 		ManifestPath:   absPath,
@@ -252,16 +276,16 @@ func resolveEnvFilePath(manifestPath string, envFile string) string {
 	return filepath.Join(filepath.Dir(manifestPath), envFile)
 }
 
-func readinessConfig(m manifest.Manifest) (time.Duration, time.Duration, error) {
-	timeout, err := time.ParseDuration(m.Rollout.ReadinessTimeout)
+func convergenceConfig(m manifest.Manifest) (time.Duration, time.Duration, error) {
+	timeout, err := time.ParseDuration(m.Rollout.ConvergenceTimeout)
 	if err != nil {
-		return 0, 0, fmt.Errorf("parse rollout.readiness_timeout %q: %w", m.Rollout.ReadinessTimeout, err)
+		return 0, 0, fmt.Errorf("parse rollout.convergence_timeout %q: %w", m.Rollout.ConvergenceTimeout, err)
 	}
 
-	interval, err := time.ParseDuration(m.Rollout.ReadinessInterval)
+	monitor, err := time.ParseDuration(m.Rollout.Monitor)
 	if err != nil {
-		return 0, 0, fmt.Errorf("parse rollout.readiness_interval %q: %w", m.Rollout.ReadinessInterval, err)
+		return 0, 0, fmt.Errorf("parse rollout.monitor %q: %w", m.Rollout.Monitor, err)
 	}
 
-	return timeout, interval, nil
+	return timeout, monitor, nil
 }

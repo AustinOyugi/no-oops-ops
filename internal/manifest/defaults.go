@@ -1,5 +1,7 @@
 package manifest
 
+import "time"
+
 const (
 	defaultImageTag               = "latest"
 	defaultServiceReplicas        = 1
@@ -16,8 +18,12 @@ const (
 	defaultRestartDelay           = "10s"
 	defaultRestartMaxAttempts     = 5
 	defaultRestartWindow          = "70s"
-	defaultReadinessTimeout       = "30s"
-	defaultReadinessInterval      = "2s"
+	defaultConvergenceTimeout     = "5m"
+	defaultRollbackOrder          = "start-first"
+	defaultRollbackParallelism    = 1
+	defaultRollbackDelay          = "0s"
+	defaultRollbackFailureAction  = "pause"
+	defaultMonitorSafetyBuffer    = 10 * time.Second
 	defaultExposePathPrefix       = "/"
 )
 
@@ -62,6 +68,10 @@ func (m *Manifest) applyDefaults() {
 		m.Rollout.Delay = defaultRolloutDelay
 	}
 
+	if m.Rollout.Monitor == "" {
+		m.Rollout.Monitor = rolloutMonitor(m.Healthcheck)
+	}
+
 	if m.Rollout.FailureAction == "" {
 		m.Rollout.FailureAction = defaultRolloutFailureAction
 	}
@@ -82,12 +92,28 @@ func (m *Manifest) applyDefaults() {
 		m.Rollout.RestartWindow = defaultRestartWindow
 	}
 
-	if m.Rollout.ReadinessTimeout == "" {
-		m.Rollout.ReadinessTimeout = defaultReadinessTimeout
+	if m.Rollout.ConvergenceTimeout == "" {
+		m.Rollout.ConvergenceTimeout = defaultConvergenceTimeout
 	}
 
-	if m.Rollout.ReadinessInterval == "" {
-		m.Rollout.ReadinessInterval = defaultReadinessInterval
+	if m.Rollout.Rollback.Order == "" {
+		m.Rollout.Rollback.Order = defaultRollbackOrder
+	}
+
+	if m.Rollout.Rollback.Parallelism == 0 {
+		m.Rollout.Rollback.Parallelism = defaultRollbackParallelism
+	}
+
+	if m.Rollout.Rollback.Delay == "" {
+		m.Rollout.Rollback.Delay = defaultRollbackDelay
+	}
+
+	if m.Rollout.Rollback.Monitor == "" {
+		m.Rollout.Rollback.Monitor = m.Rollout.Monitor
+	}
+
+	if m.Rollout.Rollback.FailureAction == "" {
+		m.Rollout.Rollback.FailureAction = defaultRollbackFailureAction
 	}
 
 	if m.Expose.PathPrefix == "" {
@@ -101,4 +127,16 @@ func (m *Manifest) applyDefaults() {
 	if m.Volumes == nil {
 		m.Volumes = []string{}
 	}
+}
+
+func rolloutMonitor(healthcheck Healthcheck) string {
+	startPeriod, startErr := time.ParseDuration(healthcheck.StartPeriod)
+	interval, intervalErr := time.ParseDuration(healthcheck.Interval)
+	timeout, timeoutErr := time.ParseDuration(healthcheck.Timeout)
+	if startErr != nil || intervalErr != nil || timeoutErr != nil {
+		return "2m"
+	}
+
+	monitor := startPeriod + time.Duration(healthcheck.Retries)*interval + timeout + defaultMonitorSafetyBuffer
+	return monitor.String()
 }

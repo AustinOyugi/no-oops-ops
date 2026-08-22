@@ -48,7 +48,16 @@ services:
         parallelism: {{ .Parallelism }}
         delay: {{ .RolloutDelay }}
         order: {{ .RolloutOrder }}
+        monitor: {{ .RolloutMonitor }}
+        max_failure_ratio: {{ .MaxFailureRatio }}
         failure_action: {{ .FailureAction }}
+      rollback_config:
+        parallelism: {{ .RollbackParallelism }}
+        delay: {{ .RollbackDelay }}
+        order: {{ .RollbackOrder }}
+        monitor: {{ .RollbackMonitor }}
+        max_failure_ratio: {{ .RollbackMaxFailureRatio }}
+        failure_action: {{ .RollbackFailureAction }}
     networks:
       - {{ .Network }}
 
