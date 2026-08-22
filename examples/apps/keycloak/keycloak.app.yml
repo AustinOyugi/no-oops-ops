@@ -19,7 +19,6 @@ healthcheck:
   timeout: 10s
   retries: 3
 
-
 env:
   file: keycloak.env.yml
 

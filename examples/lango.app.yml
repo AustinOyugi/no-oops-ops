@@ -11,10 +11,10 @@ source:
 
 image:
   repository: lango-service
-  replicas: 2
 
 service:
   internal_port: 8080
+  replicas: 2
 
 healthcheck:
   test:
