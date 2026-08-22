@@ -6,7 +6,7 @@ VERSION ?= 0.0.1
 
 .PHONY: build install install-cli uninstall release-check release-snapshot test
 
-build:
+build: test
 	mkdir -p $(BIN_DIR)
 	go build \
       -ldflags "-X github.com/AustinOyugi/no-oops-ops/internal/config.Version=$(VERSION)" \
