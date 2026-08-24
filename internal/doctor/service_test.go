@@ -5,18 +5,23 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 )
 
 type fakeHost struct {
-	dockerErr          error
-	swarmState         string
-	swarmErr           error
-	swarmManagerErr    error
-	sharedNetworkCalls int
-	registryCalls      int
+	dockerErr           error
+	swarmState          string
+	swarmErr            error
+	swarmManagerErr     error
+	sharedNetworkCalls  int
+	registryCalls       int
+	desiredTasks        int
+	runningTasks        int
+	taskError           string
+	serviceReadinessErr error
 }
 
 func (h *fakeHost) VerifyDocker(context.Context) error {
@@ -39,6 +44,14 @@ func (h *fakeHost) InspectSharedNetwork(context.Context) error {
 func (h *fakeHost) InspectRegistryService(context.Context) error {
 	h.registryCalls++
 	return nil
+}
+
+func (h *fakeHost) InspectServiceReadiness(context.Context, string) (int, int, string, error) {
+	desired, running := h.desiredTasks, h.runningTasks
+	if desired == 0 && running == 0 && h.serviceReadinessErr == nil && h.taskError == "" {
+		desired, running = 1, 1
+	}
+	return desired, running, h.taskError, h.serviceReadinessErr
 }
 
 func TestRunInactiveSwarmSkipsSwarmDependentChecks(t *testing.T) {
@@ -66,7 +79,7 @@ func TestRunInactiveSwarmSkipsSwarmDependentChecks(t *testing.T) {
 	if got := checks["swarm"].Status; got != StatusFail {
 		t.Errorf("swarm status = %q, want %q", got, StatusFail)
 	}
-	for _, name := range []string{"swarm_manager", "shared_network", "registry_service", "registry_config", "registry_stack"} {
+	for _, name := range []string{"swarm_manager", "shared_network", "registry_service", "nginx_service", "certbot_service", "registry_config", "registry_stack"} {
 		if got := checks[name].Status; got != StatusSkip {
 			t.Errorf("%s status = %q, want %q", name, got, StatusSkip)
 		}
@@ -76,6 +89,25 @@ func TestRunInactiveSwarmSkipsSwarmDependentChecks(t *testing.T) {
 	}
 	if got := checks["install_metadata"].Remediation; got != "Run noops install to create installation metadata" {
 		t.Errorf("install_metadata remediation = %q", got)
+	}
+}
+
+func TestDoctorFailsForRejectedServiceTask(t *testing.T) {
+	host := &fakeHost{swarmState: "active", desiredTasks: 1, runningTasks: 0, taskError: "invalid mount config"}
+	service := NewService(slog.New(slog.NewTextHandler(io.Discard, nil)), config.Config{StateDir: t.TempDir(), RegistryName: "noops-registry", NginxName: "noops-nginx"}, host)
+	result, err := service.RunProfile(context.Background(), ProfileDeployReadiness)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checks := map[string]Check{}
+	for _, check := range result.Checks {
+		checks[check.Name] = check
+	}
+	if got := checks["registry_service"].Status; got != StatusFail {
+		t.Errorf("registry service status = %q, want %q", got, StatusFail)
+	}
+	if got := checks["registry_service"].Message; !strings.Contains(got, "invalid mount config") {
+		t.Errorf("registry message = %q, want task error", got)
 	}
 }
 
@@ -94,8 +126,8 @@ func TestRunDockerUnavailableSkipsDockerDependentChecks(t *testing.T) {
 	if result.Count(StatusFail) != 2 {
 		t.Errorf("failed checks = %d, want 2", result.Count(StatusFail))
 	}
-	if result.Count(StatusSkip) != 6 {
-		t.Errorf("skipped checks = %d, want 6", result.Count(StatusSkip))
+	if result.Count(StatusSkip) != 8 {
+		t.Errorf("skipped checks = %d, want 8", result.Count(StatusSkip))
 	}
 }
 
@@ -119,7 +151,7 @@ func TestRunNonManagerSkipsManagerDependentChecks(t *testing.T) {
 	if got := checks["swarm_manager"].Status; got != StatusFail {
 		t.Errorf("swarm_manager status = %q, want %q", got, StatusFail)
 	}
-	for _, name := range []string{"shared_network", "registry_service"} {
+	for _, name := range []string{"shared_network", "registry_service", "nginx_service", "certbot_service"} {
 		if got := checks[name].Status; got != StatusSkip {
 			t.Errorf("%s status = %q, want %q", name, got, StatusSkip)
 		}
@@ -135,8 +167,8 @@ func TestRunDeployReadinessExcludesInstallationArtifactChecks(t *testing.T) {
 		t.Fatalf("run deploy-readiness doctor: %v", err)
 	}
 
-	if len(result.Checks) != 5 {
-		t.Fatalf("checks = %d, want 5", len(result.Checks))
+	if len(result.Checks) != 7 {
+		t.Fatalf("checks = %d, want 7", len(result.Checks))
 	}
 	for _, check := range result.Checks {
 		if check.Status != StatusOK {

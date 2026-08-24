@@ -36,6 +36,20 @@ func (s *Service) checks(profile Profile) ([]checkDefinition, error) {
 			remediation: "Run noops install on a Swarm manager",
 			run:         s.checkRegistryService,
 		},
+		{
+			name:        "nginx_service",
+			requires:    []string{"swarm_manager"},
+			skipMessage: "requires a Docker Swarm manager",
+			remediation: "Run noops install on a Swarm manager",
+			run:         s.checkNginxService,
+		},
+		{
+			name:        "certbot_service",
+			requires:    []string{"swarm_manager"},
+			skipMessage: "requires a Docker Swarm manager",
+			remediation: "Run noops install on a Swarm manager",
+			run:         s.checkCertbotService,
+		},
 	}
 
 	if profile == ProfileDeployReadiness {

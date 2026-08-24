@@ -13,6 +13,7 @@ type Host interface {
 	InspectSwarmManager(ctx context.Context) error
 	InspectSharedNetwork(ctx context.Context) error
 	InspectRegistryService(ctx context.Context) error
+	InspectServiceReadiness(ctx context.Context, service string) (desired int, running int, taskError string, err error)
 }
 
 type Service struct {

@@ -3,8 +3,9 @@ package status
 type ComponentStatus string
 
 const (
-	ComponentStatusReady   ComponentStatus = "ready"
-	ComponentStatusMissing ComponentStatus = "missing"
+	ComponentStatusReady    ComponentStatus = "ready"
+	ComponentStatusDegraded ComponentStatus = "degraded"
+	ComponentStatusMissing  ComponentStatus = "missing"
 )
 
 type Component struct {

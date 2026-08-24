@@ -79,18 +79,30 @@ func (s *Service) checkSharedNetwork(ctx context.Context) Check {
 }
 
 func (s *Service) checkRegistryService(ctx context.Context) Check {
-	if err := s.host.InspectRegistryService(ctx); err != nil {
-		return Check{
-			Name:        "registry_service",
-			Status:      StatusFail,
-			Message:     fmt.Sprintf("service %s is missing", s.config.RegistryName+"_registry"),
-			Remediation: "Run noops install to deploy the registry"}
-	}
+	return s.checkServiceReadiness(ctx, "registry_service", s.config.RegistryName+"_registry", "Run noops install to deploy the registry")
+}
 
-	return Check{
-		Name:    "registry_service",
-		Status:  StatusOK,
-		Message: fmt.Sprintf("service %s exists", s.config.RegistryName+"_registry")}
+func (s *Service) checkNginxService(ctx context.Context) Check {
+	return s.checkServiceReadiness(ctx, "nginx_service", s.config.NginxName+"_nginx", "Run noops install to deploy nginx ingress")
+}
+
+func (s *Service) checkCertbotService(ctx context.Context) Check {
+	return s.checkServiceReadiness(ctx, "certbot_service", s.config.NginxName+"_certbot", "Run noops install to deploy certificate renewal")
+}
+
+func (s *Service) checkServiceReadiness(ctx context.Context, name, service, remediation string) Check {
+	desired, running, taskError, err := s.host.InspectServiceReadiness(ctx, service)
+	if err != nil {
+		return Check{Name: name, Status: StatusFail, Message: fmt.Sprintf("service %s is unavailable", service), Remediation: remediation}
+	}
+	if desired > 0 && desired == running {
+		return Check{Name: name, Status: StatusOK, Message: fmt.Sprintf("service %s is running %d/%d desired tasks", service, running, desired)}
+	}
+	message := fmt.Sprintf("service %s is running %d/%d desired tasks", service, running, desired)
+	if taskError != "" {
+		message += fmt.Sprintf(": %s", taskError)
+	}
+	return Check{Name: name, Status: StatusFail, Message: message, Remediation: remediation}
 }
 
 func (s *Service) checkInstallMetadata(context.Context) Check {

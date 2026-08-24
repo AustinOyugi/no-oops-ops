@@ -16,6 +16,7 @@ type Host interface {
 	InspectSharedNetwork(ctx context.Context) error
 	InspectRegistryService(ctx context.Context) error
 	InspectNginxService(ctx context.Context) error
+	InspectServiceReadiness(ctx context.Context, service string) (desired int, running int, taskError string, err error)
 }
 
 type Service struct {
@@ -56,23 +57,32 @@ func (s *Service) Run(ctx context.Context) (Result, error) {
 		result.AddComponent("shared_network", ComponentStatusReady, s.config.NetworkName)
 	}
 
-	if err := s.host.InspectRegistryService(ctx); err != nil {
-		result.AddComponent("registry_service", ComponentStatusMissing, err.Error())
-	} else {
-		result.AddComponent("registry_service", ComponentStatusReady, result.Metadata.Registry.ServiceName)
-	}
-
-	if err := s.host.InspectNginxService(ctx); err != nil {
-		result.AddComponent("nginx_service", ComponentStatusMissing, err.Error())
-	} else {
-		result.AddComponent("nginx_service", ComponentStatusReady, result.Metadata.Nginx.ServiceName)
-	}
+	s.addServiceComponent(ctx, &result, "registry_service", result.Metadata.Registry.ServiceName)
+	s.addServiceComponent(ctx, &result, "nginx_service", result.Metadata.Nginx.ServiceName)
+	s.addServiceComponent(ctx, &result, "certbot_service", s.config.NginxName+"_certbot")
 
 	result.AddComponent("registry_config", componentStatusFromFile(result.Metadata.Registry.ConfigPath), result.Metadata.Registry.ConfigPath)
 	result.AddComponent("registry_stack", componentStatusFromFile(result.Metadata.Registry.StackPath), result.Metadata.Registry.StackPath)
 	result.AddComponent("nginx_stack", componentStatusFromFile(result.Metadata.Nginx.StackPath), result.Metadata.Nginx.StackPath)
 
 	return result, nil
+}
+
+func (s *Service) addServiceComponent(ctx context.Context, result *Result, component, service string) {
+	desired, running, taskError, err := s.host.InspectServiceReadiness(ctx, service)
+	if err != nil {
+		result.AddComponent(component, ComponentStatusMissing, err.Error())
+		return
+	}
+	message := fmt.Sprintf("%s: %d/%d desired tasks running", service, running, desired)
+	if desired > 0 && desired == running {
+		result.AddComponent(component, ComponentStatusReady, message)
+		return
+	}
+	if taskError != "" {
+		message += fmt.Sprintf(": %s", taskError)
+	}
+	result.AddComponent(component, ComponentStatusDegraded, message)
 }
 
 func (s *Service) readMetadata() (Metadata, error) {
