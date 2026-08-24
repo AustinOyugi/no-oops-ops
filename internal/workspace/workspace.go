@@ -13,7 +13,7 @@ const (
 	ConfigName = "config.yml"
 )
 
-const initialAppsCatalog = `version: 1
+const initialAppsCatalog = `version: %s
 
 settings:
   platform:
@@ -41,10 +41,9 @@ type Paths struct {
 	DataDir  string
 }
 
-// Initialize creates the No Oops-owned store below root. Application
-// definitions remain in the workspace root and are never generated or changed
-// by this operation.
-func Initialize(root string) (Paths, error) {
+// Initialize creates the No Oops-owned store below root. It seeds apps.yml
+// when absent but never replaces an existing application catalog.
+func Initialize(root, noopsVersion string) (Paths, error) {
 	paths, err := resolve(root)
 	if err != nil {
 		return Paths{}, err
@@ -64,7 +63,7 @@ func Initialize(root string) (Paths, error) {
 	}
 	appsPath := filepath.Join(paths.Root, "apps.yml")
 	if _, err := os.Stat(appsPath); errors.Is(err, os.ErrNotExist) {
-		if err := os.WriteFile(appsPath, []byte(initialAppsCatalog), 0o600); err != nil {
+		if err := os.WriteFile(appsPath, []byte(fmt.Sprintf(initialAppsCatalog, noopsVersion)), 0o600); err != nil {
 			return Paths{}, fmt.Errorf("write app catalog %q: %w", appsPath, err)
 		}
 	} else if err != nil {

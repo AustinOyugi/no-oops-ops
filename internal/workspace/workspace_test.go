@@ -8,7 +8,7 @@ import (
 
 func TestInitializeCreatesOnlyOwnedStore(t *testing.T) {
 	root := t.TempDir()
-	paths, err := Initialize(root)
+	paths, err := Initialize(root, "test")
 	if err != nil {
 		t.Fatalf("initialize workspace: %v", err)
 	}

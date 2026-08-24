@@ -64,6 +64,12 @@ func Load(root string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	if apps.Version == "" {
+		return Config{}, fmt.Errorf("app catalog %q is missing version; expected %q", paths.Root+"/apps.yml", Version)
+	}
+	if apps.Version != Version {
+		return Config{}, fmt.Errorf("app catalog %q uses version %q, but noops is version %q", paths.Root+"/apps.yml", apps.Version, Version)
+	}
 	platform := apps.Settings.Platform
 	networkName := defaultString(platform.Network.Name, defaultNetworkName)
 	registryName := defaultString(platform.Registry.Name, defaultRegistryName)

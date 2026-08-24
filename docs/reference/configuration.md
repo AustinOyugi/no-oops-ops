@@ -20,7 +20,7 @@ Commit `apps.yml` and `apps/`; add `.noops/` to `.gitignore`.
 truth for platform settings and app aliases:
 
 ```yaml
-version: 1
+version: v0.1.0
 
 settings:
   platform:
@@ -49,6 +49,10 @@ deployments use `platform.networks`: an explicit environment mapping wins, and
 otherwise `{environment}` in `default` is replaced by the selected environment.
 No Oops creates that overlay network on demand. The managed ingress joins an
 environment network only when it serves an exposed app in that environment.
+
+The `version` value must exactly match `noops --version`. A release binary
+creates a matching value during `noops init`; update the catalog in the same
+change as the CLI when adopting a new No Oops release.
 
 The workspace state directory contains paths such as:
 

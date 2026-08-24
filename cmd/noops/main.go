@@ -30,7 +30,7 @@ func main() {
 			_, _ = fmt.Fprintln(os.Stderr, "init requires exactly one workspace directory")
 			os.Exit(1)
 		}
-		paths, initErr := workspace.Initialize(args[1])
+		paths, initErr := workspace.Initialize(args[1], config.Version)
 		if initErr != nil {
 			_, _ = fmt.Fprintln(os.Stderr, initErr)
 			os.Exit(1)
@@ -65,7 +65,7 @@ func main() {
 }
 
 func isVersionCommand(args []string) bool {
-	return len(args) == 1 && (args[0] == "version" || args[0] == "--version" || args[0] == "-v")
+	return len(args) == 0 || (len(args) == 1 && (args[0] == "version" || args[0] == "--version" || args[0] == "-v"))
 }
 
 func resolveWorkspaceArgs(args []string) (string, []string, error) {

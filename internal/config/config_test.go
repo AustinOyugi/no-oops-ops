@@ -10,10 +10,12 @@ import (
 
 func TestLoadUsesPlatformSettingsFromAppsCatalog(t *testing.T) {
 	root := t.TempDir()
-	if _, err := workspace.Initialize(root); err != nil {
+	if _, err := workspace.Initialize(root, Version); err != nil {
 		t.Fatal(err)
 	}
-	content := `settings:
+	content := `version: dev
+
+settings:
   platform:
     network:
       name: cranium-platform
@@ -48,5 +50,18 @@ apps: {}
 	}
 	if got, want := cfg.EnvironmentNetwork("dev"), "cranium-dev"; got != want {
 		t.Errorf("dev network = %q, want %q", got, want)
+	}
+}
+
+func TestLoadRejectsDifferentAppsCatalogVersion(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Initialize(root, Version); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "apps.yml"), []byte("version: another-version\napps: {}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(root); err == nil {
+		t.Fatal("expected catalog version mismatch")
 	}
 }

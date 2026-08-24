@@ -22,7 +22,7 @@ Running `noops` without arguments prints its name and build version.
 
 | Command                 | Behavior                                                                                                                                                         |
 |-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `init <workspace>`      | Creates the workspace-local `.noops/state` and `.noops/data` stores, plus an initial `apps.yml` when absent.                                                     |
+| `init <workspace>`      | Creates the workspace-local `.noops/state` and `.noops/data` stores, plus an initial version-matched `apps.yml` when absent.                                     |
 | `install`               | Initializes Swarm when required, creates the shared network, deploys the registry, and records installation metadata.                                            |
 | `doctor`                | Checks Docker, Swarm, installation artifacts, network, and registry.                                                                                             |
 | `doctor --deploy-ready` | Checks only the runtime prerequisites used by `deploy`.                                                                                                          |

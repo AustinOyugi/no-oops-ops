@@ -10,6 +10,7 @@ import (
 )
 
 type File struct {
+	Version  string         `yaml:"version"`
 	Settings Settings       `yaml:"settings"`
 	Apps     map[string]App `yaml:"apps"`
 }

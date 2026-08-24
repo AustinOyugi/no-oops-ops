@@ -11,6 +11,8 @@ builds:
     binary: noops
     flags:
       - -trimpath
+    ldflags:
+      - -s -w -X github.com/AustinOyugi/no-oops-ops/internal/config.Version={{ .Version }}
     env:
       - CGO_ENABLED=0
     goos:
