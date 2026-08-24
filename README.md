@@ -51,7 +51,7 @@ make test
 
 ## Status
 
-The project currently supports a local Docker Swarm, a plain-HTTP internal registry, and a shared nginx ingress on ports 80 and 443. Route and TLS configuration, and registry garbage collection policy, are not implemented. See [Current limitations](docs/limitations.md).
+The project currently supports a local Docker Swarm, a plain-HTTP internal registry, and a shared nginx ingress with manifest-driven HTTP routes. TLS configuration and registry garbage collection policy are not implemented. See [Current limitations](docs/limitations.md).
 
 ## License
 

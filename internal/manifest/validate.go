@@ -2,7 +2,13 @@ package manifest
 
 import (
 	"fmt"
+	"regexp"
 	"time"
+)
+
+var (
+	domainPattern     = regexp.MustCompile(`(?i)^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$`)
+	pathPrefixPattern = regexp.MustCompile(`^/[A-Za-z0-9._~%/@:+-]*$`)
 )
 
 func (m Manifest) Validate() error {
@@ -60,6 +66,18 @@ func (m Manifest) Validate() error {
 	if m.Env.Secrets != nil {
 		if err := m.Env.Secrets.Validate(); err != nil {
 			return err
+		}
+	}
+
+	if m.Expose.Enabled {
+		if m.Expose.Domain == "" {
+			return fmt.Errorf("expose.domain is required when expose.enabled is true")
+		}
+		if !domainPattern.MatchString(m.Expose.Domain) {
+			return fmt.Errorf("expose.domain must be a valid hostname")
+		}
+		if !pathPrefixPattern.MatchString(m.Expose.PathPrefix) {
+			return fmt.Errorf("expose.path_prefix must be an absolute HTTP path without query or fragment")
 		}
 	}
 

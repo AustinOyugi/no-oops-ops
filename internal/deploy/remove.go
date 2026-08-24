@@ -37,6 +37,9 @@ func (s *Service) Remove(ctx context.Context, environment, path string) (RemoveR
 
 	stack := stackName(environment, m.Name)
 	s.logger.InfoContext(ctx, "removing application", "environment", environment, "name", m.Name, "stack", stack)
+	if err := s.ingress.Remove(ctx, environment, m.Name); err != nil {
+		return RemoveResult{}, fmt.Errorf("remove ingress route: %w", err)
+	}
 	if err := s.removeStack(ctx, stack); err != nil {
 		return RemoveResult{}, err
 	}

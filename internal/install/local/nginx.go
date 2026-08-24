@@ -23,10 +23,19 @@ func (h *Host) nginxStackPath() string {
 	return filepath.Join(h.nginxDir(), "stack.yml")
 }
 
+func (h *Host) nginxConfigDir() string {
+	return filepath.Join(h.nginxDir(), "conf")
+}
+
+func (h *Host) nginxConfigPath() string {
+	return filepath.Join(h.nginxConfigDir(), "routes.conf")
+}
+
 type nginxStackTemplateData struct {
 	HTTPPort    string
 	HTTPSPort   string
 	NetworkName string
+	ConfigPath  string
 }
 
 func (h *Host) WriteNginxStack(ctx context.Context) error {
@@ -39,11 +48,22 @@ func (h *Host) WriteNginxStack(ctx context.Context) error {
 			Err:   fmt.Errorf("create nginx state dir %q: %w", h.nginxDir(), err),
 		}
 	}
+	if err := os.MkdirAll(h.nginxConfigDir(), stateDirMode); err != nil {
+		return install.PrerequisiteError{Check: install.StepWriteNginxStack, Err: fmt.Errorf("create nginx config dir %q: %w", h.nginxConfigDir(), err)}
+	}
+	if _, err := os.Stat(h.nginxConfigPath()); os.IsNotExist(err) {
+		if err := os.WriteFile(h.nginxConfigPath(), []byte(defaultNginxConfig), installMetadataFileMode); err != nil {
+			return install.PrerequisiteError{Check: install.StepWriteNginxStack, Err: fmt.Errorf("write nginx config %q: %w", h.nginxConfigPath(), err)}
+		}
+	} else if err != nil {
+		return install.PrerequisiteError{Check: install.StepWriteNginxStack, Err: fmt.Errorf("inspect nginx config %q: %w", h.nginxConfigPath(), err)}
+	}
 
 	rendered, err := renderTemplate("nginx-stack.yml.tmpl", nginxStackTemplateContents, nginxStackTemplateData{
 		HTTPPort:    h.nginxHTTPPort,
 		HTTPSPort:   h.nginxHTTPSPort,
 		NetworkName: h.networkName,
+		ConfigPath:  h.nginxConfigDir(),
 	})
 	if err != nil {
 		return install.PrerequisiteError{Check: install.StepWriteNginxStack, Err: fmt.Errorf("render nginx stack: %w", err)}
@@ -54,6 +74,20 @@ func (h *Host) WriteNginxStack(ctx context.Context) error {
 	}
 	return nil
 }
+
+const defaultNginxConfig = `server {
+  listen 80 default_server;
+  listen [::]:80 default_server;
+  server_name _;
+
+  location = /__noops/health {
+    add_header Content-Type text/plain;
+    return 200 'ok\n';
+  }
+
+  location / { return 404; }
+}
+`
 
 func (h *Host) InspectNginxService(ctx context.Context) error {
 	result, err := h.runner.Run(ctx, "docker", []string{"service", "inspect", h.nginxService}, command.RunOptions{})

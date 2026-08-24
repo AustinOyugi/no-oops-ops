@@ -10,6 +10,7 @@ func TestRenderNginxStack(t *testing.T) {
 		HTTPPort:    "8080",
 		HTTPSPort:   "8443",
 		NetworkName: "noops-net",
+		ConfigPath:  "/var/lib/noops/nginx/conf",
 	})
 	if err != nil {
 		t.Fatalf("render nginx stack: %v", err)
@@ -20,8 +21,9 @@ func TestRenderNginxStack(t *testing.T) {
 		"image: nginx:1.28-alpine",
 		`- "8080:80"`,
 		`- "8443:443"`,
+		`- "/var/lib/noops/nginx/conf:/etc/nginx/conf.d:ro"`,
 		`- "noops-net"`,
-		"wget -q --spider http://127.0.0.1/ || exit 1",
+		"wget -q --spider http://127.0.0.1/__noops/health || exit 1",
 		"external: true",
 	} {
 		if !strings.Contains(output, want) {

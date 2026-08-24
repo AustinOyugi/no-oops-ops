@@ -86,3 +86,28 @@ func TestEnvSecretsValidateRejectsEmptyResolution(t *testing.T) {
 		t.Error("expected error for empty resolution")
 	}
 }
+
+func TestValidateRequiresSafeExposureConfiguration(t *testing.T) {
+	base := Manifest{
+		Name:        "test",
+		Image:       Image{Repository: "repo"},
+		Service:     Service{InternalPort: 8080},
+		Healthcheck: Healthcheck{Test: []string{"CMD", "true"}},
+		Source:      Source{Context: ".", Dockerfile: "Dockerfile"},
+		Expose:      Expose{Enabled: true, Domain: "app.example.test", PathPrefix: "/api"},
+	}
+	if err := base.Validate(); err != nil {
+		t.Fatalf("valid exposure rejected: %v", err)
+	}
+
+	base.Expose.Domain = "app.example.test; return 200"
+	if err := base.Validate(); err == nil {
+		t.Fatal("expected invalid domain to be rejected")
+	}
+
+	base.Expose.Domain = "app.example.test"
+	base.Expose.PathPrefix = "/api?debug=true"
+	if err := base.Validate(); err == nil {
+		t.Fatal("expected path with query to be rejected")
+	}
+}

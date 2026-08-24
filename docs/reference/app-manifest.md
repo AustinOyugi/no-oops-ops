@@ -37,7 +37,7 @@ env:
 | `image.repository` | Yes | — | Image repository name; for an external image this is also the upstream repository. |
 | `image.tag` | No | `latest` | Upstream tag when `image.build: false`. |
 | `image.build` | No | `true` | Build from source when true; snapshot the upstream image when false. |
-| `service.internal_port` | Yes | — | Application port used by your health check; it is not published by No Oops Ops. |
+| `service.internal_port` | Yes | — | Application port used by health checks and nginx when the app is exposed; it is not published directly. |
 | `service.replicas` | No | `1` | Swarm replica count. |
 | `service.network` | No | `noops-net` | Existing external Swarm network used by the stack. |
 | `service.command` | No | image command | Command override, also used when env-mode secrets need a wrapper. |
@@ -48,6 +48,9 @@ env:
 | `healthcheck.retries` | No | `3` | Healthcheck retries. |
 | `healthcheck.start_period` | No | `60s` | Go duration. |
 | `rollout.*` | No | See below | Swarm update, rollback, restart, and convergence settings. |
+| `expose.enabled` | No | `false` | Adds the app to the shared nginx ingress when true. |
+| `expose.domain` | When enabled | — | HTTP host name served by nginx. |
+| `expose.path_prefix` | No | `/` | HTTP path prefix forwarded to the app. |
 | `env.file` | Effectively yes for deploy | — | Environment YAML file, relative to the manifest. |
 | `env.secrets` | No | — | Allow-listed secret references and delivery mode. |
 
@@ -59,6 +62,8 @@ The defaults are: update `order: start-first`, `parallelism: 1`, `delay: 10s`, `
 
 `rollout.monitor` defaults to `healthcheck.start_period + retries × interval + timeout + 10s`. Override it only when the application needs a longer or shorter Swarm monitoring window. `max_failure_ratio` for both update and rollback must be between 0 and 1.
 
-## Intentionally unsupported public fields
+## Public routing
 
-The implementation currently does not render router/TLS configuration, publish `service.external_port`, or process `expose` and `depends_on`. Do not rely on those fields in manifests; they are not part of the supported documentation contract.
+After the application successfully converges, `noops deploy` writes its enabled route to the platform-managed nginx ingress. nginx forwards requests to the application's private Swarm service and `service.internal_port`; no application port is published directly. `noops remove` removes the route before stopping the stack.
+
+Routes are currently plain HTTP only. A given domain/path-prefix pair can be owned by only one deployed app. `service.external_port` and `depends_on` remain unsupported.

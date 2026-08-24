@@ -6,10 +6,12 @@ services:
     ports:
       - "{{ .HTTPPort }}:80"
       - "{{ .HTTPSPort }}:443"
+    volumes:
+      - "{{ .ConfigPath }}:/etc/nginx/conf.d:ro"
     networks:
       - "{{ .NetworkName }}"
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/__noops/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3

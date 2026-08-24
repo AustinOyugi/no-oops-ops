@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
+	"github.com/AustinOyugi/no-oops-ops/internal/ingress"
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"github.com/AustinOyugi/no-oops-ops/internal/release"
@@ -21,6 +22,7 @@ type Service struct {
 	releases    release.Store
 	deployments deploymentStore
 	secrets     *secret.Service
+	ingress     *ingress.Service
 }
 
 func NewService(logger *slog.Logger, cfg config.Config) *Service {
@@ -31,6 +33,7 @@ func NewService(logger *slog.Logger, cfg config.Config) *Service {
 		releases:    release.NewFilesystemStore(),
 		deployments: newFilesystemDeploymentStore(),
 		secrets:     secret.NewService(logger, cfg),
+		ingress:     ingress.NewService(logger, cfg),
 	}
 }
 
@@ -185,6 +188,10 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 			return Result{}, fmt.Errorf("%w; record deployment outcome: %v", err, saveErr)
 		}
 		return Result{}, err
+	}
+
+	if err := s.ingress.Reconcile(ctx, environment, m); err != nil {
+		return Result{}, fmt.Errorf("reconcile ingress route: %w", err)
 	}
 
 	deploymentPath, err := s.deployments.Save(s.config, Deployment{
