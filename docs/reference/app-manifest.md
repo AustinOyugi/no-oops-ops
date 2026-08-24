@@ -2,36 +2,27 @@
 
 The manifest is YAML. `source.context` and `source.dockerfile` are resolved relative to the manifest unless absolute. `env.file` is resolved relative to the manifest directory.
 
+## Manifest format
+
+No Oops Ops accepts a Compose-shaped manifest containing one service. Standard Docker fields such as `image`, `build`, `command`, `healthcheck`, `deploy.replicas`, `networks`, and `volumes` are mapped into the deployment. No Oops Ops features remain under `x-noops`.
+
 ```yaml
-name: my-service
-
-source:
-  context: .
-  dockerfile: Dockerfile
-  build:
-    command: ["make", "build"]
-
-image:
-  repository: my-service
-  build: true
-
-service:
-  internal_port: 8080
-  replicas: 2
-
-healthcheck:
-  test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-
-expose:
-  enabled: true
-  blue_green: true
-  domain: app.example.com
-  tls: true
-  path_prefix: /
-
-env:
-  file: app.env.yml
+services:
+  api:
+    image: registry.example.com/api:1.2.3
+    command: ["serve"]
+    healthcheck:
+      test: ["CMD", "true"]
+    deploy:
+      replicas: 2
+    x-noops:
+      service:
+        internal_port: 8080
+      env:
+        file: api.env.yml
 ```
+
+Manifests currently require exactly one service. Multi-service selection and raw Compose pass-through are the next extension. The earlier top-level `name`, `image`, and `service` manifest format is no longer supported.
 
 ## Supported fields
 

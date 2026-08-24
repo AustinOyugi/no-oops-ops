@@ -1,28 +1,17 @@
-name: postgres
-
-image:
-  repository: docker.io/bitnamilegacy/postgresql
-  tag: 14
-  build: false
-
-service:
-  internal_port: 5432
-
-healthcheck:
-  test:
-    - CMD
-    - pg_isready
-    - -Upostgres
-  start_period: 60s
-  interval: 10s
-  timeout: 10s
-  retries: 3
-
-env:
-  file: postgres.env.yml
-
-  secrets:
-    resolution: file
-    resolvable:
-      - POSTGRES_USER
-      - POSTGRES_PASSWORD
+services:
+  postgres:
+    image: docker.io/bitnamilegacy/postgresql:14
+    healthcheck:
+      test: [CMD, pg_isready, -Upostgres]
+      start_period: 60s
+      interval: 10s
+      timeout: 10s
+      retries: 3
+    x-noops:
+      service:
+        internal_port: 5432
+      env:
+        file: postgres.env.yml
+        secrets:
+          resolution: file
+          resolvable: [POSTGRES_USER, POSTGRES_PASSWORD]

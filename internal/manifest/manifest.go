@@ -1,5 +1,11 @@
 package manifest
 
+import (
+	"fmt"
+
+	"gopkg.in/yaml.v3"
+)
+
 type Manifest struct {
 	Name        string      `yaml:"name"`
 	Source      Source      `yaml:"source"`
@@ -11,6 +17,53 @@ type Manifest struct {
 	Env         Env         `yaml:"env"`
 	DependsOn   []string    `yaml:"depends_on"`
 	Volumes     []string    `yaml:"volumes"`
+}
+
+// ComposeFile is the initial Compose-shaped input supported by No Oops Ops.
+// Until service selection is introduced, it must contain exactly one service.
+type ComposeFile struct {
+	Services map[string]ComposeService `yaml:"services"`
+}
+
+type ComposeService struct {
+	Image       string        `yaml:"image"`
+	Build       ComposeBuild  `yaml:"build"`
+	Command     []string      `yaml:"command"`
+	Healthcheck Healthcheck   `yaml:"healthcheck"`
+	Deploy      ComposeDeploy `yaml:"deploy"`
+	Networks    []string      `yaml:"networks"`
+	Volumes     []string      `yaml:"volumes"`
+	NoOps       ComposeNoOps  `yaml:"x-noops"`
+}
+
+type ComposeBuild struct {
+	Context    string `yaml:"context"`
+	Dockerfile string `yaml:"dockerfile"`
+}
+
+func (b *ComposeBuild) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind == yaml.ScalarNode {
+		b.Context = value.Value
+		return nil
+	}
+	if value.Kind != yaml.MappingNode {
+		return fmt.Errorf("build must be a path or mapping")
+	}
+	type composeBuild ComposeBuild
+	return value.Decode((*composeBuild)(b))
+}
+
+type ComposeDeploy struct {
+	Replicas int `yaml:"replicas"`
+}
+
+type ComposeNoOps struct {
+	Env       Env      `yaml:"env"`
+	Expose    Expose   `yaml:"expose"`
+	Rollout   Rollout  `yaml:"rollout"`
+	DependsOn []string `yaml:"depends_on"`
+	Source    Source   `yaml:"source"`
+	Service   Service  `yaml:"service"`
 }
 
 type Source struct {

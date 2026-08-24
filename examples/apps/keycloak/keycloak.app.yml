@@ -1,31 +1,18 @@
-name: keycloak
-
-image:
-  repository: quay.io/keycloak/keycloak
-  tag: 21.0.1
-  build: false
-
-service:
-  internal_port: 8003
-  command:
-    - start-dev
-
-healthcheck:
-  test:
-    - CMD-SHELL
-    - bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080; printf "GET /health/ready HTTP/1.0\r\n\r\n" >&3; grep -q "HTTP/1.0 200" <&3'
-  start_period: 60s
-  interval: 10s
-  timeout: 10s
-  retries: 3
-
-env:
-  file: keycloak.env.yml
-
-  secrets:
-    resolution: env
-    resolvable:
-      - KEYCLOAK_ADMIN
-      - KEYCLOAK_ADMIN_PASSWORD
-      - KC_DB_PASSWORD
-      - KC_DB_USERNAME
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:21.0.1
+    command: [start-dev]
+    healthcheck:
+      test: [CMD-SHELL, "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080; printf \"GET /health/ready HTTP/1.0\\r\\n\\r\\n\" >&3; grep -q \"HTTP/1.0 200\" <&3'"]
+      start_period: 60s
+      interval: 10s
+      timeout: 10s
+      retries: 3
+    x-noops:
+      service:
+        internal_port: 8003
+      env:
+        file: keycloak.env.yml
+        secrets:
+          resolution: env
+          resolvable: [KEYCLOAK_ADMIN, KEYCLOAK_ADMIN_PASSWORD, KC_DB_PASSWORD, KC_DB_USERNAME]

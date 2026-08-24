@@ -1,46 +1,30 @@
-name: lango
-
-source:
-  context: "/Users/odu/Documents/alien/code-innate/enterprise/rolengi/security/lango-service"
-  dockerfile: "/Users/odu/Documents/alien/code-innate/enterprise/rolengi/security/lango-service/Dockerfile"
-  build:
-    command:
-      - mvn
-      - package
-      - -DskipTests
-
-image:
-  repository: lango-service
-
-service:
-  internal_port: 8080
-  replicas: 1
-
-healthcheck:
-  test:
-    - CMD
-    - curl
-    - -f
-    - http://localhost:8080/lango/liveness
-  start_period: 60s
-  interval: 10s
-  timeout: 10s
-  retries: 3
-
-# Blue/green promotion deploys a candidate for later releases, waits for its
-# health check, switches this route to it, then removes the prior release.
-expose:
-  enabled: true
-  blue_green: true
-  domain: lango.example.com
-  path_prefix: /
-
-env:
-  file: lango.env.yml
-
-  secrets:
-    resolution: env
-
-    resolvable:
-      - REDIS_PASSWORD
-      - AUTH_SERVER_API_CLIENT_SECRET
+services:
+  lango:
+    image: lango-service
+    build:
+      context: /Users/odu/Documents/alien/code-innate/enterprise/rolengi/security/lango-service
+      dockerfile: /Users/odu/Documents/alien/code-innate/enterprise/rolengi/security/lango-service/Dockerfile
+    healthcheck:
+      test: [CMD, curl, -f, http://localhost:8080/lango/liveness]
+      start_period: 60s
+      interval: 10s
+      timeout: 10s
+      retries: 3
+    deploy:
+      replicas: 1
+    x-noops:
+      source:
+        build:
+          command: [mvn, package, -DskipTests]
+      service:
+        internal_port: 8080
+      expose:
+        enabled: true
+        blue_green: true
+        domain: lango.example.com
+        path_prefix: /
+      env:
+        file: lango.env.yml
+        secrets:
+          resolution: env
+          resolvable: [REDIS_PASSWORD, AUTH_SERVER_API_CLIENT_SECRET]
