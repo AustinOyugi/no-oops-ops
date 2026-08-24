@@ -7,6 +7,8 @@
 - Docker Swarm manager authority on the machine that runs `noops install` and `noops deploy`
 - Docker configured to allow the internal registry at `127.0.0.1:5000`
 
+For a public TLS route, the domain's DNS A/AAAA record must point to the Swarm manager and ports 80 and 443 must be reachable from the internet. The first TLS deployment prompts for the ACME contact email if `NOOPS_ACME_EMAIL` is not already configured.
+
 The bundled registry uses HTTP. For Docker Desktop, add the following to the Docker Engine configuration and restart Docker Desktop:
 
 ```json

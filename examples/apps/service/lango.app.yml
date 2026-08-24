@@ -27,6 +27,14 @@ healthcheck:
   timeout: 10s
   retries: 3
 
+# Public HTTPS ingress. Replace this with a domain whose DNS A/AAAA record
+# points at the Swarm manager before enabling it.
+# expose:
+#   enabled: true
+#   domain: lango.example.com
+#   tls: true
+#   path_prefix: /
+
 env:
   file: lango.env.yml
 

@@ -22,6 +22,12 @@ service:
 healthcheck:
   test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
 
+expose:
+  enabled: true
+  domain: app.example.com
+  tls: true
+  path_prefix: /
+
 env:
   file: app.env.yml
 ```
@@ -67,7 +73,7 @@ The defaults are: update `order: start-first`, `parallelism: 1`, `delay: 10s`, `
 
 After the application successfully converges, `noops deploy` writes its enabled route to the platform-managed nginx ingress. nginx forwards requests to the application's private Swarm service and `service.internal_port`; no application port is published directly. `noops remove` removes the route before stopping the stack.
 
-Routes are currently plain HTTP only. A given domain/path-prefix pair can be owned by only one deployed app. `service.external_port` and `depends_on` remain unsupported.
+Set `expose.tls: true` to serve HTTPS. The domain's DNS A/AAAA record must resolve to the Swarm manager and allow inbound ports 80 and 443. On its first deployment, No Oops Ops makes the HTTP-01 challenge path available, obtains a Let's Encrypt certificate, and then enables the HTTPS virtual host with HTTP-to-HTTPS redirects. Subsequent certificate renewals reload nginx automatically. A given domain/path-prefix pair can be owned by only one deployed app, and all routes sharing a domain must agree on its TLS setting. `service.external_port` and `depends_on` remain unsupported.
 
 ## Internal routing
 
