@@ -1,3 +1,23 @@
+{{ define "default" }}server {
+  listen 80 default_server;
+  listen [::]:80 default_server;
+  server_name _;
+  location = /__noops/health { return 200; }
+  location / { return 404; }
+}
+{{ end }}
+
+{{ define "external-include" }}{{ if .HasExternal }}include /etc/nginx/conf.d/external/*.conf;
+{{ end }}{{ end }}
+
+{{ define "internal-server" }}{{ if .HasInternal }}server {
+  listen 80;
+  listen [::]:80;
+  server_name ingress.noops.internal;
+  include /etc/nginx/conf.d/internal/*.conf;
+}
+{{ end }}{{ end }}
+
 {{ define "all" }}server {
   listen 80 default_server;
   listen [::]:80 default_server;

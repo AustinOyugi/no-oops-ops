@@ -81,3 +81,21 @@ func TestRenderConfigRendersTLSVirtualHost(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderStaticIngressTemplates(t *testing.T) {
+	defaultConfig, err := renderTemplate(configTemplateData{}, "default")
+	if err != nil {
+		t.Fatalf("render default config: %v", err)
+	}
+	if !strings.Contains(string(defaultConfig), "listen 80 default_server;") {
+		t.Errorf("default config was not rendered:\n%s", defaultConfig)
+	}
+
+	internalConfig, err := renderTemplate(configTemplateData{HasInternal: true}, "internal-server")
+	if err != nil {
+		t.Fatalf("render internal config: %v", err)
+	}
+	if !strings.Contains(string(internalConfig), "include /etc/nginx/conf.d/internal/*.conf;") {
+		t.Errorf("internal config was not rendered:\n%s", internalConfig)
+	}
+}

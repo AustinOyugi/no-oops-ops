@@ -164,21 +164,25 @@ func (s *Service) writeConfig(routes []Route) error {
 		hasExternal = hasExternal || strings.HasPrefix(path, "external/")
 		hasInternal = hasInternal || strings.HasPrefix(path, "internal/")
 	}
-	if err := atomicWrite(filepath.Join(s.configDir(), "default.conf"), []byte(defaultConfig)); err != nil {
+	defaultConfig, err := renderTemplate(configTemplateData{}, "default")
+	if err != nil {
 		return err
 	}
-	external := ""
-	if hasExternal {
-		external = "include /etc/nginx/conf.d/external/*.conf;\n"
-	}
-	if err := atomicWrite(filepath.Join(s.configDir(), "external.conf"), []byte(external)); err != nil {
+	if err := atomicWrite(filepath.Join(s.configDir(), "default.conf"), defaultConfig); err != nil {
 		return err
 	}
-	internal := ""
-	if hasInternal {
-		internal = internalConfig
+	externalConfig, err := renderTemplate(configTemplateData{HasExternal: hasExternal}, "external-include")
+	if err != nil {
+		return err
 	}
-	if err := atomicWrite(filepath.Join(s.configDir(), "internal.conf"), []byte(internal)); err != nil {
+	if err := atomicWrite(filepath.Join(s.configDir(), "external.conf"), externalConfig); err != nil {
+		return err
+	}
+	internalConfig, err := renderTemplate(configTemplateData{HasInternal: hasInternal}, "internal-server")
+	if err != nil {
+		return err
+	}
+	if err := atomicWrite(filepath.Join(s.configDir(), "internal.conf"), internalConfig); err != nil {
 		return err
 	}
 	for path, data := range files {
@@ -232,9 +236,6 @@ func (s *Service) issueMissingCertificates(ctx context.Context, routes []Route) 
 	}
 	return len(issued) > 0, nil
 }
-
-const defaultConfig = "server {\n  listen 80 default_server;\n  listen [::]:80 default_server;\n  server_name _;\n  location = /__noops/health { return 200; }\n  location / { return 404; }\n}\n"
-const internalConfig = "server {\n  listen 80;\n  listen [::]:80;\n  server_name ingress.noops.internal;\n  include /etc/nginx/conf.d/internal/*.conf;\n}\n"
 
 func (s *Service) reload(ctx context.Context) error {
 	serviceName := s.config.NginxName + "_nginx"

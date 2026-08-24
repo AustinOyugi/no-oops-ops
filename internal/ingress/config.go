@@ -69,6 +69,8 @@ var routesConfigTemplate string
 type configTemplateData struct {
 	Domains        []domainRoutes
 	InternalRoutes []internalRoute
+	HasExternal    bool
+	HasInternal    bool
 }
 
 type domainRoutes struct {
