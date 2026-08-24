@@ -6,10 +6,10 @@ noops install
 noops uninstall [--purge]
 noops doctor [--deploy-ready]
 noops status
-noops release <environment> <manifest>
-noops deploy [--quick] <environment> <manifest> [release-tag]
-noops rollback <environment> <manifest>
-noops remove <environment> <manifest>
+noops release <environment> <manifest> (--service <name> | --all)
+noops deploy [--quick] <environment> <manifest> (--service <name> | --all)
+noops rollback <environment> <manifest> (--service <name> | --all)
+noops remove <environment> <manifest> (--service <name> | --all)
 noops secret set <environment> <key>
 noops secret list <environment>
 noops cleanup [--apply] [--orphaned] [--keep <count>]
@@ -34,10 +34,10 @@ Running `noops` without arguments prints its name and build version.
 
 | Command | Behavior |
 | --- | --- |
-| `release <env> <manifest>` | Builds or snapshots an image, pushes an immutable registry image, and records release metadata. |
-| `deploy [--quick] <env> <manifest> [tag]` | Deploys the latest recorded release, or the specified release tag. When no release exists, it creates one and retries deployment. `--quick` uses the health-check start period as its monitor window for faster development feedback. |
-| `rollback <env> <manifest>` | Redeploys the previous successful deployment, including its pinned secret versions. |
-| `remove <env> <manifest>` | Removes the app stack, recorded release and wrapper manifests, and generated app state. Named volumes and environment secrets are preserved. |
+| `release <env> <manifest> (--service <name> \| --all)` | Builds or snapshots selected services, pushes immutable images, and records release metadata. |
+| `deploy [--quick] <env> <manifest> (--service <name> \| --all)` | Deploys selected services using their latest recorded releases. `--quick` uses the health-check start period as its monitor window. |
+| `rollback <env> <manifest> (--service <name> \| --all)` | Redeploys each selected service's previous successful deployment, including pinned secret versions. |
+| `remove <env> <manifest> (--service <name> \| --all)` | Removes selected app stacks and generated state. Named volumes and environment secrets are preserved. |
 | `cleanup [--apply] [--orphaned] [--keep <count>]` | Plans retention cleanup across releases, deployments, and registry images. `--orphaned` selects app environments with no actually running recorded service, overriding normal retention. Dry-run is the default; `--apply` deletes selected manifests and metadata, then runs offline registry GC when needed. |
 
 ## Secret commands

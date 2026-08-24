@@ -2,17 +2,24 @@ package app
 
 import (
 	"context"
-	"errors"
+
+	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 )
 
 func (a *App) runRollback(ctx context.Context, args []string) error {
-	if len(args) < 2 {
-		return errors.New("rollback requires an environment and manifest path")
+	environment, manifestPath, services, err := parseServiceArgs(args, "rollback")
+	if err != nil {
+		return err
 	}
+	for _, service := range services {
+		if err := a.runRollbackService(ctx, environment, manifest.WithService(manifestPath, service)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-	environment := args[0]
-	manifestPath := args[1]
-
+func (a *App) runRollbackService(ctx context.Context, environment, manifestPath string) error {
 	result, err := a.deployer.Rollback(ctx, environment, manifestPath)
 
 	if err != nil {

@@ -3,15 +3,25 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
+
+	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 )
 
 func (a *App) runRelease(ctx context.Context, args []string) error {
-	if len(args) < 2 {
-		return errors.New("release requires an environment and manifest path")
+	environment, manifestPath, services, err := parseServiceArgs(args, "release")
+	if err != nil {
+		return err
 	}
+	for _, service := range services {
+		if err := a.runReleaseService(ctx, environment, manifest.WithService(manifestPath, service)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-	environment := args[0]
-	manifestPath := args[1]
+func (a *App) runReleaseService(ctx context.Context, environment, manifestPath string) error {
 
 	result, err := a.releaser.Run(ctx, environment, manifestPath)
 	if err != nil {
@@ -47,4 +57,38 @@ func (a *App) runRelease(ctx context.Context, args []string) error {
 	)
 
 	return nil
+}
+
+func parseServiceArgs(args []string, command string) (string, string, []string, error) {
+	if len(args) < 3 {
+		return "", "", nil, fmt.Errorf("%s requires an environment, manifest path, and --service <name> or --all", command)
+	}
+	environment, path := args[0], args[1]
+	var selected string
+	all := false
+	for i := 2; i < len(args); i++ {
+		switch args[i] {
+		case "--all":
+			all = true
+		case "--service":
+			i++
+			if i == len(args) {
+				return "", "", nil, errors.New("--service requires a service name")
+			}
+			selected = args[i]
+		default:
+			return "", "", nil, fmt.Errorf("unknown %s option %q", command, args[i])
+		}
+	}
+	if all == (selected != "") {
+		return "", "", nil, errors.New("provide exactly one of --service or --all")
+	}
+	if all {
+		names, err := manifest.Services(path)
+		return environment, path, names, err
+	}
+	if _, err := manifest.LoadService(path, selected); err != nil {
+		return "", "", nil, err
+	}
+	return environment, path, []string{selected}, nil
 }

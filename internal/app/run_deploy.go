@@ -13,7 +13,7 @@ import (
 )
 
 func (a *App) runDeploy(ctx context.Context, args []string) error {
-	environment, manifestPath, optionalReleaseVersion, quick, err := parseDeployArgs(args)
+	environment, manifestPath, services, quick, err := parseDeployArgs(args)
 	if err != nil {
 		return err
 	}
@@ -21,6 +21,15 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 	if err := a.runDeployPreflight(ctx); err != nil {
 		return err
 	}
+	for _, service := range services {
+		if err := a.runDeployService(ctx, environment, manifest.WithService(manifestPath, service), "", quick); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (a *App) runDeployService(ctx context.Context, environment, manifestPath, optionalReleaseVersion string, quick bool) error {
 	loadedManifest, err := manifest.Load(manifestPath)
 	if err != nil {
 		return err
@@ -137,21 +146,23 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 	return nil
 }
 
-func parseDeployArgs(args []string) (environment, manifestPath, releaseTag string, quick bool, err error) {
+func parseDeployArgs(args []string) (environment, manifestPath string, services []string, quick bool, err error) {
 	if len(args) > 0 && args[0] == "--quick" {
 		quick = true
 		args = args[1:]
 	}
 	if len(args) < 2 {
-		return "", "", "", false, errors.New("deploy requires an environment and manifest path")
+		return "", "", nil, false, errors.New("deploy requires an environment, manifest path, and --service <name> or --all")
 	}
-	if len(args) > 3 {
-		return "", "", "", false, errors.New("deploy accepts only an optional release tag")
+	environment, manifestPath = args[0], args[1]
+	if len(args) == 3 && args[2] == "--all" {
+		names, e := manifest.Services(manifestPath)
+		return environment, manifestPath, names, quick, e
 	}
-	if len(args) == 3 {
-		releaseTag = args[2]
+	if len(args) == 4 && args[2] == "--service" {
+		return environment, manifestPath, []string{args[3]}, quick, nil
 	}
-	return args[0], args[1], releaseTag, quick, nil
+	return "", "", nil, false, errors.New("deploy requires exactly --service <name> or --all")
 }
 
 func (a *App) runDeployPreflight(ctx context.Context) error {

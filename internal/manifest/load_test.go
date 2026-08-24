@@ -3,6 +3,7 @@ package manifest
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -53,6 +54,28 @@ func TestLoadComposeShapedManifestRejectsMultipleServices(t *testing.T) {
 	}
 	if _, err := Load(path); err == nil {
 		t.Fatal("expected multi-service Compose manifest to be rejected")
+	}
+}
+
+func TestLoadServiceSelectsOneServiceFromMultiServiceManifest(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "app.yml")
+	data := []byte("services:\n  worker:\n    image: repo/worker:1\n    healthcheck: {test: [CMD, 'true']}\n    x-noops: {service: {internal_port: 8081}}\n  api:\n    image: repo/api:1\n    healthcheck: {test: [CMD, 'true']}\n    x-noops: {service: {internal_port: 8080}}\n")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	names, err := Services(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.Join(names, ","), "api,worker"; got != want {
+		t.Fatalf("Services = %q, want %q", got, want)
+	}
+	m, err := LoadService(path, "worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Name != "worker" || m.Service.InternalPort != 8081 {
+		t.Fatalf("unexpected selected manifest: %#v", m)
 	}
 }
 

@@ -67,7 +67,7 @@ func TestRunDeployStopsBeforeDeployingWhenPreflightFails(t *testing.T) {
 		doctor:   failingDoctor{},
 	}
 
-	err := application.runDeploy(context.Background(), []string{"prod", "app.yml"})
+	err := application.runDeploy(context.Background(), []string{"prod", "app.yml", "--service", "api"})
 	if err == nil {
 		t.Fatal("runDeploy returned nil error")
 	}
@@ -80,11 +80,11 @@ func TestRunDeployStopsBeforeDeployingWhenPreflightFails(t *testing.T) {
 }
 
 func TestParseDeployArgsQuick(t *testing.T) {
-	environment, path, tag, quick, err := parseDeployArgs([]string{"--quick", "dev", "app.yml", "20260824-133119"})
+	environment, path, services, quick, err := parseDeployArgs([]string{"--quick", "dev", "app.yml", "--service", "api"})
 	if err != nil {
 		t.Fatalf("parseDeployArgs returned error: %v", err)
 	}
-	if environment != "dev" || path != "app.yml" || tag != "20260824-133119" || !quick {
-		t.Errorf("parseDeployArgs = (%q, %q, %q, %t), want quick dev deployment", environment, path, tag, quick)
+	if environment != "dev" || path != "app.yml" || len(services) != 1 || services[0] != "api" || !quick {
+		t.Errorf("parseDeployArgs = (%q, %q, %v, %t), want quick dev deployment", environment, path, services, quick)
 	}
 }
