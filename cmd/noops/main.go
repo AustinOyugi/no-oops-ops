@@ -15,7 +15,12 @@ import (
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	workspaceRoot, args, err := resolveWorkspaceArgs(os.Args[1:])
+	rawArgs := os.Args[1:]
+	if isVersionCommand(rawArgs) {
+		_, _ = fmt.Fprintf(os.Stdout, "noops %s\n", config.Version)
+		return
+	}
+	workspaceRoot, args, err := resolveWorkspaceArgs(rawArgs)
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -31,10 +36,6 @@ func main() {
 			os.Exit(1)
 		}
 		_, _ = fmt.Fprintf(os.Stdout, "initialized No Oops workspace at %s\n", paths.Root)
-		return
-	}
-	if len(args) == 0 || args[0] == "version" {
-		_, _ = fmt.Fprintf(os.Stdout, "noops %s\n", config.Version)
 		return
 	}
 	cfg, err := config.Load(workspaceRoot)
@@ -61,6 +62,10 @@ func main() {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func isVersionCommand(args []string) bool {
+	return len(args) == 1 && (args[0] == "version" || args[0] == "--version" || args[0] == "-v")
 }
 
 func resolveWorkspaceArgs(args []string) (string, []string, error) {
