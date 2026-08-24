@@ -18,10 +18,16 @@ type swarmProgressIndicator struct {
 	output *os.File
 	active bool
 
-	mu       sync.Mutex
-	status   string
-	done     chan struct{}
-	finished chan struct{}
+	mu            sync.Mutex
+	updateState   string
+	runningTasks  int
+	desiredTasks  int
+	monitoring    bool
+	startedAt     time.Time
+	monitoringAt  time.Time
+	monitorWindow time.Duration
+	done          chan struct{}
+	finished      chan struct{}
 }
 
 func newSwarmProgressIndicator(output *os.File) *swarmProgressIndicator {
@@ -31,13 +37,19 @@ func newSwarmProgressIndicator(output *os.File) *swarmProgressIndicator {
 	}
 }
 
-func (p *swarmProgressIndicator) Start(service string, desiredTasks int) {
+func (p *swarmProgressIndicator) Start(service string, desiredTasks int, monitorWindow time.Duration) {
 	if !p.active {
 		return
 	}
 
 	p.mu.Lock()
-	p.status = fmt.Sprintf("Deploying %s: preparing rollout (0/%d tasks)", service, desiredTasks)
+	p.updateState = fmt.Sprintf("preparing rollout for %s", service)
+	p.runningTasks = 0
+	p.desiredTasks = desiredTasks
+	p.monitoring = false
+	p.startedAt = time.Now()
+	p.monitoringAt = time.Time{}
+	p.monitorWindow = monitorWindow
 	p.done = make(chan struct{})
 	p.finished = make(chan struct{})
 	done := p.done
@@ -70,7 +82,16 @@ func (p *swarmProgressIndicator) Update(updateState string, runningTasks int, de
 	if p.done == nil {
 		return
 	}
-	p.status = formatSwarmProgress(updateState, runningTasks, desiredTasks, monitoring)
+	p.updateState = updateState
+	p.runningTasks = runningTasks
+	p.desiredTasks = desiredTasks
+	if monitoring && !p.monitoring {
+		p.monitoringAt = time.Now()
+	}
+	if !monitoring {
+		p.monitoringAt = time.Time{}
+	}
+	p.monitoring = monitoring
 }
 
 func (p *swarmProgressIndicator) Stop() {
@@ -96,17 +117,29 @@ func (p *swarmProgressIndicator) Stop() {
 func (p *swarmProgressIndicator) render(frame int) {
 	frames := [...]string{"|", "/", "-", "\\"}
 	p.mu.Lock()
-	status := p.status
+	status := formatSwarmProgress(
+		p.updateState,
+		p.runningTasks,
+		p.desiredTasks,
+		p.monitoring,
+		time.Since(p.startedAt),
+		time.Since(p.monitoringAt),
+		p.monitorWindow,
+	)
 	p.mu.Unlock()
 	_, _ = fmt.Fprintf(p.output, "\r\033[2K%s %s", frames[frame%len(frames)], status)
 }
 
-func formatSwarmProgress(updateState string, runningTasks int, desiredTasks int, monitoring bool) string {
+func formatSwarmProgress(updateState string, runningTasks int, desiredTasks int, monitoring bool, elapsed, monitoringElapsed, monitorWindow time.Duration) string {
 	if monitoring {
-		return fmt.Sprintf("Validating rollout (%d/%d tasks)", runningTasks, desiredTasks)
+		return fmt.Sprintf("Validating rollout (%d/%d tasks, %s/%s)", runningTasks, desiredTasks, formatProgressDuration(monitoringElapsed), formatProgressDuration(monitorWindow))
 	}
 	if updateState != "" {
-		return fmt.Sprintf("Rolling out: %s (%d/%d tasks)", updateState, runningTasks, desiredTasks)
+		return fmt.Sprintf("Rolling out: %s (%d/%d tasks, %s elapsed)", updateState, runningTasks, desiredTasks, formatProgressDuration(elapsed))
 	}
-	return fmt.Sprintf("Starting tasks (%d/%d)", runningTasks, desiredTasks)
+	return fmt.Sprintf("Starting tasks (%d/%d, %s elapsed)", runningTasks, desiredTasks, formatProgressDuration(elapsed))
+}
+
+func formatProgressDuration(value time.Duration) string {
+	return value.Truncate(time.Second).String()
 }

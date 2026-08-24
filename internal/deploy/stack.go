@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -102,6 +103,13 @@ func releaseStackName(environment, appName, tag string) string {
 		}
 	}
 	return environment + "-" + appName + "-r" + out.String()
+}
+
+// candidateStackName identifies one blue/green attempt. The timestamp keeps
+// candidates distinct when the same immutable release is deployed repeatedly.
+func candidateStackName(environment, appName, tag string, createdAt time.Time) string {
+	deploymentID := fmt.Sprintf("%d", createdAt.UTC().UnixNano())
+	return releaseStackName(environment, appName, tag+"-"+deploymentID)
 }
 
 func writeEnvMap(cfg config.Config, appName string, environment string, values map[string]string) (string, error) {

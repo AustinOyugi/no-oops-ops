@@ -72,14 +72,13 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		return Result{}, err
 	}
 	if options.Quick {
-		monitor, timeout, err := quickRolloutDurations(m)
+		monitor, err := quickRolloutMonitor(m)
 		if err != nil {
 			return Result{}, err
 		}
 		m.Rollout.Monitor = monitor
 		m.Rollout.Rollback.Monitor = monitor
-		m.Rollout.ConvergenceTimeout = timeout
-		s.logger.InfoContext(ctx, "using quick rollout settings", "monitor", monitor, "convergence_timeout", timeout)
+		s.logger.InfoContext(ctx, "using quick rollout monitor", "monitor", monitor, "convergence_timeout", m.Rollout.ConvergenceTimeout)
 	}
 
 	envFilePath := resolveEnvFilePath(absPath, m.Env.File)
@@ -154,25 +153,18 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 	deploymentService := serviceName(environment, m.Name)
 	deploymentSwarmService := swarmServiceName(environment, m.Name)
 	deploymentStackPath := stackPath(s.config, m.Name, environment)
-	activeReleaseStack := releaseStackName(environment, m.Name, releaseTag)
-	blueGreen := m.Expose.Enabled && m.Expose.BlueGreenEnabled() && activeDeployment.ReleaseTag != "" && activeDeployment.ReleaseTag != releaseTag
-	if isActiveReleaseStack(activeDeployment, releaseTag, activeReleaseStack) {
-		// A repeat deploy of the promoted release must keep using its candidate
-		// stack. Falling back to the stable stack would create a duplicate
-		// service and move ingress away from the promoted release.
-		deploymentStack = activeReleaseStack
-		deploymentService = "app"
-		deploymentSwarmService = deploymentStack + "_" + deploymentService
-		deploymentStackPath = releaseStackPath(s.config, m.Name, environment, deploymentStack)
-		s.logger.InfoContext(ctx, "reusing active blue-green release stack", "stack", deploymentStack, "release_tag", releaseTag)
-	} else if blueGreen {
+	// A blue/green deployment always receives a fresh candidate stack, even
+	// when redeploying the same immutable release. This lets Swarm validate the
+	// new task before ingress moves away from the currently active stack.
+	blueGreen := m.Expose.Enabled && m.Expose.BlueGreenEnabled() && activeDeployment.StackName != ""
+	if blueGreen {
 		if !m.Expose.Enabled {
 			return Result{}, fmt.Errorf("blue-green deployment requires expose.enabled so nginx can promote the candidate service")
 		}
 		if len(namedVolumes(m.Volumes)) > 0 {
 			return Result{}, fmt.Errorf("blue-green deployment does not support named volumes; use a shared external service or deploy this app in place")
 		}
-		deploymentStack = releaseStackName(environment, m.Name, releaseTag)
+		deploymentStack = candidateStackName(environment, m.Name, releaseTag, time.Now().UTC())
 		deploymentService = "app"
 		deploymentSwarmService = deploymentStack + "_" + deploymentService
 		deploymentStackPath = releaseStackPath(s.config, m.Name, environment, deploymentStack)
@@ -361,10 +353,6 @@ func (s *Service) resolveSecretBindings(ctx context.Context, environment string,
 	return bindings, nil
 }
 
-func isActiveReleaseStack(active Deployment, releaseTag, expectedStack string) bool {
-	return active.ReleaseTag == releaseTag && active.StackName == expectedStack
-}
-
 func resolveEnvFilePath(manifestPath string, envFile string) string {
 	return filepath.Join(filepath.Dir(manifestPath), envFile)
 }
@@ -383,14 +371,13 @@ func convergenceConfig(m manifest.Manifest) (time.Duration, time.Duration, error
 	return timeout, monitor, nil
 }
 
-// quickRolloutDurations uses the health-check start period as the shortest
-// viable monitor window. It omits the retry budget and normal safety buffer. A
-// ten-second scheduling allowance prevents the convergence deadline from
-// racing that monitor window.
-func quickRolloutDurations(m manifest.Manifest) (monitor, timeout string, err error) {
+// quickRolloutMonitor uses the health-check start period as the shortest
+// viable monitor window. The configured convergence timeout remains unchanged
+// so task scheduling time cannot race the monitoring window.
+func quickRolloutMonitor(m manifest.Manifest) (string, error) {
 	startPeriod, err := time.ParseDuration(m.Healthcheck.StartPeriod)
 	if err != nil {
-		return "", "", fmt.Errorf("parse healthcheck.start_period %q: %w", m.Healthcheck.StartPeriod, err)
+		return "", fmt.Errorf("parse healthcheck.start_period %q: %w", m.Healthcheck.StartPeriod, err)
 	}
-	return startPeriod.String(), (startPeriod + 10*time.Second).String(), nil
+	return startPeriod.String(), nil
 }

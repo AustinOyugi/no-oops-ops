@@ -150,7 +150,7 @@ func (s *Service) waitForSwarmConvergence(
 		"monitor", initialMonitor.String(),
 	)
 	progressIndicator := newSwarmProgressIndicator(os.Stderr)
-	progressIndicator.Start(serviceName, desiredTasks)
+	progressIndicator.Start(serviceName, desiredTasks, initialMonitor)
 	defer progressIndicator.Stop()
 
 	for {
@@ -158,7 +158,6 @@ func (s *Service) waitForSwarmConvergence(
 		if err != nil {
 			return "", 0, err
 		}
-		progressIndicator.Update(state, 0, desiredTasks, false)
 
 		switch state {
 		case "completed":

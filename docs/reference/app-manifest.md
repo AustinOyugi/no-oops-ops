@@ -71,7 +71,7 @@ The defaults are: update `order: start-first`, `parallelism: 1`, `delay: 10s`, `
 
 `rollout.monitor` defaults to `healthcheck.start_period + retries × interval + timeout + 10s`. Override it only when the application needs a longer or shorter Swarm monitoring window. `max_failure_ratio` for both update and rollback must be between 0 and 1.
 
-For development feedback loops, `noops deploy --quick <environment> <manifest>` temporarily uses `healthcheck.start_period` as the monitor window, with a convergence deadline ten seconds later. It does not change the manifest; a later normal deploy uses the configured monitor again.
+For development feedback loops, `noops deploy --quick <environment> <manifest>` temporarily uses `healthcheck.start_period` as the monitor window while retaining the manifest's `rollout.convergence_timeout`. It does not change the manifest; a later normal deploy uses the configured monitor again.
 
 ## Public routing
 

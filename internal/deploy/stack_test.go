@@ -3,11 +3,24 @@ package deploy
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestReleaseStackNameUsesReleaseSpecificSwarmSafeSuffix(t *testing.T) {
 	if got, want := releaseStackName("prod", "lango", "2026-08-24T10:30:00Z"), "prod-lango-r2026-08-24t103000z"; got != want {
 		t.Errorf("releaseStackName() = %q, want %q", got, want)
+	}
+}
+
+func TestCandidateStackNameIsUniquePerDeployment(t *testing.T) {
+	tag := "20260824-133728"
+	first := candidateStackName("dev", "lango", tag, time.Date(2026, 8, 24, 13, 37, 28, 1, time.UTC))
+	second := candidateStackName("dev", "lango", tag, time.Date(2026, 8, 24, 13, 37, 28, 2, time.UTC))
+	if first == second {
+		t.Fatalf("candidate stack names must differ for repeated deployments: %q", first)
+	}
+	if !strings.HasPrefix(first, "dev-lango-r20260824-133728-") {
+		t.Errorf("candidate stack name = %q, want release-specific prefix", first)
 	}
 }
 
