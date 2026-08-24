@@ -132,6 +132,14 @@ func (h *Host) EnsureNginx(ctx context.Context) error {
 	if err != nil {
 		return install.PrerequisiteError{Check: install.StepEnsureNginx, Err: fmt.Errorf("deploy nginx stack %q: %w: %s", h.nginxName, err, strings.TrimSpace(string(result.Output)))}
 	}
-	h.nginxReady = h.InspectNginxService(ctx) == nil
+	if err := h.waitForServiceReady(ctx, h.nginxService); err != nil {
+		h.nginxReady = false
+		return install.PrerequisiteError{Check: install.StepEnsureNginx, Err: err}
+	}
+	if err := h.waitForServiceReady(ctx, h.nginxName+"_certbot"); err != nil {
+		h.nginxReady = false
+		return install.PrerequisiteError{Check: install.StepEnsureNginx, Err: err}
+	}
+	h.nginxReady = true
 	return nil
 }

@@ -37,11 +37,6 @@ func (h *Host) EnsureRegistry(ctx context.Context) error {
 		"port", h.registryPort,
 	)
 
-	if h.inspectRegistryService(ctx) {
-		h.registryReady = true
-		return nil
-	}
-
 	result, err := h.runner.Run(
 		ctx,
 		"docker",
@@ -65,7 +60,10 @@ func (h *Host) EnsureRegistry(ctx context.Context) error {
 		}
 	}
 
-	h.registryReady = h.inspectRegistryService(ctx)
-
+	if err := h.waitForServiceReady(ctx, h.registryService); err != nil {
+		h.registryReady = false
+		return install.PrerequisiteError{Check: install.StepEnsureRegistry, Err: err}
+	}
+	h.registryReady = true
 	return nil
 }

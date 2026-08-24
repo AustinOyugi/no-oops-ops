@@ -29,7 +29,10 @@ func TestRenderNginxStack(t *testing.T) {
 		"wget -q --spider http://127.0.0.1/__noops/health || exit 1",
 		"external: true",
 		`entrypoint: ["/bin/sh", "-c"]`,
-		"--deploy-hook 'docker service update --force noops-nginx_nginx'",
+		"command:",
+		"- >-",
+		"--webroot-path /var/www/certbot --deploy-hook 'docker service update",
+		"--force noops-nginx_nginx'; sleep 12h; done",
 		"/var/run/docker.sock:/var/run/docker.sock",
 	} {
 		if !strings.Contains(output, want) {

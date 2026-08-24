@@ -96,6 +96,9 @@ func (a *App) Run(ctx context.Context, args []string) error {
 	}
 
 	if args[0] == "install" {
+		if len(args) != 1 {
+			return errors.New("install does not accept arguments; run noops install from the workspace or use --workspace <directory>")
+		}
 		return a.runInstall(ctx)
 	}
 
