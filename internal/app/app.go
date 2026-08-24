@@ -32,6 +32,7 @@ type App struct {
 
 type deployer interface {
 	Run(ctx context.Context, environment string, path string, optionalReleaseVersion string) (deploy.Result, error)
+	RunWithOptions(ctx context.Context, environment string, path string, optionalReleaseVersion string, options deploy.RunOptions) (deploy.Result, error)
 	Rollback(ctx context.Context, environment string, path string) (deploy.Result, error)
 	Remove(ctx context.Context, environment string, path string) (deploy.RemoveResult, error)
 }

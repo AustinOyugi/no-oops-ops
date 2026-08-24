@@ -7,7 +7,7 @@ noops uninstall [--purge]
 noops doctor [--deploy-ready]
 noops status
 noops release <environment> <manifest>
-noops deploy <environment> <manifest> [release-tag]
+noops deploy [--quick] <environment> <manifest> [release-tag]
 noops rollback <environment> <manifest>
 noops remove <environment> <manifest>
 noops secret set <environment> <key>
@@ -34,7 +34,7 @@ Running `noops` without arguments prints its name and build version.
 | Command | Behavior |
 | --- | --- |
 | `release <env> <manifest>` | Builds or snapshots an image, pushes an immutable registry image, and records release metadata. |
-| `deploy <env> <manifest> [tag]` | Deploys the latest recorded release, or the specified release tag. When no release exists, it creates one and retries deployment. |
+| `deploy [--quick] <env> <manifest> [tag]` | Deploys the latest recorded release, or the specified release tag. When no release exists, it creates one and retries deployment. `--quick` uses the health-check start period as its monitor window and a short convergence deadline for faster development feedback. |
 | `rollback <env> <manifest>` | Redeploys the previous successful deployment, including its pinned secret versions. |
 | `remove <env> <manifest>` | Removes the app stack, recorded release and wrapper manifests, and generated app state. Named volumes and environment secrets are preserved. |
 

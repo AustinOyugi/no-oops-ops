@@ -29,6 +29,11 @@ func (d *recordingDeployer) Run(context.Context, string, string, string) (deploy
 	return deploy.Result{}, errors.New("deployer should not run")
 }
 
+func (d *recordingDeployer) RunWithOptions(context.Context, string, string, string, deploy.RunOptions) (deploy.Result, error) {
+	d.runCalls++
+	return deploy.Result{}, errors.New("deployer should not run")
+}
+
 func (d *recordingDeployer) Rollback(context.Context, string, string) (deploy.Result, error) {
 	return deploy.Result{}, nil
 }
@@ -54,5 +59,15 @@ func TestRunDeployStopsBeforeDeployingWhenPreflightFails(t *testing.T) {
 	}
 	if deployer.runCalls != 0 {
 		t.Errorf("deployer calls = %d, want 0", deployer.runCalls)
+	}
+}
+
+func TestParseDeployArgsQuick(t *testing.T) {
+	environment, path, tag, quick, err := parseDeployArgs([]string{"--quick", "dev", "app.yml", "20260824-133119"})
+	if err != nil {
+		t.Fatalf("parseDeployArgs returned error: %v", err)
+	}
+	if environment != "dev" || path != "app.yml" || tag != "20260824-133119" || !quick {
+		t.Errorf("parseDeployArgs = (%q, %q, %q, %t), want quick dev deployment", environment, path, tag, quick)
 	}
 }

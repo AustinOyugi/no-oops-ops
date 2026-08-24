@@ -25,6 +25,15 @@ type Service struct {
 	ingress     *ingress.Service
 }
 
+// RunOptions controls behavior for a single deploy without changing the
+// manifest's durable rollout policy.
+type RunOptions struct {
+	// Quick uses the health-check start period as the Swarm monitor window. It is
+	// useful for development feedback loops; normal deploys retain the
+	// manifest's full monitor period.
+	Quick bool
+}
+
 func NewService(logger *slog.Logger, cfg config.Config) *Service {
 	return &Service{
 		logger:      logger,
@@ -43,10 +52,14 @@ func (s *Service) SetACMEEmail(email string) {
 }
 
 func (s *Service) Run(ctx context.Context, environment string, path string, optionalReleaseVersion string) (Result, error) {
-	return s.run(ctx, environment, path, optionalReleaseVersion, nil)
+	return s.RunWithOptions(ctx, environment, path, optionalReleaseVersion, RunOptions{})
 }
 
-func (s *Service) run(ctx context.Context, environment string, path string, optionalReleaseVersion string, pinnedSecrets []SecretBinding) (Result, error) {
+func (s *Service) RunWithOptions(ctx context.Context, environment string, path string, optionalReleaseVersion string, options RunOptions) (Result, error) {
+	return s.run(ctx, environment, path, optionalReleaseVersion, nil, options)
+}
+
+func (s *Service) run(ctx context.Context, environment string, path string, optionalReleaseVersion string, pinnedSecrets []SecretBinding, options RunOptions) (Result, error) {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return Result{}, fmt.Errorf("resolve manifest path %q: %w", path, err)
@@ -57,6 +70,16 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 	m, err := manifest.Load(absPath)
 	if err != nil {
 		return Result{}, err
+	}
+	if options.Quick {
+		monitor, timeout, err := quickRolloutDurations(m)
+		if err != nil {
+			return Result{}, err
+		}
+		m.Rollout.Monitor = monitor
+		m.Rollout.Rollback.Monitor = monitor
+		m.Rollout.ConvergenceTimeout = timeout
+		s.logger.InfoContext(ctx, "using quick rollout settings", "monitor", monitor, "convergence_timeout", timeout)
 	}
 
 	envFilePath := resolveEnvFilePath(absPath, m.Env.File)
@@ -131,8 +154,18 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 	deploymentService := serviceName(environment, m.Name)
 	deploymentSwarmService := swarmServiceName(environment, m.Name)
 	deploymentStackPath := stackPath(s.config, m.Name, environment)
+	activeReleaseStack := releaseStackName(environment, m.Name, releaseTag)
 	blueGreen := m.Expose.Enabled && m.Expose.BlueGreenEnabled() && activeDeployment.ReleaseTag != "" && activeDeployment.ReleaseTag != releaseTag
-	if blueGreen {
+	if isActiveReleaseStack(activeDeployment, releaseTag, activeReleaseStack) {
+		// A repeat deploy of the promoted release must keep using its candidate
+		// stack. Falling back to the stable stack would create a duplicate
+		// service and move ingress away from the promoted release.
+		deploymentStack = activeReleaseStack
+		deploymentService = "app"
+		deploymentSwarmService = deploymentStack + "_" + deploymentService
+		deploymentStackPath = releaseStackPath(s.config, m.Name, environment, deploymentStack)
+		s.logger.InfoContext(ctx, "reusing active blue-green release stack", "stack", deploymentStack, "release_tag", releaseTag)
+	} else if blueGreen {
 		if !m.Expose.Enabled {
 			return Result{}, fmt.Errorf("blue-green deployment requires expose.enabled so nginx can promote the candidate service")
 		}
@@ -297,7 +330,7 @@ func (s *Service) Rollback(ctx context.Context, environment string, path string)
 	}
 
 	s.logger.InfoContext(ctx, "starting rollback", "manifest", absPath, "environment", environment, "release_tag", previous.ReleaseTag)
-	return s.run(ctx, environment, absPath, previous.ReleaseTag, previous.SecretBindings)
+	return s.run(ctx, environment, absPath, previous.ReleaseTag, previous.SecretBindings, RunOptions{})
 }
 
 func (s *Service) resolveSecretBindings(ctx context.Context, environment string, refs []EnvSecretRef, pinned []SecretBinding) ([]SecretBinding, error) {
@@ -328,6 +361,10 @@ func (s *Service) resolveSecretBindings(ctx context.Context, environment string,
 	return bindings, nil
 }
 
+func isActiveReleaseStack(active Deployment, releaseTag, expectedStack string) bool {
+	return active.ReleaseTag == releaseTag && active.StackName == expectedStack
+}
+
 func resolveEnvFilePath(manifestPath string, envFile string) string {
 	return filepath.Join(filepath.Dir(manifestPath), envFile)
 }
@@ -344,4 +381,16 @@ func convergenceConfig(m manifest.Manifest) (time.Duration, time.Duration, error
 	}
 
 	return timeout, monitor, nil
+}
+
+// quickRolloutDurations uses the health-check start period as the shortest
+// viable monitor window. It omits the retry budget and normal safety buffer. A
+// ten-second scheduling allowance prevents the convergence deadline from
+// racing that monitor window.
+func quickRolloutDurations(m manifest.Manifest) (monitor, timeout string, err error) {
+	startPeriod, err := time.ParseDuration(m.Healthcheck.StartPeriod)
+	if err != nil {
+		return "", "", fmt.Errorf("parse healthcheck.start_period %q: %w", m.Healthcheck.StartPeriod, err)
+	}
+	return startPeriod.String(), (startPeriod + 10*time.Second).String(), nil
 }

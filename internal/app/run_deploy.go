@@ -7,21 +7,15 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/AustinOyugi/no-oops-ops/internal/deploy"
 	"github.com/AustinOyugi/no-oops-ops/internal/doctor"
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 )
 
 func (a *App) runDeploy(ctx context.Context, args []string) error {
-	if len(args) < 2 {
-		return errors.New("deploy requires an environment and manifest path")
-	}
-
-	environment := args[0]
-	manifestPath := args[1]
-	var optionalReleaseVersion string
-
-	if len(args) > 2 {
-		optionalReleaseVersion = args[2]
+	environment, manifestPath, optionalReleaseVersion, quick, err := parseDeployArgs(args)
+	if err != nil {
+		return err
 	}
 
 	if err := a.runDeployPreflight(ctx); err != nil {
@@ -40,7 +34,8 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 		}
 	}
 
-	result, err := a.deployer.Run(ctx, environment, manifestPath, optionalReleaseVersion)
+	options := deploy.RunOptions{Quick: quick}
+	result, err := a.deployer.RunWithOptions(ctx, environment, manifestPath, optionalReleaseVersion, options)
 	if err != nil {
 		a.logger.ErrorContext(ctx, "deploy failed", "environment", environment, "manifest_path", manifestPath, "reason", err.Error())
 		return err
@@ -52,7 +47,7 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 			return err
 		}
 
-		result, err := a.deployer.Run(ctx, environment, manifestPath, optionalReleaseVersion)
+		result, err := a.deployer.RunWithOptions(ctx, environment, manifestPath, optionalReleaseVersion, options)
 		if err != nil {
 			a.logger.ErrorContext(ctx, "deploy failed", "environment", environment, "manifest_path", manifestPath, "reason", err.Error())
 			return err
@@ -140,6 +135,23 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 	)
 
 	return nil
+}
+
+func parseDeployArgs(args []string) (environment, manifestPath, releaseTag string, quick bool, err error) {
+	if len(args) > 0 && args[0] == "--quick" {
+		quick = true
+		args = args[1:]
+	}
+	if len(args) < 2 {
+		return "", "", "", false, errors.New("deploy requires an environment and manifest path")
+	}
+	if len(args) > 3 {
+		return "", "", "", false, errors.New("deploy accepts only an optional release tag")
+	}
+	if len(args) == 3 {
+		releaseTag = args[2]
+	}
+	return args[0], args[1], releaseTag, quick, nil
 }
 
 func (a *App) runDeployPreflight(ctx context.Context) error {
