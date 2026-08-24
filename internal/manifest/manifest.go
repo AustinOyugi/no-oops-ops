@@ -77,6 +77,7 @@ type Expose struct {
 	Domain     string `yaml:"domain"`
 	PathPrefix string `yaml:"path_prefix"`
 	Enabled    bool   `yaml:"enabled"`
+	TLS        bool   `yaml:"tls"`
 }
 
 type Env struct {

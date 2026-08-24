@@ -1,11 +1,14 @@
 package config
 
 import (
+	"bufio"
 	"errors"
+	"fmt"
 	"github.com/adrg/xdg"
 	"github.com/joho/godotenv"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type Config struct {
@@ -22,6 +25,8 @@ type Config struct {
 	NginxName      string
 	NginxHTTPPort  string
 	NginxHTTPSPort string
+	ACMEEmail      string
+	ConfigPath     string
 }
 
 const defaultAppName = "noops"
@@ -61,7 +66,39 @@ func Load() (Config, error) {
 		NginxName:      envOrDefault("NOOPS_NGINX_NAME", defaultNginxName),
 		NginxHTTPPort:  envOrDefault("NOOPS_NGINX_HTTP_PORT", defaultNginxHTTPPort),
 		NginxHTTPSPort: envOrDefault("NOOPS_NGINX_HTTPS_PORT", defaultNginxHTTPSPort),
+		ACMEEmail:      os.Getenv("NOOPS_ACME_EMAIL"),
+		ConfigPath:     filepath.Join(configDir, ".env.noops"),
 	}, nil
+}
+
+func (c *Config) RequireACMEEmail(in *bufio.Reader, out *os.File) error {
+	if c.ACMEEmail != "" {
+		return nil
+	}
+	if _, err := fmt.Fprint(out, "ACME email (used for Let's Encrypt certificate expiry notices): "); err != nil {
+		return err
+	}
+	email, err := in.ReadString('\n')
+	if err != nil && len(email) == 0 {
+		return fmt.Errorf("read ACME email: %w", err)
+	}
+	email = strings.TrimSpace(email)
+	if !strings.Contains(email, "@") || strings.ContainsAny(email, "\r\n") {
+		return fmt.Errorf("a valid ACME email is required")
+	}
+	if err := os.MkdirAll(filepath.Dir(c.ConfigPath), 0o700); err != nil {
+		return fmt.Errorf("create config directory: %w", err)
+	}
+	f, err := os.OpenFile(c.ConfigPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return fmt.Errorf("open config file: %w", err)
+	}
+	defer f.Close()
+	if _, err := fmt.Fprintf(f, "\nNOOPS_ACME_EMAIL=%s\n", email); err != nil {
+		return fmt.Errorf("store ACME email: %w", err)
+	}
+	c.ACMEEmail = email
+	return nil
 }
 
 func envOrDefault(key string, fallback string) string {

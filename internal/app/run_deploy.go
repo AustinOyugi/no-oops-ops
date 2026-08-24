@@ -1,11 +1,14 @@
 package app
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/doctor"
+	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 )
 
 func (a *App) runDeploy(ctx context.Context, args []string) error {
@@ -15,7 +18,6 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 
 	environment := args[0]
 	manifestPath := args[1]
-
 	var optionalReleaseVersion string
 
 	if len(args) > 2 {
@@ -24,6 +26,15 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 
 	if err := a.runDeployPreflight(ctx); err != nil {
 		return err
+	}
+	loadedManifest, err := manifest.Load(manifestPath)
+	if err != nil {
+		return err
+	}
+	if loadedManifest.Expose.TLS {
+		if err := a.config.RequireACMEEmail(bufio.NewReader(os.Stdin), os.Stderr); err != nil {
+			return err
+		}
 	}
 
 	result, err := a.deployer.Run(ctx, environment, manifestPath, optionalReleaseVersion)
