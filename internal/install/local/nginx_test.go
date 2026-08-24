@@ -28,6 +28,7 @@ func TestRenderNginxStack(t *testing.T) {
 		`- "ingress.noops.internal"`,
 		"wget -q --spider http://127.0.0.1/__noops/health || exit 1",
 		"external: true",
+		`entrypoint: ["/bin/sh", "-c"]`,
 		"--deploy-hook 'docker service update --force noops-nginx_nginx'",
 		"/var/run/docker.sock:/var/run/docker.sock",
 	} {

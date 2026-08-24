@@ -29,7 +29,10 @@ services:
         condition: any
   certbot:
     image: certbot/certbot:latest
-    command: ["/bin/sh", "-c", "apk add --no-cache docker-cli && while :; do certbot renew --webroot --webroot-path /var/www/certbot --deploy-hook 'docker service update --force {{ .NginxService }}'; sleep 12h; done"]
+    # The image entrypoint is `certbot`; override it so this is a long-running
+    # renewal service rather than arguments passed to the certbot CLI.
+    entrypoint: ["/bin/sh", "-c"]
+    command: "apk add --no-cache docker-cli && while :; do certbot renew --webroot --webroot-path /var/www/certbot --deploy-hook 'docker service update --force {{ .NginxService }}'; sleep 12h; done"
     volumes:
       - "{{ .ACMEWebroot }}:/var/www/certbot:rw"
       - "{{ .CertificateDir }}:/etc/letsencrypt:rw"

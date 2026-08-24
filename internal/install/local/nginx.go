@@ -116,11 +116,8 @@ func (h *Host) InspectNginxService(ctx context.Context) error {
 
 func (h *Host) EnsureNginx(ctx context.Context) error {
 	h.logger.InfoContext(ctx, "ensuring nginx ingress", "name", h.nginxName, "http_port", h.nginxHTTPPort, "https_port", h.nginxHTTPSPort)
-	if h.InspectNginxService(ctx) == nil {
-		h.nginxReady = true
-		return nil
-	}
-
+	// Stack deploy is idempotent. Always apply the rendered stack so updates to
+	// the nginx or certbot definition take effect on an existing installation.
 	result, err := h.runner.Run(ctx, "docker", []string{"stack", "deploy", "--detach=true", "--compose-file", h.nginxStackPath(), h.nginxName}, command.RunOptions{
 		StreamOutput: true,
 		LogCommand:   true,
