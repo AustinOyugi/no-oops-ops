@@ -15,6 +15,9 @@ func (a *App) runCleanup(ctx context.Context, args []string) error {
 		case "--apply":
 			options.Apply = true
 			args = args[1:]
+		case "--orphaned":
+			options.Orphaned = true
+			args = args[1:]
 		case "--keep":
 			if len(args) < 2 {
 				return errors.New("cleanup --keep requires a value")
@@ -26,7 +29,7 @@ func (a *App) runCleanup(ctx context.Context, args []string) error {
 			options.Keep = keep
 			args = args[2:]
 		default:
-			return errors.New("cleanup accepts only --apply and --keep <count>")
+			return errors.New("cleanup accepts only --apply, --orphaned, and --keep <count>")
 		}
 	}
 	plan, err := a.cleaner.Run(ctx, options)
@@ -42,6 +45,6 @@ func (a *App) runCleanup(ctx context.Context, args []string) error {
 	for _, path := range plan.DeploymentPaths {
 		a.logger.InfoContext(ctx, "cleanup deployment record candidate", "path", path)
 	}
-	a.logger.InfoContext(ctx, "cleanup plan", "apply", options.Apply, "protected_images", plan.Protected, "release_records", len(plan.ReleasePaths), "deployment_records", len(plan.DeploymentPaths), "registry_images", len(plan.Images))
+	a.logger.InfoContext(ctx, "cleanup plan", "apply", options.Apply, "orphaned", options.Orphaned, "protected_images", plan.Protected, "release_records", len(plan.ReleasePaths), "deployment_records", len(plan.DeploymentPaths), "registry_images", len(plan.Images))
 	return nil
 }

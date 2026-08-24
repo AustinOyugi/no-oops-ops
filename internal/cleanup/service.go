@@ -20,8 +20,9 @@ import (
 )
 
 type Options struct {
-	Apply bool
-	Keep  int
+	Apply    bool
+	Keep     int
+	Orphaned bool
 }
 type Plan struct {
 	ReleasePaths, DeploymentPaths, Images []string
@@ -41,26 +42,29 @@ func (s *Service) Run(ctx context.Context, options Options) (Plan, error) {
 	if options.Keep < 0 {
 		return Plan{}, fmt.Errorf("keep must be zero or greater")
 	}
-	live, err := s.liveImages(ctx)
+	liveServices, err := s.liveServices(ctx)
 	if err != nil {
 		return Plan{}, err
 	}
-	plan, err := s.plan(live, options.Keep)
+	plan, err := s.plan(liveServices, options.Keep, options.Orphaned)
 	if err != nil || !options.Apply {
 		return plan, err
 	}
 	client := registryClient{runner: s.runner, service: s.cfg.RegistryName + "_registry"}
+	deletedAny := false
 	for _, image := range plan.Images {
-		if err := client.deleteImage(ctx, image); err != nil {
+		deleted, err := client.deleteImage(ctx, image)
+		if err != nil {
 			return plan, err
 		}
+		deletedAny = deletedAny || deleted
 	}
 	for _, path := range append(plan.ReleasePaths, plan.DeploymentPaths...) {
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 			return plan, fmt.Errorf("remove cleanup metadata %q: %w", path, err)
 		}
 	}
-	if len(plan.Images) > 0 {
+	if deletedAny {
 		if err := s.garbageCollect(ctx); err != nil {
 			return plan, err
 		}
@@ -68,8 +72,11 @@ func (s *Service) Run(ctx context.Context, options Options) (Plan, error) {
 	return plan, nil
 }
 
-func (s *Service) plan(live map[string]struct{}, keep int) (Plan, error) {
-	protected := live
+func (s *Service) plan(liveServices map[string]string, keep int, orphanedOnly bool) (Plan, error) {
+	protected := make(map[string]struct{}, len(liveServices))
+	for _, image := range liveServices {
+		protected[image] = struct{}{}
+	}
 	var plan Plan
 	root := filepath.Join(s.cfg.StateDir, "apps")
 	apps, err := os.ReadDir(root)
@@ -97,14 +104,17 @@ func (s *Service) plan(live map[string]struct{}, keep int) (Plan, error) {
 				return plan, err
 			}
 			sort.Slice(releases, func(i, j int) bool { return releases[i].CreateAt.After(releases[j].CreateAt) })
-			for i, item := range releases {
-				if i < keep {
-					protected[item.RegistryImage] = struct{}{}
-				}
-			}
 			deployments, paths, err := readDeployments(dir)
 			if err != nil {
 				return plan, err
+			}
+			orphaned := orphanedOnly && !hasLiveDeployment(deployments, liveServices)
+			if !orphaned {
+				for i, item := range releases {
+					if i < keep {
+						protected[item.RegistryImage] = struct{}{}
+					}
+				}
 			}
 			success := make([]deploy.Deployment, 0, len(deployments))
 			for _, d := range deployments {
@@ -114,17 +124,24 @@ func (s *Service) plan(live map[string]struct{}, keep int) (Plan, error) {
 			}
 			sort.Slice(success, func(i, j int) bool { return success[i].CreatedAt.After(success[j].CreatedAt) })
 			for i, d := range success {
-				if i < 2 {
+				if !orphaned && i < 2 {
 					protected[d.ReleaseImage] = struct{}{}
 				}
 			}
 			for _, item := range releases {
-				if _, ok := protected[item.RegistryImage]; !ok {
+				_, protectedImage := protected[item.RegistryImage]
+				if orphaned || !protectedImage {
 					plan.ReleasePaths = append(plan.ReleasePaths, filepath.Join(dir, "releases", item.Tag+".json"))
-					plan.Images = append(plan.Images, item.RegistryImage)
+					if !protectedImage {
+						plan.Images = append(plan.Images, item.RegistryImage)
+					}
 				}
 			}
 			for i, d := range deployments {
+				if orphaned {
+					plan.DeploymentPaths = append(plan.DeploymentPaths, paths[i])
+					continue
+				}
 				if _, ok := protected[d.ReleaseImage]; !ok {
 					plan.DeploymentPaths = append(plan.DeploymentPaths, paths[i])
 				}
@@ -164,19 +181,44 @@ func readDeployments(dir string) ([]deploy.Deployment, []string, error) {
 	return items, paths, nil
 }
 
-func (s *Service) liveImages(ctx context.Context) (map[string]struct{}, error) {
+func hasLiveDeployment(deployments []deploy.Deployment, liveServices map[string]string) bool {
+	for _, deployment := range deployments {
+		if _, ok := liveServices[deployment.ServiceName]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Service) liveServices(ctx context.Context) (map[string]string, error) {
 	out, err := s.runner.Run(ctx, "docker", []string{"service", "ls", "-q"}, command.RunOptions{})
 	if err != nil {
 		return nil, err
 	}
-	result := map[string]struct{}{}
+	result := map[string]string{}
 	for _, id := range strings.Fields(string(out.Output)) {
+		tasks, err := s.runner.Run(ctx, "docker", []string{"service", "ps", "--filter", "desired-state=running", "--format", "{{.CurrentState}}", id}, command.RunOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("inspect running tasks for service %q: %w", id, err)
+		}
+		if !hasRunningTask(string(tasks.Output)) {
+			continue
+		}
 		img, err := s.runner.Run(ctx, "docker", []string{"service", "inspect", "--format", "{{.Spec.TaskTemplate.ContainerSpec.Image}}", id}, command.RunOptions{})
 		if err == nil {
-			result[strings.TrimSpace(string(img.Output))] = struct{}{}
+			result[id] = strings.TrimSpace(string(img.Output))
 		}
 	}
 	return result, nil
+}
+
+func hasRunningTask(output string) bool {
+	for _, line := range strings.Split(output, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "Running") {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Service) garbageCollect(ctx context.Context) error {
@@ -213,33 +255,47 @@ type registryClient struct {
 	service, container string
 }
 
-func (c *registryClient) deleteImage(ctx context.Context, image string) error {
+func (c *registryClient) deleteImage(ctx context.Context, image string) (bool, error) {
 	prefix := "127.0.0.1:"
 	if !strings.HasPrefix(image, prefix) {
-		return nil
+		return false, nil
 	}
 	name := strings.TrimPrefix(image, prefix)
 	slash := strings.Index(name, "/")
 	colon := strings.LastIndex(name, ":")
 	if slash < 0 || colon < slash {
-		return fmt.Errorf("invalid registry image %q", image)
+		return false, fmt.Errorf("invalid registry image %q", image)
 	}
 	repo, tag := name[slash+1:colon], name[colon+1:]
 	head, err := c.request(ctx, "HEAD", "/v2/"+repo+"/manifests/"+tag, "application/vnd.docker.distribution.manifest.v2+json")
 	if err != nil {
-		return err
+		return false, err
 	}
-	digest := ""
-	for _, line := range strings.Split(head, "\n") {
+	digest := registryDigest(head)
+	if digest == "" {
+		// The manifest may already have been removed by a previous cleanup or
+		// an external registry operation. It is safe to continue so the stale
+		// No Oops Ops metadata can be cleared as well.
+		return false, nil
+	}
+	response, err := c.request(ctx, "DELETE", "/v2/"+repo+"/manifests/"+digest, "")
+	if err != nil {
+		return false, err
+	}
+	return registryManifestDeleted(response), nil
+}
+
+func registryDigest(response string) string {
+	for _, line := range strings.Split(response, "\n") {
 		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(line)), "docker-content-digest:") {
-			digest = strings.TrimSpace(strings.SplitN(line, ":", 2)[1])
+			return strings.TrimSpace(strings.SplitN(line, ":", 2)[1])
 		}
 	}
-	if digest == "" {
-		return fmt.Errorf("registry digest missing for %s", image)
-	}
-	_, err = c.request(ctx, "DELETE", "/v2/"+repo+"/manifests/"+digest, "")
-	return err
+	return ""
+}
+
+func registryManifestDeleted(response string) bool {
+	return strings.Contains(response, " 202 ")
 }
 func (c *registryClient) request(ctx context.Context, method, path, accept string) (string, error) {
 	if c.container == "" {

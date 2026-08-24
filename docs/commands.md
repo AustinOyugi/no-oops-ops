@@ -12,7 +12,7 @@ noops rollback <environment> <manifest>
 noops remove <environment> <manifest>
 noops secret set <environment> <key>
 noops secret list <environment>
-noops cleanup [--apply] [--keep <count>]
+noops cleanup [--apply] [--orphaned] [--keep <count>]
 ```
 
 Running `noops` without arguments prints its name and build version.
@@ -38,7 +38,7 @@ Running `noops` without arguments prints its name and build version.
 | `deploy [--quick] <env> <manifest> [tag]` | Deploys the latest recorded release, or the specified release tag. When no release exists, it creates one and retries deployment. `--quick` uses the health-check start period as its monitor window for faster development feedback. |
 | `rollback <env> <manifest>` | Redeploys the previous successful deployment, including its pinned secret versions. |
 | `remove <env> <manifest>` | Removes the app stack, recorded release and wrapper manifests, and generated app state. Named volumes and environment secrets are preserved. |
-| `cleanup [--apply] [--keep <count>]` | Plans retention cleanup across releases, deployments, and registry images. Dry-run is the default; `--apply` deletes unprotected manifests and metadata, then runs offline registry GC. |
+| `cleanup [--apply] [--orphaned] [--keep <count>]` | Plans retention cleanup across releases, deployments, and registry images. `--orphaned` selects app environments with no actually running recorded service, overriding normal retention. Dry-run is the default; `--apply` deletes selected manifests and metadata, then runs offline registry GC when needed. |
 
 ## Secret commands
 
