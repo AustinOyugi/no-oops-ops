@@ -33,6 +33,7 @@ func (h *Host) LoadInstallation(ctx context.Context) (uninstall.Metadata, error)
 		DataDir:  dataDir,
 		Network:  uninstall.Network{Name: m.Network.Name},
 		Registry: uninstall.Registry{Name: m.Registry.Name},
+		Nginx:    uninstall.Nginx{Name: m.Nginx.Name},
 	}, nil
 }
 
@@ -72,6 +73,13 @@ func (h *Host) RemoveRegistry(ctx context.Context, m uninstall.Metadata) error {
 		return nil
 	}
 	return h.removeStack(ctx, m.Registry.Name)
+}
+
+func (h *Host) RemoveNginx(ctx context.Context, m uninstall.Metadata) error {
+	if m.Nginx.Name == "" {
+		return nil
+	}
+	return h.removeStack(ctx, m.Nginx.Name)
 }
 
 func (h *Host) RemoveNetwork(ctx context.Context, m uninstall.Metadata) error {

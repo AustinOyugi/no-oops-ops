@@ -18,6 +18,10 @@ type Config struct {
 
 	RegistryName string
 	RegistryPort string
+
+	NginxName      string
+	NginxHTTPPort  string
+	NginxHTTPSPort string
 }
 
 const defaultAppName = "noops"
@@ -26,6 +30,10 @@ const defaultNetworkName = "noops-net"
 
 const defaultRegistryName = "noops-registry"
 const defaultRegistryPort = "5000"
+
+const defaultNginxName = "noops-nginx"
+const defaultNginxHTTPPort = "80"
+const defaultNginxHTTPSPort = "443"
 
 var Version = "dev"
 
@@ -50,6 +58,9 @@ func Load() (Config, error) {
 		NetworkName:    envOrDefault("NOOPS_NETWORK_NAME", defaultNetworkName),
 		RegistryName:   envOrDefault("NOOPS_REGISTRY_NAME", defaultRegistryName),
 		RegistryPort:   envOrDefault("NOOPS_REGISTRY_PORT", defaultRegistryPort),
+		NginxName:      envOrDefault("NOOPS_NGINX_NAME", defaultNginxName),
+		NginxHTTPPort:  envOrDefault("NOOPS_NGINX_HTTP_PORT", defaultNginxHTTPPort),
+		NginxHTTPSPort: envOrDefault("NOOPS_NGINX_HTTPS_PORT", defaultNginxHTTPSPort),
 	}, nil
 }
 

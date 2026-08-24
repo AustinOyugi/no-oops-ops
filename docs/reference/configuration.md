@@ -9,6 +9,9 @@ Settings may be set as environment variables or in `$XDG_CONFIG_HOME/noops/.env.
 | `NOOPS_NETWORK_NAME` | `noops-net` | Shared external Swarm network. |
 | `NOOPS_REGISTRY_NAME` | `noops-registry` | Internal registry service/stack name. |
 | `NOOPS_REGISTRY_PORT` | `5000` | Internal registry port. |
+| `NOOPS_NGINX_NAME` | `noops-nginx` | Shared nginx ingress stack name. |
+| `NOOPS_NGINX_HTTP_PORT` | `80` | Host port published to nginx HTTP. |
+| `NOOPS_NGINX_HTTPS_PORT` | `443` | Host port published to nginx HTTPS. |
 
 The state directory contains paths such as:
 
@@ -16,6 +19,7 @@ The state directory contains paths such as:
 install.json
 registry/config.yml
 registry/stack.yml
+nginx/stack.yml
 apps/<app>/<environment>/.env
 apps/<app>/<environment>/stack.yml
 apps/<app>/<environment>/release.json

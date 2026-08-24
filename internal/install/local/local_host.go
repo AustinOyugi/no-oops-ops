@@ -19,6 +19,11 @@ type Host struct {
 	registryPort     string
 	registryService  string
 	registryReady    bool
+	nginxName        string
+	nginxHTTPPort    string
+	nginxHTTPSPort   string
+	nginxService     string
+	nginxReady       bool
 }
 
 func NewHost(
@@ -28,7 +33,10 @@ func NewHost(
 	installVersion string,
 	networkName string,
 	registryName string,
-	registryPort string) *Host {
+	registryPort string,
+	nginxName string,
+	nginxHTTPPort string,
+	nginxHTTPSPort string) *Host {
 	return &Host{
 		runner:          command.NewRunner(logger),
 		logger:          logger,
@@ -39,5 +47,9 @@ func NewHost(
 		registryName:    registryName,
 		registryPort:    registryPort,
 		registryService: registryName + "_registry",
+		nginxName:       nginxName,
+		nginxHTTPPort:   nginxHTTPPort,
+		nginxHTTPSPort:  nginxHTTPSPort,
+		nginxService:    nginxName + "_nginx",
 	}
 }

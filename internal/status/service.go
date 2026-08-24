@@ -15,6 +15,7 @@ type Host interface {
 	InspectSwarmState(ctx context.Context) (string, error)
 	InspectSharedNetwork(ctx context.Context) error
 	InspectRegistryService(ctx context.Context) error
+	InspectNginxService(ctx context.Context) error
 }
 
 type Service struct {
@@ -61,8 +62,15 @@ func (s *Service) Run(ctx context.Context) (Result, error) {
 		result.AddComponent("registry_service", ComponentStatusReady, result.Metadata.Registry.ServiceName)
 	}
 
+	if err := s.host.InspectNginxService(ctx); err != nil {
+		result.AddComponent("nginx_service", ComponentStatusMissing, err.Error())
+	} else {
+		result.AddComponent("nginx_service", ComponentStatusReady, result.Metadata.Nginx.ServiceName)
+	}
+
 	result.AddComponent("registry_config", componentStatusFromFile(result.Metadata.Registry.ConfigPath), result.Metadata.Registry.ConfigPath)
 	result.AddComponent("registry_stack", componentStatusFromFile(result.Metadata.Registry.StackPath), result.Metadata.Registry.StackPath)
+	result.AddComponent("nginx_stack", componentStatusFromFile(result.Metadata.Nginx.StackPath), result.Metadata.Nginx.StackPath)
 
 	return result, nil
 }

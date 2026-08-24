@@ -51,7 +51,8 @@ func New(cfg config.Config) (*App, error) {
 
 	localHost := local.NewHost(
 		logger, cfg.StateDir, cfg.DataDir, cfg.InstallVersion,
-		cfg.NetworkName, cfg.RegistryName, cfg.RegistryPort)
+		cfg.NetworkName, cfg.RegistryName, cfg.RegistryPort,
+		cfg.NginxName, cfg.NginxHTTPPort, cfg.NginxHTTPSPort)
 
 	installer, err := install.New(logger, localHost)
 

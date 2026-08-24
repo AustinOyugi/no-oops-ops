@@ -45,6 +45,8 @@ func (i *Installer) Run(ctx context.Context) (Result, error) {
 		{name: StepWriteRegistryConfig, run: i.host.WriteRegistryConfig},
 		{name: StepWriteRegistryStack, run: i.host.WriteRegistryStack},
 		{name: StepEnsureRegistry, run: i.host.EnsureRegistry},
+		{name: StepWriteNginxStack, run: i.host.WriteNginxStack},
+		{name: StepEnsureNginx, run: i.host.EnsureNginx},
 		{name: StepWriteInstallMetadata, run: i.host.WriteInstallMetadata},
 	}
 

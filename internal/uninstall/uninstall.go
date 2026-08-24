@@ -16,6 +16,7 @@ type Metadata struct {
 	DataDir  string
 	Network  Network
 	Registry Registry
+	Nginx    Nginx
 }
 
 type Network struct {
@@ -26,10 +27,15 @@ type Registry struct {
 	Name string
 }
 
+type Nginx struct {
+	Name string
+}
+
 type Host interface {
 	LoadInstallation(context.Context) (Metadata, error)
 	RemoveApps(context.Context, Metadata) error
 	RemoveRegistry(context.Context, Metadata) error
+	RemoveNginx(context.Context, Metadata) error
 	RemoveNetwork(context.Context, Metadata) error
 	RemoveGeneratedState(context.Context, Metadata) error
 	RemoveData(context.Context, Metadata) error
@@ -62,6 +68,7 @@ func (s *Service) Run(ctx context.Context, options Options) error {
 	}{
 		{name: "remove managed application stacks", run: s.host.RemoveApps},
 		{name: "remove registry stack", run: s.host.RemoveRegistry},
+		{name: "remove nginx stack", run: s.host.RemoveNginx},
 		{name: "remove shared network", run: s.host.RemoveNetwork},
 		{name: "remove generated state", run: s.host.RemoveGeneratedState},
 	}

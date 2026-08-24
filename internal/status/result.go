@@ -33,6 +33,14 @@ type Metadata struct {
 		ServiceName string `json:"service_name"`
 		Ready       bool   `json:"ready"`
 	} `json:"registry"`
+	Nginx struct {
+		Name        string `json:"name"`
+		HTTPPort    string `json:"http_port"`
+		HTTPSPort   string `json:"https_port"`
+		StackPath   string `json:"stack_path"`
+		ServiceName string `json:"service_name"`
+		Ready       bool   `json:"ready"`
+	} `json:"nginx"`
 }
 
 type Result struct {

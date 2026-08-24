@@ -9,6 +9,8 @@ type Host interface {
 	WriteRegistryConfig(ctx context.Context) error
 	WriteRegistryStack(ctx context.Context) error
 	EnsureRegistry(ctx context.Context) error
+	WriteNginxStack(ctx context.Context) error
+	EnsureNginx(ctx context.Context) error
 
 	PrepareStateDir(ctx context.Context) error
 	WriteInstallMetadata(ctx context.Context) error

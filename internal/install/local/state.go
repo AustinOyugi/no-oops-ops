@@ -59,6 +59,14 @@ func (h *Host) WriteInstallMetadata(ctx context.Context) error {
 			ServiceName: h.registryService,
 			Ready:       h.registryReady,
 		},
+		Nginx: nginxMetadata{
+			Name:        h.nginxName,
+			HTTPPort:    h.nginxHTTPPort,
+			HTTPSPort:   h.nginxHTTPSPort,
+			StackPath:   h.nginxStackPath(),
+			ServiceName: h.nginxService,
+			Ready:       h.nginxReady,
+		},
 	}, "", "  ")
 	if err != nil {
 		return install.PrerequisiteError{

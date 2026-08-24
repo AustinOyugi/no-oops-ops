@@ -19,7 +19,7 @@ func TestRunPreservesDataByDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := []string{"load", "apps", "registry", "network", "state", "metadata"}
+	want := []string{"load", "apps", "registry", "nginx", "network", "state", "metadata"}
 	if !reflect.DeepEqual(host.calls, want) {
 		t.Fatalf("calls = %v, want %v", host.calls, want)
 	}
@@ -36,7 +36,7 @@ func TestRunPurgesDataBeforeRemovingMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := []string{"load", "apps", "registry", "network", "state", "data", "metadata"}
+	want := []string{"load", "apps", "registry", "nginx", "network", "state", "data", "metadata"}
 	if !reflect.DeepEqual(host.calls, want) {
 		t.Fatalf("calls = %v, want %v", host.calls, want)
 	}
@@ -90,6 +90,10 @@ func (h *fakeHost) RemoveApps(context.Context, Metadata) error {
 func (h *fakeHost) RemoveRegistry(context.Context, Metadata) error {
 	h.calls = append(h.calls, "registry")
 	return h.registryErr
+}
+func (h *fakeHost) RemoveNginx(context.Context, Metadata) error {
+	h.calls = append(h.calls, "nginx")
+	return nil
 }
 func (h *fakeHost) RemoveNetwork(context.Context, Metadata) error {
 	h.calls = append(h.calls, "network")

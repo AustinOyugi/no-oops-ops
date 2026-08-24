@@ -8,6 +8,7 @@ type metadata struct {
 	Swarm       swarmMetadata    `json:"swarm"`
 	Network     networkMetadata  `json:"network"`
 	Registry    registryMetadata `json:"registry"`
+	Nginx       nginxMetadata    `json:"nginx"`
 }
 
 type swarmMetadata struct {
@@ -26,6 +27,15 @@ type registryMetadata struct {
 	ConfigPath  string `json:"config_path"`
 	StackPath   string `json:"stack_path"`
 	DataPath    string `json:"data_path"`
+	ServiceName string `json:"service_name"`
+	Ready       bool   `json:"ready"`
+}
+
+type nginxMetadata struct {
+	Name        string `json:"name"`
+	HTTPPort    string `json:"http_port"`
+	HTTPSPort   string `json:"https_port"`
+	StackPath   string `json:"stack_path"`
 	ServiceName string `json:"service_name"`
 	Ready       bool   `json:"ready"`
 }

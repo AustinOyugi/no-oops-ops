@@ -1,0 +1,31 @@
+package local
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestRenderNginxStack(t *testing.T) {
+	rendered, err := renderTemplate("nginx-stack.yml.tmpl", nginxStackTemplateContents, nginxStackTemplateData{
+		HTTPPort:    "8080",
+		HTTPSPort:   "8443",
+		NetworkName: "noops-net",
+	})
+	if err != nil {
+		t.Fatalf("render nginx stack: %v", err)
+	}
+
+	output := string(rendered)
+	for _, want := range []string{
+		"image: nginx:1.28-alpine",
+		`- "8080:80"`,
+		`- "8443:443"`,
+		`- "noops-net"`,
+		"wget -q --spider http://127.0.0.1/ || exit 1",
+		"external: true",
+	} {
+		if !strings.Contains(output, want) {
+			t.Errorf("rendered stack does not contain %q:\n%s", want, output)
+		}
+	}
+}

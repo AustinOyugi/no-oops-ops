@@ -9,6 +9,8 @@ const (
 	StepWriteRegistryConfig    Step = "write_registry_config"
 	StepWriteRegistryStack     Step = "write_registry_stack"
 	StepEnsureRegistry         Step = "ensure_registry"
+	StepWriteNginxStack        Step = "write_nginx_stack"
+	StepEnsureNginx            Step = "ensure_nginx"
 
 	StepPrepareStateDir      Step = "prepare_state_dir"
 	StepWriteInstallMetadata Step = "write_install_metadata"
