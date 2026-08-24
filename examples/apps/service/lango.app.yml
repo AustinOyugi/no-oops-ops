@@ -14,7 +14,7 @@ image:
 
 service:
   internal_port: 8080
-  replicas: 2
+  replicas: 1
 
 healthcheck:
   test:

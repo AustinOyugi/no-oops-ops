@@ -3,6 +3,7 @@ package deploy
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -29,6 +30,14 @@ const (
 )
 
 const swarmObservationInterval = 2 * time.Second
+
+// swarmProgress is intentionally limited to fields that reflect rollout
+// progress. The image is checked for correctness, but including its digest in
+// every log entry makes normal deploy output needlessly noisy.
+type swarmProgress struct {
+	updateState  string
+	runningTasks int
+}
 
 type swarmConvergenceError struct {
 	Outcome     SwarmOutcome
@@ -129,6 +138,8 @@ func (s *Service) waitForSwarmConvergence(
 ) (SwarmOutcome, int, error) {
 	deadline := time.Now().Add(timeout)
 	var stableSince time.Time
+	var lastProgress swarmProgress
+	hasLastProgress := false
 
 	s.logger.InfoContext(
 		ctx,
@@ -138,23 +149,35 @@ func (s *Service) waitForSwarmConvergence(
 		"timeout", timeout.String(),
 		"monitor", initialMonitor.String(),
 	)
+	progressIndicator := newSwarmProgressIndicator(os.Stderr)
+	progressIndicator.Start(serviceName, desiredTasks)
+	defer progressIndicator.Stop()
 
 	for {
 		state, message, image, err := s.serviceUpdateStatus(ctx, serviceName)
 		if err != nil {
 			return "", 0, err
 		}
+		progressIndicator.Update(state, 0, desiredTasks, false)
 
 		switch state {
 		case "completed":
 			if strings.HasPrefix(image, expectedImage) {
+				progressIndicator.Stop()
+				s.logger.InfoContext(ctx, "Swarm convergence complete", "service", serviceName, "running_tasks", desiredTasks, "desired_tasks", desiredTasks)
 				return SwarmOutcomeCompleted, desiredTasks, nil
 			}
 		case "rollback_completed":
+			progressIndicator.Stop()
+			s.logger.WarnContext(ctx, "Swarm rollout rolled back", "service", serviceName, "reason", message)
 			return SwarmOutcomeRolledBack, 0, s.convergenceError(ctx, serviceName, SwarmOutcomeRolledBack, message)
 		case "paused":
+			progressIndicator.Stop()
+			s.logger.WarnContext(ctx, "Swarm rollout paused", "service", serviceName, "reason", message)
 			return SwarmOutcomePaused, 0, s.convergenceError(ctx, serviceName, SwarmOutcomePaused, message)
 		case "rollback_paused":
+			progressIndicator.Stop()
+			s.logger.WarnContext(ctx, "Swarm rollback paused", "service", serviceName, "reason", message)
 			return SwarmOutcomeRollbackPaused, 0, s.convergenceError(ctx, serviceName, SwarmOutcomeRollbackPaused, message)
 		}
 
@@ -162,21 +185,34 @@ func (s *Service) waitForSwarmConvergence(
 		if err != nil {
 			return "", 0, err
 		}
+		progressIndicator.Update(state, runningTasks, desiredTasks, state == "" && allDesiredTasksRunning(runningTasks, desiredTasks))
 
 		if state == "" && allDesiredTasksRunning(runningTasks, desiredTasks) {
 			if stableSince.IsZero() {
 				stableSince = time.Now()
+				if !progressIndicator.active {
+					s.logger.InfoContext(ctx, "Swarm desired task count reached; observing monitor window", "service", serviceName, "running_tasks", runningTasks, "desired_tasks", desiredTasks, "monitor", initialMonitor.String())
+				}
 			}
 			if time.Since(stableSince) >= initialMonitor {
+				progressIndicator.Stop()
+				s.logger.InfoContext(ctx, "Swarm convergence complete", "service", serviceName, "running_tasks", runningTasks, "desired_tasks", desiredTasks)
 				return SwarmOutcomeCompleted, runningTasks, nil
 			}
 		} else {
 			stableSince = time.Time{}
+
+			progress := swarmProgress{updateState: state, runningTasks: runningTasks}
+			if !progressIndicator.active && (!hasLastProgress || progress != lastProgress) {
+				s.logger.InfoContext(ctx, "Swarm rollout progress", "service", serviceName, "update_state", state, "running_tasks", runningTasks, "desired_tasks", desiredTasks)
+			}
+			lastProgress = progress
+			hasLastProgress = true
 		}
 
-		s.logger.InfoContext(ctx, "Swarm convergence poll", "service", serviceName, "update_state", state, "service_image", image, "running_tasks", runningTasks, "desired_tasks", desiredTasks)
-
 		if time.Now().After(deadline) {
+			progressIndicator.Stop()
+			s.logger.WarnContext(ctx, "Swarm convergence timed out", "service", serviceName, "running_tasks", runningTasks, "desired_tasks", desiredTasks, "timeout", timeout.String())
 			return SwarmOutcomeTimedOut, runningTasks, s.convergenceError(ctx, serviceName, SwarmOutcomeTimedOut, fmt.Sprintf("service did not converge within %s", timeout))
 		}
 
