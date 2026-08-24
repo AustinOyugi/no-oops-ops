@@ -71,3 +71,5 @@ Routes are currently plain HTTP only. A given domain/path-prefix pair can be own
 ## Internal routing
 
 Services on the shared network can call exposed applications through the nginx alias `ingress.noops.internal`, without depending on a release-specific Swarm service name. The internal URL is `http://ingress.noops.internal/<environment>/<app>/...`; nginx strips the internal prefix before proxying the request. For example, the development `lango` app is reachable internally as `http://ingress.noops.internal/dev/lango/health` and receives `/health`.
+
+Nginx keeps generated external routes in one file per domain and internal routes in one file per environment/app. This keeps each route owner isolated while nginx still loads one effective configuration.

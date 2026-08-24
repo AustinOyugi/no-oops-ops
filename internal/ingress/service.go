@@ -90,6 +90,7 @@ func (s *Service) Remove(ctx context.Context, environment, app string) error {
 func (s *Service) ingressDir() string { return filepath.Join(s.config.StateDir, "nginx") }
 func (s *Service) routesPath() string { return filepath.Join(s.ingressDir(), "routes.json") }
 func (s *Service) configPath() string { return filepath.Join(s.ingressDir(), "conf", "routes.conf") }
+func (s *Service) configDir() string  { return filepath.Join(s.ingressDir(), "conf") }
 
 func (s *Service) loadRoutes() ([]Route, error) {
 	data, err := os.ReadFile(s.routesPath())
@@ -115,12 +116,50 @@ func (s *Service) writeRoutes(routes []Route) error {
 }
 
 func (s *Service) writeConfig(routes []Route) error {
-	data, err := RenderConfig(routes)
+	files, err := RenderFiles(routes)
 	if err != nil {
 		return err
 	}
-	return atomicWrite(s.configPath(), data)
+	for _, directory := range []string{"external", "internal"} {
+		if err := os.RemoveAll(filepath.Join(s.configDir(), directory)); err != nil {
+			return fmt.Errorf("clear generated nginx %s routes: %w", directory, err)
+		}
+	}
+	if err := os.Remove(s.configPath()); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove legacy nginx routes config: %w", err)
+	}
+	var hasExternal, hasInternal bool
+	for path := range files {
+		hasExternal = hasExternal || strings.HasPrefix(path, "external/")
+		hasInternal = hasInternal || strings.HasPrefix(path, "internal/")
+	}
+	if err := atomicWrite(filepath.Join(s.configDir(), "default.conf"), []byte(defaultConfig)); err != nil {
+		return err
+	}
+	external := ""
+	if hasExternal {
+		external = "include /etc/nginx/conf.d/external/*.conf;\n"
+	}
+	if err := atomicWrite(filepath.Join(s.configDir(), "external.conf"), []byte(external)); err != nil {
+		return err
+	}
+	internal := ""
+	if hasInternal {
+		internal = internalConfig
+	}
+	if err := atomicWrite(filepath.Join(s.configDir(), "internal.conf"), []byte(internal)); err != nil {
+		return err
+	}
+	for path, data := range files {
+		if err := atomicWrite(filepath.Join(s.configDir(), path), data); err != nil {
+			return err
+		}
+	}
+	return nil
 }
+
+const defaultConfig = "server {\n  listen 80 default_server;\n  listen [::]:80 default_server;\n  server_name _;\n  location = /__noops/health { return 200; }\n  location / { return 404; }\n}\n"
+const internalConfig = "server {\n  listen 80;\n  listen [::]:80;\n  server_name ingress.noops.internal;\n  include /etc/nginx/conf.d/internal/*.conf;\n}\n"
 
 func (s *Service) reload(ctx context.Context) error {
 	serviceName := s.config.NginxName + "_nginx"

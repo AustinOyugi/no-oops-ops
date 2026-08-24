@@ -1,17 +1,20 @@
-server {
+{{ define "all" }}server {
   listen 80 default_server;
   listen [::]:80 default_server;
   server_name _;
-
-  location = /__noops/health {
-    add_header Content-Type text/plain;
-    return 200 'ok\n';
-  }
-
+  location = /__noops/health { add_header Content-Type text/plain; return 200 'ok\\n'; }
   location / { return 404; }
 }
-{{ range .Domains }}
-server {
+{{ template "external" . }}
+{{ if .InternalRoutes }}server {
+  listen 80;
+  listen [::]:80;
+  server_name ingress.noops.internal;
+{{ template "internal" . }}
+}
+{{ end }}{{ end }}
+
+{{ define "external" }}{{ range .Domains }}server {
   listen 80;
   listen [::]:80;
   server_name {{ .Domain }};
@@ -25,33 +28,21 @@ server {
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
   }
 {{ end }}
 }
-{{ end }}
-{{ if .InternalRoutes }}
-server {
-  listen 80;
-  listen [::]:80;
-  server_name ingress.noops.internal;
-{{ range .InternalRoutes }}
-  location = {{ .Path }} { return 308 {{ .Path }}/; }
+{{ end }}{{ end }}
 
-  location {{ .Path }}/ {
-    resolver 127.0.0.11 valid=10s;
-    set $upstream {{ .Service }};
-    rewrite ^{{ .Path }}/?(.*)$ /$1 break;
-    proxy_pass http://$upstream:{{ .Port }}$uri$is_args$args;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-  }
-{{ end }}
+{{ define "internal" }}{{ range .InternalRoutes }}location = {{ .Path }} { return 308 {{ .Path }}/; }
+location {{ .Path }}/ {
+  resolver 127.0.0.11 valid=10s;
+  set $upstream {{ .Service }};
+  rewrite ^{{ .Path }}/?(.*)$ /$1 break;
+  proxy_pass http://$upstream:{{ .Port }}$uri$is_args$args;
+  proxy_http_version 1.1;
+  proxy_set_header Host $host;
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
 }
-{{ end }}
+{{ end }}{{ end }}

@@ -40,3 +40,25 @@ func TestRenderConfigGroupsRoutesByDomainAndPrefersLongerPrefixes(t *testing.T) 
 		}
 	}
 }
+
+func TestRenderFilesSeparatesDomainsAndInternalServices(t *testing.T) {
+	files, err := RenderFiles([]Route{
+		{Environment: "dev", App: "lango", Domain: "lango.example.test", PathPrefix: "/", Service: "dev-lango_dev-lango", Port: 8080},
+		{Environment: "prod", App: "lango", Domain: "lango.example.test", PathPrefix: "/api", Service: "prod-lango_prod-lango", Port: 8080},
+		{Environment: "dev", App: "accounts", Domain: "accounts.example.test", PathPrefix: "/", Service: "dev-accounts_dev-accounts", Port: 8081},
+	})
+	if err != nil {
+		t.Fatalf("render files: %v", err)
+	}
+	for _, path := range []string{
+		"external/lango-example-test.conf",
+		"external/accounts-example-test.conf",
+		"internal/dev-lango.conf",
+		"internal/prod-lango.conf",
+		"internal/dev-accounts.conf",
+	} {
+		if _, ok := files[path]; !ok {
+			t.Errorf("missing generated nginx file %q", path)
+		}
+	}
+}
