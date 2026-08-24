@@ -25,7 +25,7 @@ services:
         file: api.env.yml
 ```
 
-Lifecycle operations target a service explicitly: `noops release <env> app.yml --service api`, `noops deploy <env> app.yml --service api`, or `--all`. `--all` uses a stable dependency order from `x-noops.depends_on` and stops at the first failure. Compose `depends_on` is preserved, but is not a Swarm readiness guarantee; applications must retry dependencies at runtime. The earlier top-level `name`, `image`, and `service` format is not supported.
+Lifecycle operations target an app alias from the workspace `apps.yml` and a service explicitly: `noops release <env> api --service api`, `noops deploy <env> api --service api`, or `--all`. `--all` uses a stable dependency order from `x-noops.depends_on` and stops at the first failure. Compose `depends_on` is preserved, but is not a Swarm readiness guarantee; applications must retry dependencies at runtime. The earlier top-level `name`, `image`, and `service` format is not supported.
 
 No Oops rejects `container_name` because Swarm schedules service tasks, rejects public `ports` on ingress-managed services, and rejects plainly embedded credential-like environment values. Move such values to managed No Oops secrets. `x-noops.expose` remains accepted as a compatibility alias for `x-noops.ingress`.
 
@@ -52,7 +52,7 @@ The defaults are: update `order: start-first`, `parallelism: 1`, `delay: 10s`, `
 
 `rollout.monitor` defaults to `healthcheck.start_period + retries × interval + timeout + 10s`. Override it only when the application needs a longer or shorter Swarm monitoring window. `max_failure_ratio` for both update and rollback must be between 0 and 1.
 
-For development feedback loops, `noops deploy --quick <environment> <manifest>` temporarily uses `healthcheck.start_period` as the monitor window while retaining the manifest's `rollout.convergence_timeout`. It does not change the manifest; a later normal deploy uses the configured monitor again.
+For development feedback loops, `noops deploy --quick <environment> <app>` temporarily uses `healthcheck.start_period` as the monitor window while retaining the manifest's `rollout.convergence_timeout`. It does not change the manifest; a later normal deploy uses the configured monitor again.
 
 ## Public routing
 

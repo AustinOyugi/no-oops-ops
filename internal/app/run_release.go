@@ -5,11 +5,12 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/AustinOyugi/no-oops-ops/internal/catalog"
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 )
 
 func (a *App) runRelease(ctx context.Context, args []string) error {
-	environment, manifestPath, services, err := parseServiceArgs(args, "release")
+	environment, manifestPath, services, err := parseServiceArgs(args, "release", a.resolveApp)
 	if err != nil {
 		return err
 	}
@@ -59,11 +60,19 @@ func (a *App) runReleaseService(ctx context.Context, environment, manifestPath s
 	return nil
 }
 
-func parseServiceArgs(args []string, command string) (string, string, []string, error) {
+func (a *App) resolveApp(name string) (string, error) {
+	return catalog.Resolve(a.config.Workspace, name)
+}
+
+func parseServiceArgs(args []string, command string, resolveApp func(string) (string, error)) (string, string, []string, error) {
 	if len(args) < 3 {
-		return "", "", nil, fmt.Errorf("%s requires an environment, manifest path, and --service <name> or --all", command)
+		return "", "", nil, fmt.Errorf("%s requires an environment, app name, and --service <name> or --all", command)
 	}
-	environment, path := args[0], args[1]
+	environment, appName := args[0], args[1]
+	path, err := resolveApp(appName)
+	if err != nil {
+		return "", "", nil, err
+	}
 	var selected string
 	all := false
 	for i := 2; i < len(args); i++ {

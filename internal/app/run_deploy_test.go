@@ -6,6 +6,8 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -60,14 +62,17 @@ func (d *recordingDeployer) Remove(context.Context, string, string) (deploy.Remo
 }
 
 func TestRunDeployStopsBeforeDeployingWhenPreflightFails(t *testing.T) {
+	workspace := t.TempDir()
+	writeCatalogApp(t, workspace)
 	deployer := &recordingDeployer{}
 	application := &App{
 		logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
 		deployer: deployer,
 		doctor:   failingDoctor{},
+		config:   config.Config{Workspace: workspace},
 	}
 
-	err := application.runDeploy(context.Background(), []string{"prod", "app.yml", "--service", "api"})
+	err := application.runDeploy(context.Background(), []string{"prod", "api", "--service", "api"})
 	if err == nil {
 		t.Fatal("runDeploy returned nil error")
 	}
@@ -80,11 +85,25 @@ func TestRunDeployStopsBeforeDeployingWhenPreflightFails(t *testing.T) {
 }
 
 func TestParseDeployArgsQuick(t *testing.T) {
-	environment, path, services, quick, err := parseDeployArgs([]string{"--quick", "dev", "app.yml", "--service", "api"})
+	resolve := func(name string) (string, error) { return name + ".yml", nil }
+	environment, path, services, quick, err := parseDeployArgs([]string{"--quick", "dev", "api", "--service", "api"}, resolve)
 	if err != nil {
 		t.Fatalf("parseDeployArgs returned error: %v", err)
 	}
-	if environment != "dev" || path != "app.yml" || len(services) != 1 || services[0] != "api" || !quick {
+	if environment != "dev" || path != "api.yml" || len(services) != 1 || services[0] != "api" || !quick {
 		t.Errorf("parseDeployArgs = (%q, %q, %v, %t), want quick dev deployment", environment, path, services, quick)
+	}
+}
+
+func writeCatalogApp(t *testing.T, workspace string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(workspace, "apps", "api"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, "apps.yml"), []byte("apps:\n  api:\n    manifest: ./apps/api/app.yml\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, "apps", "api", "app.yml"), []byte("services:\n  api:\n    image: api\n"), 0o600); err != nil {
+		t.Fatal(err)
 	}
 }

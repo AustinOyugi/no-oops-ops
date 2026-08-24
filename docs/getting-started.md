@@ -6,6 +6,7 @@
 - Docker running locally
 - Docker Swarm manager authority on the machine that runs `noops install` and `noops deploy`
 - Docker configured to allow the internal registry at `127.0.0.1:5000`
+- A No Oops workspace directory containing `apps.yml` and application manifests
 
 For a public TLS route, the domain's DNS A/AAAA record must point to the Swarm manager and ports 80 and 443 must be reachable from the internet. The first TLS deployment prompts for the ACME contact email if `NOOPS_ACME_EMAIL` is not already configured.
 
@@ -33,9 +34,14 @@ make build
 ./.bin/noops status
 ```
 
-## Initialize the local platform
+## Create a workspace and initialize the platform
+
+No Oops does not use a global state directory. Run `init` once for each
+deployment workspace; it creates the Git-ignored `.noops/` runtime store.
 
 ```bash
+noops init /srv/cranium/noops
+cd /srv/cranium/noops
 noops install
 noops doctor
 ```
@@ -47,9 +53,12 @@ Installation verifies Docker, initializes Swarm when necessary, creates the shar
 Create an app manifest and environment file next to one another. The examples in `examples/` show the expected shape.
 
 ```bash
-noops release prod path/to/app.yml --service api
-noops deploy prod path/to/app.yml --service api
+noops release prod api --service api
+noops deploy prod api --service api
 ```
+
+`api` is an alias declared in the workspace `apps.yml`. Use
+`--workspace /srv/cranium/noops` from another directory.
 
 An `app.yml` may contain several Compose services. Use `--all` to process them in stable `x-noops.depends_on` order; processing stops at the first failure.
 

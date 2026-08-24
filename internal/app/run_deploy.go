@@ -13,7 +13,7 @@ import (
 )
 
 func (a *App) runDeploy(ctx context.Context, args []string) error {
-	environment, manifestPath, services, quick, err := parseDeployArgs(args)
+	environment, manifestPath, services, quick, err := parseDeployArgs(args, a.resolveApp)
 	if err != nil {
 		return err
 	}
@@ -146,15 +146,19 @@ func (a *App) runDeployService(ctx context.Context, environment, manifestPath, o
 	return nil
 }
 
-func parseDeployArgs(args []string) (environment, manifestPath string, services []string, quick bool, err error) {
+func parseDeployArgs(args []string, resolveApp func(string) (string, error)) (environment, manifestPath string, services []string, quick bool, err error) {
 	if len(args) > 0 && args[0] == "--quick" {
 		quick = true
 		args = args[1:]
 	}
 	if len(args) < 2 {
-		return "", "", nil, false, errors.New("deploy requires an environment, manifest path, and --service <name> or --all")
+		return "", "", nil, false, errors.New("deploy requires an environment, app name, and --service <name> or --all")
 	}
-	environment, manifestPath = args[0], args[1]
+	environment = args[0]
+	manifestPath, err = resolveApp(args[1])
+	if err != nil {
+		return "", "", nil, false, err
+	}
 	if len(args) == 3 && args[2] == "--all" {
 		names, e := manifest.DeploymentOrder(manifestPath)
 		return environment, manifestPath, names, quick, e

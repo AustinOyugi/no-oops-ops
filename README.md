@@ -10,9 +10,11 @@ Prerequisites: Go 1.25+, Docker running locally, and Docker configured to allow 
 
 ```bash
 make install
+noops init /srv/noops/example
+cd /srv/noops/example
 noops install
-noops release prod examples/apps/service/lango.app.yml --service lango
-noops deploy prod examples/apps/service/lango.app.yml --service lango
+noops release prod lango --service lango
+noops deploy prod lango --service lango
 ```
 
 If the app uses secrets, create them before deployment:
@@ -38,7 +40,7 @@ noops secret set prod AUTH_SERVER_API_CLIENT_SECRET
 install → secret set (when needed) → release → deploy → rollback or remove
 ```
 
-`app.yml` is ordinary Docker Compose YAML. Add `x-noops` only for No Oops behavior; standard Compose and Swarm fields remain the application's source of truth. Lifecycle commands require `--service <name>` or `--all`; `--all` uses a stable dependency order and stops at the first failure.
+`apps.yml` maps stable app names to ordinary Compose-shaped `app.yml` files. Add `x-noops` only for No Oops behavior; standard Compose and Swarm fields remain the application's source of truth. Lifecycle commands require `--service <name>` or `--all`; `--all` uses a stable dependency order and stops at the first failure.
 
 `release` creates and pushes an immutable timestamped image. `deploy` uses the latest recorded release by default, waits for the configured health and rollout result, and records the final Swarm outcome.
 

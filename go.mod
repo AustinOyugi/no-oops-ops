@@ -2,10 +2,7 @@ module github.com/AustinOyugi/no-oops-ops
 
 go 1.25.5
 
-require github.com/joho/godotenv v1.5.1
-
 require (
-	github.com/adrg/xdg v0.5.3
 	golang.org/x/term v0.45.0
 	gopkg.in/yaml.v3 v3.0.1
 )

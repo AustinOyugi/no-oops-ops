@@ -1,20 +1,22 @@
-# Configuration and generated state
+# Workspace storage
 
-Settings may be set as environment variables or in `$XDG_CONFIG_HOME/noops/.env.noops` (normally `~/.config/noops/.env.noops`). Environment variables take precedence when the CLI starts.
+No Oops is workspace-based. Initialize a workspace with `noops init <directory>`.
+The CLI may write only below that workspace's `.noops/` directory. Use the
+workspace as the current directory or provide it with `--workspace`.
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `NOOPS_STATE_DIR` | `$XDG_STATE_HOME/noops` | Installation metadata, rendered app files, release/deployment metadata, and secret metadata. |
-| `NOOPS_DATA_DIR` | `$XDG_DATA_HOME/noops` | Persistent registry data. |
-| `NOOPS_NETWORK_NAME` | `noops-net` | Shared external Swarm network. |
-| `NOOPS_REGISTRY_NAME` | `noops-registry` | Internal registry service/stack name. |
-| `NOOPS_REGISTRY_PORT` | `5000` | Internal registry port. |
-| `NOOPS_NGINX_NAME` | `noops-nginx` | Shared nginx ingress stack name. |
-| `NOOPS_NGINX_HTTP_PORT` | `80` | Host port published to nginx HTTP. |
-| `NOOPS_NGINX_HTTPS_PORT` | `443` | Host port published to nginx HTTPS. |
-| `NOOPS_ACME_EMAIL` | — | Email address registered with Let's Encrypt when an exposed route enables TLS. If unset, `noops deploy` prompts for and securely stores it. |
+```text
+workspace/
+  apps.yml
+  apps/
+  .noops/
+    config.yml
+    state/
+    data/
+```
 
-The state directory contains paths such as:
+Commit `apps.yml` and `apps/`; add `.noops/` to `.gitignore`.
+
+The workspace state directory contains paths such as:
 
 ```text
 install.json

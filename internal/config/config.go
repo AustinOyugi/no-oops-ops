@@ -2,17 +2,17 @@ package config
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
-	"github.com/adrg/xdg"
-	"github.com/joho/godotenv"
 	"os"
-	"path/filepath"
 	"strings"
+
+	"github.com/AustinOyugi/no-oops-ops/internal/workspace"
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
 	AppName        string
+	Workspace      string
 	StateDir       string
 	DataDir        string
 	InstallVersion string
@@ -42,33 +42,39 @@ const defaultNginxHTTPSPort = "443"
 
 var Version = "dev"
 
-func Load() (Config, error) {
-
-	configDir := filepath.Join(xdg.ConfigHome, defaultAppName)
-	stateDir := filepath.Join(xdg.StateHome, defaultAppName)
-	dataDir := filepath.Join(xdg.DataHome, defaultAppName)
-
-	err := godotenv.Load(filepath.Join(configDir, ".env.noops"))
+func Load(root string) (Config, error) {
+	paths, err := workspace.Open(root)
 	if err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			return Config{}, err
-		}
+		return Config{}, err
 	}
-
+	configPath := paths.Store + "/config.yml"
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return Config{}, fmt.Errorf("read workspace config %q: %w", configPath, err)
+	}
+	var file workspaceConfig
+	if err := yaml.Unmarshal(data, &file); err != nil {
+		return Config{}, fmt.Errorf("decode workspace config %q: %w", configPath, err)
+	}
 	return Config{
 		AppName:        defaultAppName,
-		StateDir:       envOrDefault("NOOPS_STATE_DIR", stateDir),
-		DataDir:        envOrDefault("NOOPS_DATA_DIR", dataDir),
+		Workspace:      paths.Root,
+		StateDir:       paths.StateDir,
+		DataDir:        paths.DataDir,
 		InstallVersion: Version,
-		NetworkName:    envOrDefault("NOOPS_NETWORK_NAME", defaultNetworkName),
-		RegistryName:   envOrDefault("NOOPS_REGISTRY_NAME", defaultRegistryName),
-		RegistryPort:   envOrDefault("NOOPS_REGISTRY_PORT", defaultRegistryPort),
-		NginxName:      envOrDefault("NOOPS_NGINX_NAME", defaultNginxName),
-		NginxHTTPPort:  envOrDefault("NOOPS_NGINX_HTTP_PORT", defaultNginxHTTPPort),
-		NginxHTTPSPort: envOrDefault("NOOPS_NGINX_HTTPS_PORT", defaultNginxHTTPSPort),
-		ACMEEmail:      os.Getenv("NOOPS_ACME_EMAIL"),
-		ConfigPath:     filepath.Join(configDir, ".env.noops"),
+		NetworkName:    defaultNetworkName,
+		RegistryName:   defaultRegistryName,
+		RegistryPort:   defaultRegistryPort,
+		NginxName:      defaultNginxName,
+		NginxHTTPPort:  defaultNginxHTTPPort,
+		NginxHTTPSPort: defaultNginxHTTPSPort,
+		ACMEEmail:      file.ACMEEmail,
+		ConfigPath:     configPath,
 	}, nil
+}
+
+type workspaceConfig struct {
+	ACMEEmail string `yaml:"acme_email"`
 }
 
 func (c *Config) RequireACMEEmail(in *bufio.Reader, out *os.File) error {
@@ -86,26 +92,14 @@ func (c *Config) RequireACMEEmail(in *bufio.Reader, out *os.File) error {
 	if !strings.Contains(email, "@") || strings.ContainsAny(email, "\r\n") {
 		return fmt.Errorf("a valid ACME email is required")
 	}
-	if err := os.MkdirAll(filepath.Dir(c.ConfigPath), 0o700); err != nil {
-		return fmt.Errorf("create config directory: %w", err)
-	}
-	f, err := os.OpenFile(c.ConfigPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	f, err := os.OpenFile(c.ConfigPath, os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		return fmt.Errorf("open config file: %w", err)
 	}
 	defer f.Close()
-	if _, err := fmt.Fprintf(f, "\nNOOPS_ACME_EMAIL=%s\n", email); err != nil {
+	if _, err := fmt.Fprintf(f, "version: 1\nacme_email: %s\n", email); err != nil {
 		return fmt.Errorf("store ACME email: %w", err)
 	}
 	c.ACMEEmail = email
 	return nil
-}
-
-func envOrDefault(key string, fallback string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		return fallback
-	}
-
-	return value
 }
