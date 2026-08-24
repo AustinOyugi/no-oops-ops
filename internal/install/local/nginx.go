@@ -30,13 +30,17 @@ func (h *Host) nginxConfigDir() string {
 func (h *Host) nginxConfigPath() string {
 	return filepath.Join(h.nginxConfigDir(), "routes.conf")
 }
+func (h *Host) nginxACMEWebroot() string    { return filepath.Join(h.dataDir, "nginx", "acme-webroot") }
+func (h *Host) nginxCertificateDir() string { return filepath.Join(h.dataDir, "nginx", "letsencrypt") }
 
 type nginxStackTemplateData struct {
-	HTTPPort     string
-	HTTPSPort    string
-	NetworkName  string
-	ConfigPath   string
-	InternalHost string
+	HTTPPort       string
+	HTTPSPort      string
+	NetworkName    string
+	ConfigPath     string
+	InternalHost   string
+	ACMEWebroot    string
+	CertificateDir string
 }
 
 func (h *Host) WriteNginxStack(ctx context.Context) error {
@@ -52,6 +56,11 @@ func (h *Host) WriteNginxStack(ctx context.Context) error {
 	if err := os.MkdirAll(h.nginxConfigDir(), stateDirMode); err != nil {
 		return install.PrerequisiteError{Check: install.StepWriteNginxStack, Err: fmt.Errorf("create nginx config dir %q: %w", h.nginxConfigDir(), err)}
 	}
+	for _, certificatePath := range []string{h.nginxACMEWebroot(), h.nginxCertificateDir()} {
+		if err := os.MkdirAll(certificatePath, stateDirMode); err != nil {
+			return install.PrerequisiteError{Check: install.StepWriteNginxStack, Err: fmt.Errorf("create nginx certificate directory %q: %w", certificatePath, err)}
+		}
+	}
 	if _, err := os.Stat(h.nginxConfigPath()); os.IsNotExist(err) {
 		if err := os.WriteFile(h.nginxConfigPath(), []byte(defaultNginxConfig), installMetadataFileMode); err != nil {
 			return install.PrerequisiteError{Check: install.StepWriteNginxStack, Err: fmt.Errorf("write nginx config %q: %w", h.nginxConfigPath(), err)}
@@ -61,11 +70,13 @@ func (h *Host) WriteNginxStack(ctx context.Context) error {
 	}
 
 	rendered, err := renderTemplate("nginx-stack.yml.tmpl", nginxStackTemplateContents, nginxStackTemplateData{
-		HTTPPort:     h.nginxHTTPPort,
-		HTTPSPort:    h.nginxHTTPSPort,
-		NetworkName:  h.networkName,
-		ConfigPath:   h.nginxConfigDir(),
-		InternalHost: internalIngressHost,
+		HTTPPort:       h.nginxHTTPPort,
+		HTTPSPort:      h.nginxHTTPSPort,
+		NetworkName:    h.networkName,
+		ConfigPath:     h.nginxConfigDir(),
+		InternalHost:   internalIngressHost,
+		ACMEWebroot:    h.nginxACMEWebroot(),
+		CertificateDir: h.nginxCertificateDir(),
 	})
 	if err != nil {
 		return install.PrerequisiteError{Check: install.StepWriteNginxStack, Err: fmt.Errorf("render nginx stack: %w", err)}

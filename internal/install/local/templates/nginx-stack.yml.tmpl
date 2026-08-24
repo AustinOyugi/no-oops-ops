@@ -8,6 +8,8 @@ services:
       - "{{ .HTTPSPort }}:443"
     volumes:
       - "{{ .ConfigPath }}:/etc/nginx/conf.d:ro"
+      - "{{ .ACMEWebroot }}:/var/www/certbot:ro"
+      - "{{ .CertificateDir }}:/etc/letsencrypt:ro"
     networks:
       "{{ .NetworkName }}":
         aliases:
@@ -18,6 +20,16 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+  certbot:
+    image: certbot/certbot:latest
+    command: ["/bin/sh", "-c", "while :; do certbot renew --webroot --webroot-path /var/www/certbot; sleep 12h; done"]
+    volumes:
+      - "{{ .ACMEWebroot }}:/var/www/certbot:rw"
+      - "{{ .CertificateDir }}:/etc/letsencrypt:rw"
     deploy:
       replicas: 1
       restart_policy:
