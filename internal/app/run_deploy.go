@@ -156,7 +156,7 @@ func parseDeployArgs(args []string) (environment, manifestPath string, services 
 	}
 	environment, manifestPath = args[0], args[1]
 	if len(args) == 3 && args[2] == "--all" {
-		names, e := manifest.Services(manifestPath)
+		names, e := manifest.DeploymentOrder(manifestPath)
 		return environment, manifestPath, names, quick, e
 	}
 	if len(args) == 4 && args[2] == "--service" {

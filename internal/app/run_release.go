@@ -84,7 +84,7 @@ func parseServiceArgs(args []string, command string) (string, string, []string, 
 		return "", "", nil, errors.New("provide exactly one of --service or --all")
 	}
 	if all {
-		names, err := manifest.Services(path)
+		names, err := manifest.DeploymentOrder(path)
 		return environment, path, names, err
 	}
 	if _, err := manifest.LoadService(path, selected); err != nil {

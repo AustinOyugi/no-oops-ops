@@ -144,6 +144,19 @@ func writeStackForService(cfg config.Config, environment string, m manifest.Mani
 		return "", fmt.Errorf("create app dir %q: %w", dir, err)
 	}
 
+	// Compose manifests are the application contract. Patch the selected raw
+	// Compose document instead of recreating it from a limited Go schema.
+	if m.Compose != nil {
+		rendered, err := renderComposeStack(m, image, secrets, wrapperCfg, service, envPath(cfg, m.Name, environment))
+		if err != nil {
+			return "", err
+		}
+		if err := os.WriteFile(path, append(rendered, '\n'), stackFileMode); err != nil {
+			return "", fmt.Errorf("write stack file %q: %w", path, err)
+		}
+		return path, nil
+	}
+
 	stackImage := image
 	if wrapperCfg.UseWrapper {
 		stackImage = wrapperCfg.WrapperImage
@@ -194,6 +207,219 @@ func writeStackForService(cfg config.Config, environment string, m manifest.Mani
 	}
 
 	return path, nil
+}
+
+// renderComposeStack changes only No Oops-owned deployment details. Every
+// other Compose value is retained as YAML, including fields unknown to this
+// version of No Oops Ops.
+func renderComposeStack(m manifest.Manifest, image string, bindings []SecretBinding, wrapper WrapperConfig, serviceName, generatedEnv string) ([]byte, error) {
+	raw, err := yaml.Marshal(m.Compose)
+	if err != nil {
+		return nil, fmt.Errorf("copy Compose manifest: %w", err)
+	}
+	var doc yaml.Node
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		return nil, fmt.Errorf("decode Compose manifest: %w", err)
+	}
+	root := documentRoot(&doc)
+	services := mappingValue(root, "services")
+	if services == nil || len(services.Content) != 2 {
+		return nil, fmt.Errorf("selected Compose service is missing")
+	}
+	serviceKey, selected := services.Content[0], services.Content[1]
+	serviceKey.Value = serviceName
+	removeNoOpsMetadata(root)
+	setMapping(selected, "image", scalar(image))
+	normalizeServicePaths(selected, filepath.Dir(m.Path))
+	appendEnvFile(selected, generatedEnv)
+	if wrapper.UseWrapper {
+		applyWrapper(selected, wrapper, bindings)
+	}
+	appendSecrets(selected, bindings)
+	appendTopLevelSecrets(root, bindings)
+	normalizeTopLevelConfigPaths(root, filepath.Dir(m.Path))
+	return yaml.Marshal(&doc)
+}
+
+func removeNoOpsMetadata(node *yaml.Node) {
+	if node == nil {
+		return
+	}
+	if node.Kind == yaml.MappingNode {
+		for i := len(node.Content) - 2; i >= 0; i -= 2 {
+			if node.Content[i].Value == "x-noops" {
+				node.Content = append(node.Content[:i], node.Content[i+2:]...)
+				continue
+			}
+			removeNoOpsMetadata(node.Content[i+1])
+		}
+		return
+	}
+	for _, child := range node.Content {
+		removeNoOpsMetadata(child)
+	}
+}
+
+func documentRoot(doc *yaml.Node) *yaml.Node {
+	if doc.Kind == yaml.DocumentNode && len(doc.Content) > 0 {
+		return doc.Content[0]
+	}
+	return doc
+}
+func scalar(value string) *yaml.Node {
+	return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: value}
+}
+func mappingValue(mapping *yaml.Node, key string) *yaml.Node {
+	if mapping == nil || mapping.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i+1 < len(mapping.Content); i += 2 {
+		if mapping.Content[i].Value == key {
+			return mapping.Content[i+1]
+		}
+	}
+	return nil
+}
+func removeMapping(mapping *yaml.Node, key string) {
+	if mapping == nil {
+		return
+	}
+	for i := 0; i+1 < len(mapping.Content); i += 2 {
+		if mapping.Content[i].Value == key {
+			mapping.Content = append(mapping.Content[:i], mapping.Content[i+2:]...)
+			return
+		}
+	}
+}
+func setMapping(mapping *yaml.Node, key string, value *yaml.Node) {
+	for i := 0; i+1 < len(mapping.Content); i += 2 {
+		if mapping.Content[i].Value == key {
+			mapping.Content[i+1] = value
+			return
+		}
+	}
+	mapping.Content = append(mapping.Content, scalar(key), value)
+}
+
+func appendEnvFile(service *yaml.Node, generated string) {
+	node := mappingValue(service, "env_file")
+	if node == nil {
+		setMapping(service, "env_file", &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq", Content: []*yaml.Node{scalar(generated)}})
+		return
+	}
+	if node.Kind == yaml.ScalarNode {
+		node.Kind, node.Tag, node.Value, node.Content = yaml.SequenceNode, "!!seq", "", []*yaml.Node{scalar(node.Value)}
+	}
+	if node.Kind == yaml.SequenceNode {
+		node.Content = append(node.Content, scalar(generated))
+	}
+}
+
+func appendSecrets(service *yaml.Node, bindings []SecretBinding) {
+	if len(bindings) == 0 {
+		return
+	}
+	node := mappingValue(service, "secrets")
+	if node == nil {
+		node = &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+		setMapping(service, "secrets", node)
+	}
+	if node.Kind != yaml.SequenceNode {
+		return
+	}
+	for _, b := range bindings {
+		node.Content = append(node.Content, &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{scalar("source"), scalar(b.SwarmName), scalar("target"), scalar(b.EnvKey), scalar("mode"), &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!int", Value: "0444"}}})
+	}
+}
+
+func appendTopLevelSecrets(root *yaml.Node, bindings []SecretBinding) {
+	if len(bindings) == 0 {
+		return
+	}
+	node := mappingValue(root, "secrets")
+	if node == nil {
+		node = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+		setMapping(root, "secrets", node)
+	}
+	if node.Kind != yaml.MappingNode {
+		return
+	}
+	for _, b := range bindings {
+		if mappingValue(node, b.SwarmName) == nil {
+			node.Content = append(node.Content, scalar(b.SwarmName), &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{scalar("external"), &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: "true"}}})
+		}
+	}
+}
+
+func applyWrapper(service *yaml.Node, wrapper WrapperConfig, bindings []SecretBinding) {
+	setMapping(service, "image", scalar(wrapper.WrapperImage))
+	setMapping(service, "entrypoint", &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq", Content: []*yaml.Node{scalar("/bin/sh"), scalar("/bootstrap.sh")}})
+	command := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+	for _, v := range append(wrapper.EffectiveExec.Entrypoint, wrapper.EffectiveExec.Cmd...) {
+		command.Content = append(command.Content, scalar(v))
+	}
+	setMapping(service, "command", command)
+	env := mappingValue(service, "environment")
+	if env == nil {
+		env = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+		setMapping(service, "environment", env)
+	}
+	if env.Kind != yaml.MappingNode {
+		return
+	}
+	setMapping(env, "NOOPS_SECRET_MAPPINGS", scalar(secretMappingsValue(wrapper.SecretMappings)))
+	for _, b := range bindings {
+		setMapping(env, b.EnvKey+"_FILE", scalar("/run/secrets/"+b.EnvKey))
+	}
+}
+
+func normalizeServicePaths(service *yaml.Node, base string) {
+	if node := mappingValue(service, "env_file"); node != nil {
+		normalizePathNode(node, base)
+	}
+	volumes := mappingValue(service, "volumes")
+	if volumes == nil || volumes.Kind != yaml.SequenceNode {
+		return
+	}
+	for _, volume := range volumes.Content {
+		if volume.Kind == yaml.ScalarNode {
+			source, rest, ok := strings.Cut(volume.Value, ":")
+			if ok && (strings.HasPrefix(source, "./") || strings.HasPrefix(source, "../")) {
+				volume.Value = filepath.Join(base, source) + ":" + rest
+			}
+		} else if volume.Kind == yaml.MappingNode {
+			source := mappingValue(volume, "source")
+			typ := mappingValue(volume, "type")
+			if source != nil && (typ == nil || typ.Value == "bind") && !filepath.IsAbs(source.Value) {
+				source.Value = filepath.Join(base, source.Value)
+			}
+		}
+	}
+}
+func normalizeTopLevelConfigPaths(root *yaml.Node, base string) {
+	for _, key := range []string{"configs", "secrets"} {
+		section := mappingValue(root, key)
+		if section == nil || section.Kind != yaml.MappingNode {
+			continue
+		}
+		for i := 1; i < len(section.Content); i += 2 {
+			file := mappingValue(section.Content[i], "file")
+			if file != nil && !filepath.IsAbs(file.Value) {
+				file.Value = filepath.Join(base, file.Value)
+			}
+		}
+	}
+}
+func normalizePathNode(node *yaml.Node, base string) {
+	if node.Kind == yaml.ScalarNode && !filepath.IsAbs(node.Value) {
+		node.Value = filepath.Join(base, node.Value)
+		return
+	}
+	if node.Kind == yaml.SequenceNode {
+		for _, value := range node.Content {
+			normalizePathNode(value, base)
+		}
+	}
 }
 
 // namedVolumes returns the named sources from Docker's short volume syntax.

@@ -1,10 +1,72 @@
 package deploy
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 )
+
+func TestRenderComposeStackPreservesUnknownComposeFields(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "app.yml")
+	data := []byte(`services:
+  api:
+    image: example/api:latest
+    entrypoint: ./entrypoint.sh
+    command: [serve]
+    healthcheck: {test: [CMD, "true"]}
+    env_file: [.env]
+    environment: {LOG_LEVEL: info}
+    labels: {owner: platform}
+    ports: ["9090:8080"]
+    networks: [platform]
+    volumes: [./data:/data]
+    configs: [app-config]
+    secrets: [existing-secret]
+    deploy:
+      replicas: 2
+      placement: {constraints: [node.role == worker]}
+      resources: {limits: {memory: 256M}}
+      restart_policy: {condition: any}
+      update_config: {parallelism: 2}
+    x-future-compose-field: retained
+    x-noops:
+      service: {internal_port: 8080}
+      env: {file: noops.env.yml}
+networks: {platform: {external: true}}
+volumes: {data: {}}
+configs: {app-config: {file: ./config.yml}}
+secrets: {existing-secret: {external: true}}
+`)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m, err := manifest.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rendered, err := renderComposeStack(m, "secure.registry/api@sha256:abc", []SecretBinding{{EnvKey: "DB_PASSWORD", SwarmName: "noops_dev_DB_PASSWORD_v1"}}, WrapperConfig{}, "dev-api", "/state/.env")
+	if err != nil {
+		t.Fatal(err)
+	}
+	output := string(rendered)
+	for _, want := range []string{
+		"entrypoint: ./entrypoint.sh", "command: [serve]", "owner: platform", "x-future-compose-field: retained",
+		"constraints: [node.role == worker]", "memory: 256M", "condition: any", "parallelism: 2",
+		"image: secure.registry/api@sha256:abc", "source: noops_dev_DB_PASSWORD_v1", "external: true",
+		filepath.Join(filepath.Dir(path), ".env"), filepath.Join(filepath.Dir(path), "data") + ":/data", filepath.Join(filepath.Dir(path), "config.yml"),
+	} {
+		if !strings.Contains(output, want) {
+			t.Errorf("rendered Compose stack missing %q:\n%s", want, output)
+		}
+	}
+	if strings.Contains(output, "x-noops") {
+		t.Errorf("generated stack must not contain x-noops:\n%s", output)
+	}
+}
 
 func TestReleaseStackNameUsesReleaseSpecificSwarmSafeSuffix(t *testing.T) {
 	if got, want := releaseStackName("prod", "lango", "2026-08-24T10:30:00Z"), "prod-lango-r2026-08-24t103000z"; got != want {

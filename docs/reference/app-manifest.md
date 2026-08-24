@@ -1,10 +1,10 @@
 # App manifest reference
 
-The manifest is YAML. `source.context` and `source.dockerfile` are resolved relative to the manifest unless absolute. `env.file` is resolved relative to the manifest directory.
+The manifest is Docker Compose YAML. Existing Compose is the source of truth: No Oops Ops retains fields it does not own, including later compatible Compose fields, and removes `x-noops` before handing the generated stack to Docker. Relative `env_file`, bind-mount, config, and secret file paths are made absolute when the generated stack is written to state.
 
 ## Manifest format
 
-No Oops Ops accepts a Compose-shaped manifest containing one service. Standard Docker fields such as `image`, `build`, `command`, `healthcheck`, `deploy.replicas`, `networks`, and `volumes` are mapped into the deployment. No Oops Ops features remain under `x-noops`.
+No Oops Ops accepts a Compose-shaped manifest with one or more services. Standard Docker and Swarm fields remain owned by the application. No Oops Ops features remain under `x-noops`.
 
 ```yaml
 services:
@@ -22,7 +22,9 @@ services:
         file: api.env.yml
 ```
 
-Manifests currently require exactly one service. Multi-service selection and raw Compose pass-through are the next extension. The earlier top-level `name`, `image`, and `service` manifest format is no longer supported.
+Lifecycle operations target a service explicitly: `noops release <env> app.yml --service api`, `noops deploy <env> app.yml --service api`, or `--all`. `--all` uses a stable dependency order from `x-noops.depends_on` and stops at the first failure. Compose `depends_on` is preserved, but is not a Swarm readiness guarantee; applications must retry dependencies at runtime. The earlier top-level `name`, `image`, and `service` format is not supported.
+
+No Oops rejects `container_name` because Swarm schedules service tasks, rejects public `ports` on ingress-managed services, and rejects plainly embedded credential-like environment values. Move such values to managed No Oops secrets.
 
 ## Supported fields
 

@@ -17,6 +17,11 @@ type Manifest struct {
 	Env         Env         `yaml:"env"`
 	DependsOn   []string    `yaml:"depends_on"`
 	Volumes     []string    `yaml:"volumes"`
+	// Compose is the selected, Compose-shaped document. It is deliberately a
+	// yaml.Node rather than a Go struct: Compose adds fields over time and No
+	// Oops must not discard fields it does not own.
+	Compose *yaml.Node `yaml:"-"`
+	Path    string     `yaml:"-"`
 }
 
 // ComposeFile is the initial Compose-shaped input supported by No Oops Ops.
@@ -77,9 +82,10 @@ type SourceBuild struct {
 }
 
 type Image struct {
-	Repository string `yaml:"repository"`
-	Tag        string `yaml:"tag"`
-	Build      *bool  `yaml:"build"`
+	Repository      string `yaml:"repository"`
+	Tag             string `yaml:"tag"`
+	SourceReference string `yaml:"-"` // original Compose reference, including a digest when supplied
+	Build           *bool  `yaml:"build"`
 }
 
 func (i Image) ShouldBuild() bool {
@@ -92,6 +98,7 @@ type Service struct {
 	Replicas     int      `yaml:"replicas"`
 	Network      string   `yaml:"network"`
 	Command      []string `yaml:"command"`
+	Entrypoint   []string `yaml:"entrypoint"`
 }
 
 type Healthcheck struct {

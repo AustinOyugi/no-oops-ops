@@ -58,7 +58,11 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 			return Result{}, err
 		}
 	} else {
-		if err := s.buildPulledImage(ctx, registryImage, m.Image.Repository, m.Image.Tag); err != nil {
+		sourceReference := m.Image.SourceReference
+		if sourceReference == "" {
+			sourceReference = fmt.Sprintf("%s:%s", m.Image.Repository, m.Image.Tag)
+		}
+		if err := s.buildPulledImage(ctx, registryImage, sourceReference); err != nil {
 			return Result{}, err
 		}
 	}
@@ -95,7 +99,7 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 	}, nil
 }
 
-func (s *Service) buildPulledImage(ctx context.Context, targetImage, repository, tag string) error {
+func (s *Service) buildPulledImage(ctx context.Context, targetImage, sourceImage string) error {
 	contextDir, err := os.MkdirTemp("", "noops-release-*")
 	if err != nil {
 		return fmt.Errorf("create temporary Docker build context: %w", err)
@@ -109,8 +113,6 @@ func (s *Service) buildPulledImage(ctx context.Context, targetImage, repository,
 	}(contextDir)
 
 	dockerfile := filepath.Join(contextDir, "Dockerfile")
-	sourceImage := fmt.Sprintf("%s:%s", repository, tag)
-
 	if err := os.WriteFile(dockerfile, []byte(fmt.Sprintf("FROM %s\n", sourceImage)), 0o600); err != nil {
 		return fmt.Errorf("write temporary Dockerfile: %w", err)
 	}
@@ -144,6 +146,9 @@ func releaseTag() string {
 func sourceTag(m manifest.Manifest) string {
 	if m.Image.ShouldBuild() {
 		return ""
+	}
+	if m.Image.SourceReference != "" {
+		return m.Image.SourceReference
 	}
 
 	return m.Image.Tag

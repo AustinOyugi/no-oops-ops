@@ -1,6 +1,9 @@
 package manifest
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 const (
 	defaultImageTag               = "latest"
@@ -28,7 +31,7 @@ const (
 )
 
 func (m *Manifest) applyDefaults() {
-	if m.Image.Tag == "" {
+	if m.Image.Tag == "" && !strings.Contains(m.Image.SourceReference, "@") {
 		m.Image.Tag = defaultImageTag
 	}
 

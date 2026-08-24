@@ -180,6 +180,9 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		if err != nil {
 			return Result{}, fmt.Errorf("inspect application image: %w", err)
 		}
+		if len(m.Service.Entrypoint) > 0 {
+			imgMeta.Entrypoint = m.Service.Entrypoint
+		}
 		wrapperCfg = BuildWrapperConfig(resolutionMode, releaseMetadata.RegistryImage, imgMeta, m.Service.Command, secretBindings)
 		if !wrapperCfg.UseWrapper {
 			return Result{}, fmt.Errorf("application image %q has neither an entrypoint nor a command", releaseMetadata.RegistryImage)

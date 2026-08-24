@@ -3,6 +3,7 @@ package manifest
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -83,7 +84,41 @@ func (m Manifest) Validate() error {
 	if m.Expose.BlueGreen != nil && *m.Expose.BlueGreen && !m.Expose.Enabled {
 		return fmt.Errorf("expose.blue_green requires expose.enabled")
 	}
+	if err := m.validateComposeCompatibility(); err != nil {
+		return err
+	}
 
+	return nil
+}
+
+func (m Manifest) validateComposeCompatibility() error {
+	if m.Compose == nil {
+		return nil
+	}
+	root := m.Compose
+	if root.Kind == 1 && len(root.Content) > 0 {
+		root = root.Content[0]
+	}
+	services := mapValue(root, "services")
+	if services == nil || len(services.Content) != 2 {
+		return nil
+	}
+	service := services.Content[1]
+	if mapValue(service, "container_name") != nil {
+		return fmt.Errorf("service %q: container_name is incompatible with Docker Swarm scheduling; remove it", m.Name)
+	}
+	if m.Expose.Enabled && mapValue(service, "ports") != nil {
+		return fmt.Errorf("service %q: ports conflicts with No Oops-managed ingress; remove public HTTP ports", m.Name)
+	}
+	if env := mapValue(service, "environment"); env != nil && env.Kind == 4 {
+		for i := 0; i+1 < len(env.Content); i += 2 {
+			key, value := env.Content[i].Value, env.Content[i+1].Value
+			lower := strings.ToLower(key)
+			if (strings.Contains(lower, "password") || strings.Contains(lower, "secret") || strings.Contains(lower, "token") || strings.Contains(lower, "api_key") || strings.Contains(lower, "private_key")) && value != "" && !strings.Contains(value, "${") {
+				return fmt.Errorf("service %q: plaintext credential %q must move to a managed secret", m.Name, key)
+			}
+		}
+	}
 	return nil
 }
 
