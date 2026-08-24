@@ -21,12 +21,8 @@ func (m Manifest) Validate() error {
 		return fmt.Errorf("image.repository is required")
 	}
 
-	if m.Service.InternalPort == 0 {
-		return fmt.Errorf("service.internal_port is required")
-	}
-
-	if len(m.Healthcheck.Test) == 0 {
-		return fmt.Errorf("healthcheck.test is required")
+	if m.Expose.Enabled && m.Service.InternalPort == 0 {
+		return fmt.Errorf("service.internal_port is required when ingress is enabled")
 	}
 
 	for name, value := range map[string]string{

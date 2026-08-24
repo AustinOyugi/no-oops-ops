@@ -18,47 +18,31 @@ services:
     x-noops:
       service:
         internal_port: 8080
+      ingress:
+        enabled: true
+        domains: [api.example.com]
       env:
         file: api.env.yml
 ```
 
 Lifecycle operations target a service explicitly: `noops release <env> app.yml --service api`, `noops deploy <env> app.yml --service api`, or `--all`. `--all` uses a stable dependency order from `x-noops.depends_on` and stops at the first failure. Compose `depends_on` is preserved, but is not a Swarm readiness guarantee; applications must retry dependencies at runtime. The earlier top-level `name`, `image`, and `service` format is not supported.
 
-No Oops rejects `container_name` because Swarm schedules service tasks, rejects public `ports` on ingress-managed services, and rejects plainly embedded credential-like environment values. Move such values to managed No Oops secrets.
+No Oops rejects `container_name` because Swarm schedules service tasks, rejects public `ports` on ingress-managed services, and rejects plainly embedded credential-like environment values. Move such values to managed No Oops secrets. `x-noops.expose` remains accepted as a compatibility alias for `x-noops.ingress`.
 
 ## Supported fields
 
 | Field | Required | Default | Meaning |
 | --- | --- | --- | --- |
-| `name` | Yes | — | Application name used in generated state and stack names. |
-| `source.context` | When `image.build` is true | — | Docker build context. |
-| `source.dockerfile` | When `image.build` is true | — | Dockerfile path. |
-| `source.build.command` | No | — | Command array run in the build context before `docker build`. |
-| `image.repository` | Yes | — | Image repository name; for an external image this is also the upstream repository. |
-| `image.tag` | No | `latest` | Upstream tag when `image.build: false`. |
-| `image.build` | No | `true` | Build from source when true; snapshot the upstream image when false. |
-| `service.internal_port` | Yes | — | Application port used by health checks and nginx when the app is exposed; it is not published directly. |
-| `service.replicas` | No | `1` | Swarm replica count. |
-| `service.network` | No | `noops-net` | Existing external Swarm network used by the stack. |
-| `service.command` | No | image command | Command override, also used when env-mode secrets need a wrapper. |
-| `volumes` | No | `[]` | Docker short mount syntax. Named volumes are defined by the rendered stack; host paths are bind mounts. |
-| `healthcheck.test` | Yes | — | Docker healthcheck command array. |
-| `healthcheck.interval` | No | `10s` | Go duration. |
-| `healthcheck.timeout` | No | `10s` | Go duration. |
-| `healthcheck.retries` | No | `3` | Healthcheck retries. |
-| `healthcheck.start_period` | No | `60s` | Go duration. |
-| `rollout.*` | No | See below | Swarm update, rollback, restart, and convergence settings. |
-| `expose.enabled` | No | `false` | Adds the app to the shared nginx ingress when true. |
-| `expose.blue_green` | No | `true` | Promotes a healthy release-specific candidate through nginx instead of updating the active service in place; requires `expose.enabled: true`. Set it to `false` to use an in-place Swarm update. |
-| `expose.domain` | When enabled | — | HTTP host name served by nginx. |
-| `expose.domains` | No | `[]` | Additional host names served by the same route, such as `www.example.com`. |
-| `expose.tls` | No | `false` | Obtains and serves a Let's Encrypt certificate for `expose.domain`; all routes sharing that domain must use the same setting. |
-| `expose.tls_certificate` | No | — | Name of an imported TLS certificate. Mutually exclusive with `expose.tls`. |
-| `expose.path_prefix` | No | `/` | HTTP path prefix forwarded to the app. |
-| `expose.proxy.websocket` | No | `false` | Enables WebSocket upgrade forwarding. |
-| `expose.proxy.client_max_body_size` | No | — | nginx request body limit, for example `100m`. |
-| `env.file` | Effectively yes for deploy | — | Environment YAML file, relative to the manifest. |
-| `env.secrets` | No | — | Allow-listed secret references and delivery mode. |
+| `services.<name>` | Yes | — | A Compose service. Its `image`, `build`, execution, environment, networks, volumes, configs, secrets, health check, labels, and `deploy` settings are preserved. |
+| `services.<name>.image` | Yes | — | Upstream image reference. It is replaced in the generated stack with the recorded immutable release image. |
+| `services.<name>.build` | No | — | Standard Compose build configuration. When present, No Oops builds it before release. |
+| `services.<name>.x-noops.service.internal_port` | Yes for ingress | — | Private application port used by managed nginx ingress. |
+| `services.<name>.x-noops.source.build.command` | No | — | Command run in the build context before a Compose build. |
+| `services.<name>.x-noops.env.file` | When using No Oops environment values | — | Environment YAML file, relative to the manifest. |
+| `services.<name>.x-noops.env.secrets` | No | — | Allow-listed versioned secret references and delivery mode. |
+| `services.<name>.x-noops.ingress.*` | No | disabled | Managed nginx route, TLS, and blue/green settings. |
+| `services.<name>.x-noops.rollout.*` | No | See below | No Oops convergence monitoring settings. It does not replace existing `deploy.update_config`, `rollback_config`, or restart policy. |
+| `services.<name>.x-noops.depends_on` | No | `[]` | Deployment ordering for `--all`; not a runtime readiness guarantee. |
 
 `healthcheck.test` must be an array accepted by Docker. Duration values use Go duration syntax, such as `30s` or `2m`.
 
@@ -74,7 +58,7 @@ For development feedback loops, `noops deploy --quick <environment> <manifest>` 
 
 After the application successfully converges, `noops deploy` writes its enabled route to the platform-managed nginx ingress. nginx forwards requests to the application's private Swarm service and `service.internal_port`; no application port is published directly. `noops remove` removes the route before stopping the stack.
 
-Blue/green promotion is enabled by default for stateless exposed apps. Named volumes are rejected in blue/green mode; set `expose.blue_green: false` to use an in-place Swarm update for stateful services. Set `expose.tls: true` to serve HTTPS. The domain's DNS A/AAAA record must resolve to the Swarm manager and allow inbound ports 80 and 443. On its first deployment, No Oops Ops makes the HTTP-01 challenge path available, obtains a Let's Encrypt certificate, and then enables the HTTPS virtual host with HTTP-to-HTTPS redirects. Subsequent certificate renewals reload nginx automatically. The current renewal service mounts the Docker daemon socket to force that reload; this grants it root-equivalent Docker-host access and is suitable only for the trusted single-node platform. A given domain/path-prefix pair can be owned by only one deployed app, and all routes sharing a domain must agree on its TLS setting. `service.external_port` and `depends_on` remain unsupported.
+Blue/green promotion is enabled by default for stateless ingress-managed apps. Named volumes are rejected in blue/green mode; set `x-noops.ingress.blue_green: false` to use an in-place Swarm update for stateful services. Set `x-noops.ingress.tls: true` to serve HTTPS. The domain's DNS A/AAAA record must resolve to the Swarm manager and allow inbound ports 80 and 443. On its first deployment, No Oops Ops makes the HTTP-01 challenge path available, obtains a Let's Encrypt certificate, and then enables the HTTPS virtual host with HTTP-to-HTTPS redirects. Subsequent certificate renewals reload nginx automatically. The current renewal service mounts the Docker daemon socket to force that reload; this grants it root-equivalent Docker-host access and is suitable only for the trusted single-node platform. A given domain/path-prefix pair can be owned by only one deployed app, and all routes sharing a domain must agree on its TLS setting. Compose `depends_on` is preserved but should not be used as a readiness guarantee.
 
 For an existing Cloudflare Origin certificate, import a rotated certificate/key pair with `noops certificate import <name> <certificate.pem> <private-key.pem>`, then set `expose.tls_certificate: <name>`. Imported keys are stored in the platform nginx data directory with owner-only permissions and mounted read-only in nginx. Cloudflare must remain proxied with SSL/TLS mode set to Full (strict).
 

@@ -254,9 +254,29 @@ func composeManifest(compose ComposeFile) (Manifest, error) {
 		serviceConfig.Replicas = service.Deploy.Replicas
 		serviceConfig.Network = firstNetwork(service.Networks)
 		serviceConfig.Command = service.Command
-		return Manifest{Name: name, Source: source, Image: image, Service: serviceConfig, Healthcheck: service.Healthcheck, Rollout: service.NoOps.Rollout, Expose: service.NoOps.Expose, Env: service.NoOps.Env, DependsOn: service.NoOps.DependsOn, Volumes: service.Volumes}, nil
+		ingress := service.NoOps.Ingress
+		if !hasIngress(ingress) {
+			ingress = service.NoOps.Expose
+		}
+		normalizeIngress(&ingress)
+		return Manifest{Name: name, Source: source, Image: image, Service: serviceConfig, Healthcheck: service.Healthcheck, Rollout: service.NoOps.Rollout, Expose: ingress, Env: service.NoOps.Env, DependsOn: service.NoOps.DependsOn, Volumes: service.Volumes}, nil
 	}
 	panic("unreachable")
+}
+
+func hasIngress(ingress Expose) bool {
+	return ingress.Enabled || ingress.Domain != "" || len(ingress.Domains) > 0 || ingress.BlueGreen != nil || ingress.TLS || ingress.TLSCertificate != "" || ingress.PathPrefix != ""
+}
+
+func normalizeIngress(ingress *Expose) {
+	if ingress.Domain == "" && len(ingress.Domains) > 0 {
+		ingress.Domain = ingress.Domains[0]
+	}
+	// Domains are an unambiguous request for a managed route, so the compact
+	// `ingress: {domains: [...]}` form is sufficient.
+	if ingress.Domain != "" {
+		ingress.Enabled = true
+	}
 }
 
 func composeManifestService(compose ComposeFile, selected string) (Manifest, error) {

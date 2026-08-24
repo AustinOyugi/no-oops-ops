@@ -79,6 +79,24 @@ func TestLoadServiceSelectsOneServiceFromMultiServiceManifest(t *testing.T) {
 	}
 }
 
+func TestLoadSupportsCompactIngressMetadataAndWorkerWithoutHealthcheck(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "app.yml")
+	data := []byte("services:\n  api:\n    image: repo/api:1\n    x-noops:\n      service: {internal_port: 8080}\n      ingress: {domains: [api.example.test]}\n  worker:\n    image: repo/worker:1\n")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	api, err := LoadService(path, "api")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !api.Expose.Enabled || api.Expose.Domain != "api.example.test" {
+		t.Fatalf("compact ingress was not normalized: %#v", api.Expose)
+	}
+	if _, err := LoadService(path, "worker"); err != nil {
+		t.Fatalf("worker without ingress or healthcheck should load: %v", err)
+	}
+}
+
 func TestLoadRejectsLegacyManifest(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "app.yml")
 	if err := os.WriteFile(path, []byte("name: legacy\nimage: {repository: example/app}\n"), 0o600); err != nil {

@@ -6,7 +6,7 @@
 
 ## Releases
 
-A release is an immutable image tagged with a UTC timestamp (`YYYYMMDD-HHMMSS`) and pushed to the internal registry. For a source build, No Oops Ops optionally runs `source.build.command` and then builds the specified Dockerfile. For `image.build: false`, it snapshots `image.repository:image.tag` into the internal registry.
+A release is an immutable image tagged with a UTC timestamp (`YYYYMMDD-HHMMSS`) and pushed to the internal registry. A Compose service with `build` is built from its declared context and Dockerfile; an image-only service is snapshotted into the internal registry. A digest image reference is also accepted as an upstream source.
 
 Release metadata is retained per app and environment. A release does not change a running service.
 
@@ -14,7 +14,7 @@ Release metadata is retained per app and environment. A release does not change 
 
 A deployment renders a Docker Stack using a recorded release. It first runs deploy-readiness checks, then waits for Swarm to converge and records the outcome and the secret versions used.
 
-Docker Swarm controls scheduling, health checks, task replacement, and automatic rollback. No Oops Ops supplies the rendered update/rollback policy and reports the result; it does not run a competing health controller.
+Docker Swarm controls scheduling, health checks, task replacement, and automatic rollback. No Oops preserves the service's existing Compose deployment policy, waits for the configured result, and does not run a competing health controller.
 
 For exposed apps, No Oops Ops uses blue/green promotion by default after the first deployment: it creates a deployment-specific candidate service, waits for Docker Swarm to report its existing Docker health check as converged, then changes nginx to target the candidate before removing the previous active service. This happens even when the release tag is unchanged. Blue/green is limited to stateless services: manifests with named volumes are rejected because candidate and active releases must not receive independent stack-scoped state. Set `expose.blue_green: false` to use an in-place Swarm update for stateful services. If the candidate fails, only that candidate is removed. Direct service-to-service callers should use the stable nginx internal URL rather than a release-specific application service name.
 

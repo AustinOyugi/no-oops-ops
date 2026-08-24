@@ -63,7 +63,10 @@ type ComposeDeploy struct {
 }
 
 type ComposeNoOps struct {
-	Env       Env      `yaml:"env"`
+	Env Env `yaml:"env"`
+	// Ingress is the Compose-preserving public-routing metadata. Expose remains
+	// accepted as a backwards-compatible alias for existing manifests.
+	Ingress   Expose   `yaml:"ingress"`
 	Expose    Expose   `yaml:"expose"`
 	Rollout   Rollout  `yaml:"rollout"`
 	DependsOn []string `yaml:"depends_on"`

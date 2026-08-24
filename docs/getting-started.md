@@ -47,9 +47,11 @@ Installation verifies Docker, initializes Swarm when necessary, creates the shar
 Create an app manifest and environment file next to one another. The examples in `examples/` show the expected shape.
 
 ```bash
-noops release prod path/to/app.yml
-noops deploy prod path/to/app.yml
+noops release prod path/to/app.yml --service api
+noops deploy prod path/to/app.yml --service api
 ```
+
+An `app.yml` may contain several Compose services. Use `--all` to process them in stable `x-noops.depends_on` order; processing stops at the first failure.
 
 For apps that reference a Swarm secret, set it before deploying:
 
