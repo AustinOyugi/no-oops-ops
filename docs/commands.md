@@ -4,16 +4,17 @@
 noops
 noops init <workspace>
 noops [--workspace <workspace>] install
-noops uninstall [--purge]
-noops doctor [--deploy-ready]
-noops status
+noops [--workspace <workspace>] uninstall [--purge]
+noops [--workspace <workspace>] doctor [--deploy-ready]
+noops [--workspace <workspace>] status
 noops [--workspace <workspace>] release <environment> <app> (--service <name> | --all)
 noops [--workspace <workspace>] deploy [--quick] <environment> <app> (--service <name> | --all)
 noops [--workspace <workspace>] rollback <environment> <app> (--service <name> | --all)
 noops [--workspace <workspace>] remove <environment> <app> (--service <name> | --all)
-noops secret set <environment> <key>
-noops secret list <environment>
-noops cleanup [--apply] [--orphaned] [--keep <count>]
+noops [--workspace <workspace>] secret set <environment> <key>
+noops [--workspace <workspace>] secret list <environment>
+noops [--workspace <workspace>] certificate import <name> <certificate.pem> <private-key.pem>
+noops [--workspace <workspace>] cleanup [--apply] [--orphaned] [--keep <count>]
 ```
 
 Running `noops` without arguments prints its name and build version.
@@ -23,10 +24,10 @@ Running `noops` without arguments prints its name and build version.
 | Command                 | Behavior                                                                                                                                                         |
 |-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `init <workspace>`      | Creates the workspace-local `.noops/state` and `.noops/data` stores, plus an initial version-matched `apps.yml` when absent.                                     |
-| `install`               | Initializes Swarm when required, creates the shared network, deploys the registry, and records installation metadata.                                            |
+| `install`               | Initializes Swarm when required, creates the shared network, deploys the registry and nginx ingress, waits for both to be ready, and records installation metadata. |
 | `doctor`                | Checks Docker, Swarm, installation artifacts, network, and registry.                                                                                             |
 | `doctor --deploy-ready` | Checks only the runtime prerequisites used by `deploy`.                                                                                                          |
-| `status`                | Reports recorded installation metadata and component status.                                                                                                     |
+| `status`                | Reports recorded installation metadata and component status, including registry/nginx task readiness; partially running services are reported as degraded.            |
 | `uninstall`             | Removes managed app stacks, registry stack, shared network when Docker allows it, generated state, and installation metadata. It keeps persistent registry data. |
 | `uninstall --purge`     | Performs uninstall and removes persistent registry data.                                                                                                         |
 
@@ -59,4 +60,5 @@ values.
 ## Certificate commands
 
 `certificate import <name> <certificate.pem> <private-key.pem>` imports a supplied TLS certificate for nginx routes that
-use `expose.tls_certificate`. It is intended for trusted origin certificates such as Cloudflare Origin CA certificates.
+use `x-noops.ingress.tls_certificate`. It is intended for trusted origin certificates such as Cloudflare Origin CA
+certificates.

@@ -8,6 +8,9 @@ noops doctor --deploy-ready
 noops status
 ```
 
+`status` reports the registry and nginx task counts. A `degraded` service has fewer running tasks than Docker Swarm
+desires; use the task diagnostic in its status message to investigate the failed task.
+
 ## Registry errors during release
 
 Confirm Docker allows `127.0.0.1:5000` as an insecure registry and restart Docker after changing that setting. The

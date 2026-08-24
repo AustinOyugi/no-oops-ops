@@ -87,7 +87,8 @@ domain/path-prefix pair can be owned by only one deployed app, and all routes sh
 setting. Compose `depends_on` is preserved but should not be used as a readiness guarantee.
 
 For an existing Cloudflare Origin certificate, import a rotated certificate/key pair with
-`noops certificate import <name> <certificate.pem> <private-key.pem>`, then set `expose.tls_certificate: <name>`.
+`noops certificate import <name> <certificate.pem> <private-key.pem>`, then set
+`x-noops.ingress.tls_certificate: <name>`.
 Imported keys are stored in the platform nginx data directory with owner-only permissions and mounted read-only in
 nginx. Cloudflare must remain proxied with SSL/TLS mode set to Full (strict).
 

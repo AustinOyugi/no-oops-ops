@@ -9,8 +9,8 @@
 - A No Oops workspace directory containing `apps.yml` and application manifests
 
 For a public TLS route, the domain's DNS A/AAAA record must point to the Swarm manager and ports 80 and 443 must be
-reachable from the internet. The first TLS deployment prompts for the ACME contact email if `NOOPS_ACME_EMAIL` is not
-already configured.
+reachable from the internet. The first TLS deployment prompts for the ACME contact email and stores it in the
+workspace configuration.
 
 The bundled registry uses HTTP. For Docker Desktop, add the following to the Docker Engine configuration and restart
 Docker Desktop:
@@ -52,7 +52,7 @@ noops doctor
 ```
 
 Installation verifies Docker, initializes Swarm when necessary, creates the shared network, deploys the internal
-registry, and writes installation metadata.
+registry and nginx ingress, waits for both services to be ready, and writes installation metadata.
 
 ## Release and deploy an app
 

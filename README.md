@@ -15,10 +15,15 @@ See [Getting started](docs/getting-started.md).
 make install
 noops init /srv/noops/example
 cd /srv/noops/example
+# Add the `lango` app alias and its manifest path to apps.yml.
 noops install
 noops release prod lango --service lango
 noops deploy prod lango --service lango
 ```
+
+`init` creates an empty, version-matched `apps.yml` catalog. Add each app's stable alias and Compose-shaped manifest
+path before releasing it; see [Configuration and generated state](docs/reference/configuration.md) for the catalog
+format and the [`lango` example](examples/apps/service/lango.app.yml) for a manifest.
 
 If the app uses secrets, create them before deployment:
 
@@ -48,7 +53,9 @@ standard Compose and Swarm fields remain the application's source of truth. Life
 `--service <name>` or `--all`; `--all` uses a stable dependency order and stops at the first failure.
 
 `release` creates and pushes an immutable timestamped image. `deploy` uses the latest recorded release by default, waits
-for the configured health and rollout result, and records the final Swarm outcome.
+for the configured health and rollout result, and records the final Swarm outcome. `install` waits for the managed
+registry and nginx services to become ready; `status` reports their task readiness and marks partially running services
+as degraded.
 
 ## Development
 
@@ -59,7 +66,7 @@ make test
 
 `make build` writes the local executable to `.bin/noops`; `make install` installs it to `~/.local/bin/noops`.
 
-## Status
+## Current capabilities
 
 The project currently supports a local Docker Swarm, a plain-HTTP internal registry, and a shared nginx ingress with
 manifest-driven HTTP and TLS routes. `noops cleanup --apply` removes selected release manifests and metadata, then runs

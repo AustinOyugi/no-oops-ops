@@ -2,8 +2,9 @@
 
 ## Platform installation
 
-`noops install` prepares one local Swarm deployment platform: the `noops-net` overlay network and the `noops-registry`
-internal registry, unless overridden by configuration. It is safe to rerun.
+`noops install` prepares one local Swarm deployment platform: the `noops-platform` overlay network, the
+`noops-registry` internal registry, and the `noops-nginx` ingress, unless overridden by the workspace catalog. It is
+safe to rerun and waits for the registry and ingress services to become ready.
 
 ## Releases
 
@@ -47,5 +48,5 @@ command. Prefer `file` when the application supports it.
 
 ## State
 
-No Oops Ops uses the XDG state directory by default (`$XDG_STATE_HOME/noops`) and the XDG data directory for persistent
-registry data. Paths and retention are described in [Configuration and generated state](reference/configuration.md).
+No Oops Ops uses workspace-local state and persistent registry data below `.noops/`. Paths and retention are described
+in [Configuration and generated state](reference/configuration.md).
