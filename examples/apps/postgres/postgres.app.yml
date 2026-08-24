@@ -2,7 +2,7 @@ services:
   postgres:
     image: docker.io/bitnamilegacy/postgresql:14
     healthcheck:
-      test: [CMD, pg_isready, -Upostgres]
+      test: [ CMD, pg_isready, -Upostgres ]
       start_period: 60s
       interval: 10s
       timeout: 10s
@@ -14,4 +14,4 @@ services:
         file: postgres.env.yml
         secrets:
           resolution: file
-          resolvable: [POSTGRES_USER, POSTGRES_PASSWORD]
+          resolvable: [ POSTGRES_USER, POSTGRES_PASSWORD ]

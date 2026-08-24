@@ -8,9 +8,12 @@
 - Docker configured to allow the internal registry at `127.0.0.1:5000`
 - A No Oops workspace directory containing `apps.yml` and application manifests
 
-For a public TLS route, the domain's DNS A/AAAA record must point to the Swarm manager and ports 80 and 443 must be reachable from the internet. The first TLS deployment prompts for the ACME contact email if `NOOPS_ACME_EMAIL` is not already configured.
+For a public TLS route, the domain's DNS A/AAAA record must point to the Swarm manager and ports 80 and 443 must be
+reachable from the internet. The first TLS deployment prompts for the ACME contact email if `NOOPS_ACME_EMAIL` is not
+already configured.
 
-The bundled registry uses HTTP. For Docker Desktop, add the following to the Docker Engine configuration and restart Docker Desktop:
+The bundled registry uses HTTP. For Docker Desktop, add the following to the Docker Engine configuration and restart
+Docker Desktop:
 
 ```json
 {
@@ -27,7 +30,8 @@ make install
 noops status
 ```
 
-This installs `noops` in `~/.local/bin`. Ensure that directory is on your `PATH`. To use a repository-local executable instead:
+This installs `noops` in `~/.local/bin`. Ensure that directory is on your `PATH`. To use a repository-local executable
+instead:
 
 ```bash
 make build
@@ -46,7 +50,8 @@ noops install
 noops doctor
 ```
 
-Installation verifies Docker, initializes Swarm when necessary, creates the shared network, deploys the internal registry, and writes installation metadata.
+Installation verifies Docker, initializes Swarm when necessary, creates the shared network, deploys the internal
+registry, and writes installation metadata.
 
 ## Release and deploy an app
 
@@ -60,7 +65,8 @@ noops deploy prod api --service api
 `api` is an alias declared in the workspace `apps.yml`. Use
 `--workspace /srv/cranium/noops` from another directory.
 
-An `app.yml` may contain several Compose services. Use `--all` to process them in stable `x-noops.depends_on` order; processing stops at the first failure.
+An `app.yml` may contain several Compose services. Use `--all` to process them in stable `x-noops.depends_on` order;
+processing stops at the first failure.
 
 For apps that reference a Swarm secret, set it before deploying:
 
@@ -68,4 +74,5 @@ For apps that reference a Swarm secret, set it before deploying:
 noops secret set prod DATABASE_URL
 ```
 
-See the [manifest reference](reference/app-manifest.md) and [environment-file reference](reference/env-file.md) before creating a production manifest.
+See the [manifest reference](reference/app-manifest.md) and [environment-file reference](reference/env-file.md) before
+creating a production manifest.

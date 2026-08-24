@@ -5,7 +5,7 @@ services:
       context: /Users/odu/Documents/alien/code-innate/enterprise/rolengi/security/lango-service
       dockerfile: /Users/odu/Documents/alien/code-innate/enterprise/rolengi/security/lango-service/Dockerfile
     healthcheck:
-      test: [CMD, curl, -f, http://localhost:8080/lango/liveness]
+      test: [ CMD, curl, -f, http://localhost:8080/lango/liveness ]
       start_period: 60s
       interval: 10s
       timeout: 10s
@@ -15,7 +15,7 @@ services:
     x-noops:
       source:
         build:
-          command: [mvn, package, -DskipTests]
+          command: [ mvn, package, -DskipTests ]
       service:
         internal_port: 8080
       expose:
@@ -27,4 +27,4 @@ services:
         file: lango.env.yml
         secrets:
           resolution: env
-          resolvable: [REDIS_PASSWORD, AUTH_SERVER_API_CLIENT_SECRET]
+          resolvable: [ REDIS_PASSWORD, AUTH_SERVER_API_CLIENT_SECRET ]

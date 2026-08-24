@@ -10,13 +10,17 @@ noops status
 
 ## Registry errors during release
 
-Confirm Docker allows `127.0.0.1:5000` as an insecure registry and restart Docker after changing that setting. The registry is plain HTTP.
+Confirm Docker allows `127.0.0.1:5000` as an insecure registry and restart Docker after changing that setting. The
+registry is plain HTTP.
 
-On Docker Desktop, a host process can occupy port 5000 while the registry is healthy inside Docker's network. Use `noops doctor` rather than a host-level `curl` request as the registry health check.
+On Docker Desktop, a host process can occupy port 5000 while the registry is healthy inside Docker's network. Use
+`noops doctor` rather than a host-level `curl` request as the registry health check.
 
 ## Deploy fails before a stack is applied
 
-`deploy` runs the deploy-readiness profile. Resolve the failed remediation reported by the command: Docker must be running, Swarm must be active, the current node must be a manager, and the shared network and registry must be available.
+`deploy` runs the deploy-readiness profile. Resolve the failed remediation reported by the command: Docker must be
+running, Swarm must be active, the current node must be a manager, and the shared network and registry must be
+available.
 
 ## A referenced secret cannot be resolved
 
@@ -27,12 +31,15 @@ noops secret list prod
 noops secret set prod DATABASE_URL
 ```
 
-The app manifest's `resolvable` value is the environment variable key; the environment file's `from_secret` value is the stored secret key.
+The app manifest's `resolvable` value is the environment variable key; the environment file's `from_secret` value is the
+stored secret key.
 
 ## Rollback is unavailable
 
-There must be at least two successful recorded deployments for the same app and environment. A release alone does not create rollback history.
+There must be at least two successful recorded deployments for the same app and environment. A release alone does not
+create rollback history.
 
 ## Registry disk usage remains after remove
 
-`remove` deletes registry manifests, making layers eligible for garbage collection. It does not run registry garbage collection; reclaiming disk space requires a separate GC operation while the registry is stopped.
+`remove` deletes registry manifests, making layers eligible for garbage collection. It does not run registry garbage
+collection; reclaiming disk space requires a separate GC operation while the registry is stopped.

@@ -31,4 +31,6 @@ apps/<app>/<environment>/deployments/<timestamp>.json
 secrets/<environment>/<key>/v<version>.json
 ```
 
-Secret files contain metadata only; values are stored by Docker Swarm. `remove` deletes an app environment's generated state but preserves its secrets and named volumes. `uninstall --purge` also deletes the configured persistent registry data.
+Secret files contain metadata only; values are stored by Docker Swarm. `remove` deletes an app environment's generated
+state but preserves its secrets and named volumes. `uninstall --purge` also deletes the configured persistent registry
+data.
