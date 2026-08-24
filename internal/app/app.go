@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"github.com/AustinOyugi/no-oops-ops/internal/cleanup"
 	"github.com/AustinOyugi/no-oops-ops/internal/release"
 	"io"
 	"log/slog"
@@ -28,6 +29,7 @@ type App struct {
 	doctor      doctorRunner
 	status      *status.Service
 	secrets     secretRunner
+	cleaner     *cleanup.Service
 }
 
 type deployer interface {
@@ -75,6 +77,7 @@ func New(cfg config.Config) (*App, error) {
 		doctor:      doctor.NewService(logger, cfg, localHost),
 		status:      status.NewService(logger, cfg, localHost),
 		secrets:     secret.NewService(logger, cfg),
+		cleaner:     cleanup.NewService(logger, cfg),
 	}, nil
 }
 
@@ -114,6 +117,10 @@ func (a *App) Run(ctx context.Context, args []string) error {
 
 	if len(args) > 0 && args[0] == "secret" {
 		return a.runSecret(ctx, args[1:])
+	}
+
+	if len(args) > 0 && args[0] == "cleanup" {
+		return a.runCleanup(ctx, args[1:])
 	}
 
 	if len(args) > 0 {

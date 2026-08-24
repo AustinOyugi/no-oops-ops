@@ -297,11 +297,6 @@ func validateExposure(m manifest.Manifest) error {
 	return nil
 }
 
-func swarmServiceName(environment, app string) string {
-	stack := environment + "-" + app
-	return stack + "_" + stack
-}
-
 func sortRoutes(routes []Route) {
 	sort.Slice(routes, func(i, j int) bool {
 		if routes[i].Domain != routes[j].Domain {
@@ -320,13 +315,24 @@ func atomicWrite(path string, data []byte) error {
 		return fmt.Errorf("create temporary ingress file: %w", err)
 	}
 	tempPath := temp.Name()
-	defer os.Remove(tempPath)
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+
+		}
+	}(tempPath)
 	if err := temp.Chmod(fileMode); err != nil {
-		temp.Close()
+		err := temp.Close()
+		if err != nil {
+			return err
+		}
 		return fmt.Errorf("set ingress file permissions: %w", err)
 	}
 	if _, err := temp.Write(data); err != nil {
-		temp.Close()
+		err := temp.Close()
+		if err != nil {
+			return err
+		}
 		return fmt.Errorf("write temporary ingress file: %w", err)
 	}
 	if err := temp.Close(); err != nil {
