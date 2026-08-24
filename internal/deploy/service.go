@@ -118,6 +118,28 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		return Result{}, err
 	}
 
+	activeDeployment, err := s.deployments.Latest(s.config, m.Name, environment)
+	if err != nil {
+		return Result{}, err
+	}
+	deploymentStack := stackName(environment, m.Name)
+	deploymentService := serviceName(environment, m.Name)
+	deploymentSwarmService := swarmServiceName(environment, m.Name)
+	deploymentStackPath := stackPath(s.config, m.Name, environment)
+	blueGreen := activeDeployment.ReleaseTag != "" && activeDeployment.ReleaseTag != releaseTag
+	if blueGreen {
+		if !m.Expose.Enabled {
+			return Result{}, fmt.Errorf("blue-green deployment requires expose.enabled so nginx can promote the candidate service")
+		}
+		if len(namedVolumes(m.Volumes)) > 0 {
+			return Result{}, fmt.Errorf("blue-green deployment does not support named volumes; use a shared external service or deploy this app in place")
+		}
+		deploymentStack = releaseStackName(environment, m.Name, releaseTag)
+		deploymentService = "app"
+		deploymentSwarmService = deploymentStack + "_" + deploymentService
+		deploymentStackPath = releaseStackPath(s.config, m.Name, environment, deploymentStack)
+	}
+
 	var wrapperCfg WrapperConfig
 
 	if resolutionMode == "env" && len(secretBindings) > 0 {
@@ -144,33 +166,42 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		deployedImage = wrapperCfg.WrapperImage
 	}
 
-	stackPath, err := writeStack(s.config, environment, m, releaseMetadata.RegistryImage, secretBindings, wrapperCfg)
+	stackPath, err := writeStackForService(s.config, environment, m, releaseMetadata.RegistryImage, secretBindings, wrapperCfg, deploymentService, deploymentStackPath)
 	if err != nil {
 		return Result{}, err
 	}
 
-	if err := s.deployStack(ctx, stackPath, stackName(environment, m.Name)); err != nil {
+	if err := s.deployStack(ctx, stackPath, deploymentStack); err != nil {
 		return Result{}, err
 	}
 
-	if err := s.verifyService(ctx, swarmServiceName(environment, m.Name)); err != nil {
+	if err := s.verifyService(ctx, deploymentSwarmService); err != nil {
+		if blueGreen {
+			_ = s.removeStack(ctx, deploymentStack)
+		}
 		return Result{}, err
 	}
 
 	timeout, monitor, err := convergenceConfig(m)
 	if err != nil {
+		if blueGreen {
+			_ = s.removeStack(ctx, deploymentStack)
+		}
 		return Result{}, err
 	}
 
 	outcome, runningTasks, err := s.waitForSwarmConvergence(
 		ctx,
-		swarmServiceName(environment, m.Name),
+		deploymentSwarmService,
 		deployedImage,
 		m.Service.Replicas,
 		timeout,
 		monitor,
 	)
 	if err != nil {
+		if blueGreen {
+			_ = s.removeStack(ctx, deploymentStack)
+		}
 		if outcome == "" {
 			outcome = SwarmOutcomeFailed
 		}
@@ -182,6 +213,8 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 			Reason:         err.Error(),
 			ReleaseImage:   releaseMetadata.RegistryImage,
 			ReleaseTag:     releaseMetadata.Tag,
+			StackName:      deploymentStack,
+			ServiceName:    deploymentSwarmService,
 			SecretBindings: secretBindings,
 		}
 		if _, saveErr := s.deployments.Save(s.config, failure); saveErr != nil {
@@ -190,8 +223,17 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		return Result{}, err
 	}
 
-	if err := s.ingress.Reconcile(ctx, environment, m); err != nil {
+	if err := s.ingress.Reconcile(ctx, environment, m, deploymentSwarmService); err != nil {
 		return Result{}, fmt.Errorf("reconcile ingress route: %w", err)
+	}
+	if blueGreen {
+		previousStack := activeDeployment.StackName
+		if previousStack == "" {
+			previousStack = stackName(environment, m.Name)
+		}
+		if err := s.removeStack(ctx, previousStack); err != nil {
+			return Result{}, fmt.Errorf("remove previous active stack %q: %w", previousStack, err)
+		}
 	}
 
 	deploymentPath, err := s.deployments.Save(s.config, Deployment{
@@ -201,6 +243,8 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		Outcome:        outcome,
 		ReleaseImage:   releaseMetadata.RegistryImage,
 		ReleaseTag:     releaseMetadata.Tag,
+		StackName:      deploymentStack,
+		ServiceName:    deploymentSwarmService,
 		SecretBindings: secretBindings,
 	})
 	if err != nil {
@@ -215,7 +259,7 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 	return Result{
 		DeploymentPath: deploymentPath,
 		Environment:    environment,
-		ServiceName:    serviceName(environment, m.Name),
+		ServiceName:    deploymentSwarmService,
 		Executed:       true,
 		Verified:       true,
 		RunningTasks:   runningTasks,
@@ -225,7 +269,7 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		ManifestPath:   absPath,
 		StackPath:      stackPath,
 		EnvFilePath:    envFilePath,
-		StackName:      stackName(environment, m.Name),
+		StackName:      deploymentStack,
 		EnvPath:        envPath,
 		Manifest:       m,
 	}, nil

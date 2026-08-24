@@ -74,6 +74,10 @@ func stackPath(cfg config.Config, name string, environment string) string {
 	return filepath.Join(appDir(cfg, name, environment), "stack.yml")
 }
 
+func releaseStackPath(cfg config.Config, name string, environment string, stack string) string {
+	return filepath.Join(appDir(cfg, name, environment), "stack-"+stack+".yml")
+}
+
 func envPath(cfg config.Config, name string, environment string) string {
 	return filepath.Join(appDir(cfg, name, environment), ".env")
 }
@@ -88,6 +92,16 @@ func stackName(environment string, appName string) string {
 
 func swarmServiceName(environment string, appName string) string {
 	return stackName(environment, appName) + "_" + serviceName(environment, appName)
+}
+
+func releaseStackName(environment, appName, tag string) string {
+	var out strings.Builder
+	for _, char := range strings.ToLower(tag) {
+		if (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') || char == '-' {
+			out.WriteRune(char)
+		}
+	}
+	return environment + "-" + appName + "-r" + out.String()
 }
 
 func writeEnvMap(cfg config.Config, appName string, environment string, values map[string]string) (string, error) {
@@ -113,6 +127,10 @@ func writeEnvMap(cfg config.Config, appName string, environment string, values m
 }
 
 func writeStack(cfg config.Config, environment string, m manifest.Manifest, image string, secrets []SecretBinding, wrapperCfg WrapperConfig) (string, error) {
+	return writeStackForService(cfg, environment, m, image, secrets, wrapperCfg, serviceName(environment, m.Name), stackPath(cfg, m.Name, environment))
+}
+
+func writeStackForService(cfg config.Config, environment string, m manifest.Manifest, image string, secrets []SecretBinding, wrapperCfg WrapperConfig, service, path string) (string, error) {
 	dir := appDir(cfg, m.Name, environment)
 	if err := os.MkdirAll(dir, appDirMode); err != nil {
 		return "", fmt.Errorf("create app dir %q: %w", dir, err)
@@ -124,7 +142,7 @@ func writeStack(cfg config.Config, environment string, m manifest.Manifest, imag
 	}
 
 	rendered, err := renderStackTemplate(stackTemplateData{
-		ServiceName:             serviceName(environment, m.Name),
+		ServiceName:             service,
 		Image:                   stackImage,
 		Network:                 m.Service.Network,
 		Replicas:                m.Service.Replicas,
@@ -163,7 +181,6 @@ func writeStack(cfg config.Config, environment string, m manifest.Manifest, imag
 
 	rendered = append(rendered, '\n')
 
-	path := stackPath(cfg, m.Name, environment)
 	if err := os.WriteFile(path, rendered, stackFileMode); err != nil {
 		return "", fmt.Errorf("write stack file %q: %w", path, err)
 	}

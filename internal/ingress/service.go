@@ -40,13 +40,13 @@ func NewService(logger *slog.Logger, cfg config.Config) *Service {
 	return &Service{logger: logger, config: cfg, runner: command.NewRunner(logger)}
 }
 
-func (s *Service) Reconcile(ctx context.Context, environment string, m manifest.Manifest) error {
+func (s *Service) Reconcile(ctx context.Context, environment string, m manifest.Manifest, upstreamService string) error {
 	routes, err := s.loadRoutes()
 	if err != nil {
 		return err
 	}
 
-	updated, changed, err := updateRoute(routes, environment, m)
+	updated, changed, err := updateRoute(routes, environment, m, upstreamService)
 	if err != nil {
 		return err
 	}
@@ -132,7 +132,7 @@ func (s *Service) reload(ctx context.Context) error {
 	return nil
 }
 
-func updateRoute(routes []Route, environment string, m manifest.Manifest) ([]Route, bool, error) {
+func updateRoute(routes []Route, environment string, m manifest.Manifest, upstreamService string) ([]Route, bool, error) {
 	updated := make([]Route, 0, len(routes)+1)
 	for _, route := range routes {
 		if route.Environment == environment && route.App == m.Name {
@@ -152,7 +152,7 @@ func updateRoute(routes []Route, environment string, m manifest.Manifest) ([]Rou
 		App:         m.Name,
 		Domain:      m.Expose.Domain,
 		PathPrefix:  m.Expose.PathPrefix,
-		Service:     swarmServiceName(environment, m.Name),
+		Service:     upstreamService,
 		Port:        m.Service.InternalPort,
 	}
 	for _, existing := range updated {

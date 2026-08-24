@@ -20,10 +20,13 @@ type Deployment struct {
 	Reason         string          `json:"reason,omitempty"`
 	ReleaseImage   string          `json:"release_image"`
 	ReleaseTag     string          `json:"release_tag"`
+	StackName      string          `json:"stack_name,omitempty"`
+	ServiceName    string          `json:"service_name,omitempty"`
 	SecretBindings []SecretBinding `json:"secret_bindings,omitempty"`
 }
 
 type deploymentStore interface {
+	Latest(cfg config.Config, appName string, environment string) (Deployment, error)
 	Previous(cfg config.Config, appName string, environment string) (Deployment, error)
 	Save(cfg config.Config, deployment Deployment) (string, error)
 }
@@ -55,13 +58,35 @@ func (filesystemDeploymentStore) Save(cfg config.Config, deployment Deployment) 
 }
 
 func (filesystemDeploymentStore) Previous(cfg config.Config, appName string, environment string) (Deployment, error) {
+	deployments, err := successfulDeployments(cfg, appName, environment)
+	if err != nil {
+		return Deployment{}, err
+	}
+	if len(deployments) < 2 {
+		return Deployment{}, fmt.Errorf("rollback requires at least two successful deployments for %q in %q", appName, environment)
+	}
+	return deployments[1], nil
+}
+
+func (filesystemDeploymentStore) Latest(cfg config.Config, appName string, environment string) (Deployment, error) {
+	deployments, err := successfulDeployments(cfg, appName, environment)
+	if err != nil {
+		return Deployment{}, err
+	}
+	if len(deployments) == 0 {
+		return Deployment{}, nil
+	}
+	return deployments[0], nil
+}
+
+func successfulDeployments(cfg config.Config, appName string, environment string) ([]Deployment, error) {
 	dir := deploymentHistoryDir(cfg, appName, environment)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return Deployment{}, fmt.Errorf("rollback requires at least two successful deployments for %q in %q", appName, environment)
+			return nil, nil
 		}
-		return Deployment{}, fmt.Errorf("read deployment history dir %q: %w", dir, err)
+		return nil, fmt.Errorf("read deployment history dir %q: %w", dir, err)
 	}
 
 	var names []string
@@ -75,25 +100,21 @@ func (filesystemDeploymentStore) Previous(cfg config.Config, appName string, env
 	for _, name := range names {
 		data, err := os.ReadFile(filepath.Join(dir, name))
 		if err != nil {
-			return Deployment{}, fmt.Errorf("read deployment metadata %q: %w", name, err)
+			return nil, fmt.Errorf("read deployment metadata %q: %w", name, err)
 		}
 		var deployment Deployment
 		if err := json.Unmarshal(data, &deployment); err != nil {
-			return Deployment{}, fmt.Errorf("decode deployment metadata %q: %w", name, err)
+			return nil, fmt.Errorf("decode deployment metadata %q: %w", name, err)
 		}
 		if deployment.Outcome == "" || deployment.Outcome == SwarmOutcomeCompleted {
 			deployments = append(deployments, deployment)
 		}
 	}
 
-	if len(deployments) < 2 {
-		return Deployment{}, fmt.Errorf("rollback requires at least two successful deployments for %q in %q", appName, environment)
-	}
-
 	sort.Slice(deployments, func(i, j int) bool {
 		return deployments[i].CreatedAt.After(deployments[j].CreatedAt)
 	})
-	return deployments[1], nil
+	return deployments, nil
 }
 
 func deploymentHistoryDir(cfg config.Config, appName string, environment string) string {

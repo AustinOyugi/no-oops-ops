@@ -5,6 +5,12 @@ import (
 	"testing"
 )
 
+func TestReleaseStackNameUsesReleaseSpecificSwarmSafeSuffix(t *testing.T) {
+	if got, want := releaseStackName("prod", "lango", "2026-08-24T10:30:00Z"), "prod-lango-r2026-08-24t103000z"; got != want {
+		t.Errorf("releaseStackName() = %q, want %q", got, want)
+	}
+}
+
 func TestRenderStackTemplateMountsExternalSecrets(t *testing.T) {
 	rendered, err := renderStackTemplate(stackTemplateData{
 		ServiceName: "prod-lango",
