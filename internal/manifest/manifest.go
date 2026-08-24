@@ -74,11 +74,19 @@ type Rollback struct {
 }
 
 type Expose struct {
-	Domain     string `yaml:"domain"`
-	PathPrefix string `yaml:"path_prefix"`
-	Enabled    bool   `yaml:"enabled"`
-	BlueGreen  *bool  `yaml:"blue_green"`
-	TLS        bool   `yaml:"tls"`
+	Domain         string   `yaml:"domain"`
+	Domains        []string `yaml:"domains"`
+	PathPrefix     string   `yaml:"path_prefix"`
+	Enabled        bool     `yaml:"enabled"`
+	BlueGreen      *bool    `yaml:"blue_green"`
+	TLS            bool     `yaml:"tls"`
+	TLSCertificate string   `yaml:"tls_certificate"`
+	Proxy          Proxy    `yaml:"proxy"`
+}
+
+type Proxy struct {
+	Websocket         bool   `yaml:"websocket"`
+	ClientMaxBodySize string `yaml:"client_max_body_size"`
 }
 
 // BlueGreenEnabled reports whether exposed releases should use blue/green

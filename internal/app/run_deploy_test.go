@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/deploy"
 	"github.com/AustinOyugi/no-oops-ops/internal/doctor"
 )
@@ -18,6 +20,21 @@ func (failingDoctor) RunProfile(context.Context, doctor.Profile) (doctor.Result,
 	result := doctor.Result{}
 	result.Add("registry_service", doctor.StatusFail, "registry service is unavailable", "Run noops install to deploy the registry")
 	return result, nil
+}
+
+func TestRunRoutesVersionCommand(t *testing.T) {
+	var logs bytes.Buffer
+	application := &App{
+		logger: slog.New(slog.NewTextHandler(&logs, nil)),
+		config: config.Config{InstallVersion: "test-version"},
+	}
+
+	if err := application.Run(context.Background(), []string{"version"}); err != nil {
+		t.Fatalf("Run(version) returned error: %v", err)
+	}
+	if got := logs.String(); !strings.Contains(got, "version=test-version") {
+		t.Errorf("Run(version) logs = %q, want version", got)
+	}
 }
 
 type recordingDeployer struct {

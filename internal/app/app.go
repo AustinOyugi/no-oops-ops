@@ -82,56 +82,55 @@ func New(cfg config.Config) (*App, error) {
 }
 
 func (a *App) Run(ctx context.Context, args []string) error {
-
-	if len(args) > 0 && args[0] == "doctor" {
-		return a.runDoctor(ctx, args[1:])
-	}
-
-	if len(args) > 0 && args[0] == "status" {
-		return a.runStatus(ctx)
-	}
-
-	if len(args) > 0 && args[0] == "install" {
-		return a.runInstall(ctx)
-	}
-
-	if len(args) > 0 && args[0] == "uninstall" {
-		return a.runUninstall(ctx, args[1:])
-	}
-
-	if len(args) > 0 && args[0] == "deploy" {
-		return a.runDeploy(ctx, args[1:])
-	}
-
-	if len(args) > 0 && args[0] == "rollback" {
-		return a.runRollback(ctx, args[1:])
-	}
-
-	if len(args) > 0 && args[0] == "remove" {
-		return a.runRemove(ctx, args[1:])
-	}
-
-	if len(args) > 0 && args[0] == "release" {
-		return a.runRelease(ctx, args[1:])
-	}
-
-	if len(args) > 0 && args[0] == "secret" {
-		return a.runSecret(ctx, args[1:])
-	}
-
-	if len(args) > 0 && args[0] == "cleanup" {
-		return a.runCleanup(ctx, args[1:])
-	}
-
-	if len(args) > 0 {
-		a.logger.ErrorContext(ctx, "unknown command", "command", args[0])
-		return errors.New("unknown command")
-	}
-
-	if len(args) > 0 && args[0] == "version" || len(args) == 0 {
+	if len(args) == 0 || args[0] == "version" {
 		a.logger.InfoContext(ctx, "No Oops Ops", "version", a.config.InstallVersion)
 		return nil
 	}
 
-	return nil
+	if args[0] == "doctor" {
+		return a.runDoctor(ctx, args[1:])
+	}
+
+	if args[0] == "status" {
+		return a.runStatus(ctx)
+	}
+
+	if args[0] == "install" {
+		return a.runInstall(ctx)
+	}
+
+	if args[0] == "uninstall" {
+		return a.runUninstall(ctx, args[1:])
+	}
+
+	if args[0] == "deploy" {
+		return a.runDeploy(ctx, args[1:])
+	}
+
+	if args[0] == "rollback" {
+		return a.runRollback(ctx, args[1:])
+	}
+
+	if args[0] == "remove" {
+		return a.runRemove(ctx, args[1:])
+	}
+
+	if args[0] == "release" {
+		return a.runRelease(ctx, args[1:])
+	}
+
+	if args[0] == "secret" {
+		return a.runSecret(ctx, args[1:])
+	}
+
+	if args[0] == "certificate" {
+		return a.runCertificate(args[1:])
+	}
+
+	if args[0] == "cleanup" {
+		return a.runCleanup(ctx, args[1:])
+	}
+
+	a.logger.ErrorContext(ctx, "unknown command", "command", args[0])
+	return errors.New("unknown command")
 }

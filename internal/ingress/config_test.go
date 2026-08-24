@@ -82,6 +82,40 @@ func TestRenderConfigRendersTLSVirtualHost(t *testing.T) {
 	}
 }
 
+func TestRenderConfigRendersImportedCertificateAndProxySettings(t *testing.T) {
+	rendered, err := RenderConfig([]Route{{
+		Environment:       "prod",
+		App:               "chat",
+		Domain:            "chat.vybes.africa",
+		Domains:           []string{"support.vybes.africa"},
+		PathPrefix:        "/",
+		Service:           "prod-chat_prod-chat",
+		Port:              3000,
+		TLS:               true,
+		TLSCertificate:    "vybes-cloudflare-origin",
+		Websocket:         true,
+		ClientMaxBodySize: "100m",
+	}})
+	if err != nil {
+		t.Fatalf("render config: %v", err)
+	}
+	output := string(rendered)
+	for _, want := range []string{
+		"server_name chat.vybes.africa support.vybes.africa;",
+		"ssl_certificate /etc/noops/certificates/vybes-cloudflare-origin/fullchain.pem;",
+		"ssl_certificate_key /etc/noops/certificates/vybes-cloudflare-origin/privkey.pem;",
+		"client_max_body_size 100m;",
+		"proxy_set_header X-Forwarded-Host $host;",
+		"proxy_set_header X-Requested-Host $scheme://$host$request_uri;",
+		"proxy_set_header Upgrade $http_upgrade;",
+		`proxy_set_header Connection "upgrade";`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Errorf("rendered config does not contain %q:\n%s", want, output)
+		}
+	}
+}
+
 func TestRenderStaticIngressTemplates(t *testing.T) {
 	defaultConfig, err := renderTemplate(configTemplateData{}, "default")
 	if err != nil {

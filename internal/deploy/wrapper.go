@@ -80,18 +80,15 @@ func inspectImage(ctx context.Context, runner *command.Runner, imageRef string) 
 	return ImageMetadata{Entrypoint: entrypoint, Cmd: cmd}, nil
 }
 
-func ResolveEffectiveExecution(imgMeta ImageMetadata, manifestEntrypoint, manifestCmd []string) EffectiveExecution {
-	ep := imgMeta.Entrypoint
-	if len(manifestEntrypoint) > 0 {
-		ep = manifestEntrypoint
-	}
-
+// ResolveEffectiveExecution applies the supported manifest command override to
+// the image execution contract. Manifest entrypoint overrides are not supported.
+func ResolveEffectiveExecution(imgMeta ImageMetadata, manifestCmd []string) EffectiveExecution {
 	cmd := imgMeta.Cmd
 	if len(manifestCmd) > 0 {
 		cmd = manifestCmd
 	}
 
-	return EffectiveExecution{Entrypoint: ep, Cmd: cmd}
+	return EffectiveExecution{Entrypoint: imgMeta.Entrypoint, Cmd: cmd}
 }
 
 func BuildWrapperConfig(
@@ -105,7 +102,7 @@ func BuildWrapperConfig(
 		return WrapperConfig{UseWrapper: false}
 	}
 
-	execution := ResolveEffectiveExecution(imgMeta, nil, manifestCmd)
+	execution := ResolveEffectiveExecution(imgMeta, manifestCmd)
 	if len(execution.Entrypoint) == 0 && len(execution.Cmd) == 0 {
 		return WrapperConfig{}
 	}

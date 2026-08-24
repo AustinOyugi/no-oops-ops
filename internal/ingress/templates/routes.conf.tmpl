@@ -37,7 +37,7 @@
 {{ define "external" }}{{ range .Domains }}server {
   listen 80;
   listen [::]:80;
-  server_name {{ .Domain }};
+  server_name {{ .Domain }}{{ range .Routes }}{{ range .Domains }} {{ . }}{{ end }}{{ end }};
   location ^~ /.well-known/acme-challenge/ {
     root /var/www/certbot;
   }
@@ -48,11 +48,19 @@ server {
   listen 443 ssl;
   listen [::]:443 ssl;
   server_name {{ .Domain }};
+{{ if (tlsCertificate .Routes) }}
+  ssl_certificate /etc/noops/certificates/{{ tlsCertificate .Routes }}/fullchain.pem;
+  ssl_certificate_key /etc/noops/certificates/{{ tlsCertificate .Routes }}/privkey.pem;
+{{ else }}
   ssl_certificate /etc/letsencrypt/live/{{ .Domain }}/fullchain.pem;
   ssl_certificate_key /etc/letsencrypt/live/{{ .Domain }}/privkey.pem;
 {{ end }}
+{{ end }}
 {{ range .Routes }}
   location {{ .PathPrefix }} {
+{{ if .ClientMaxBodySize }}
+    client_max_body_size {{ .ClientMaxBodySize }};
+{{ end }}
     resolver 127.0.0.11 valid=10s;
     set $upstream {{ .Service }};
     proxy_pass http://$upstream:{{ .Port }}$request_uri;
@@ -61,6 +69,12 @@ server {
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Requested-Host $scheme://$host$request_uri;
+{{ if .Websocket }}
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+{{ end }}
 }
 {{ end }}
 }

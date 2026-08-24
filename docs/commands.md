@@ -50,3 +50,7 @@ noops secret list prod
 ```
 
 Each update creates a versioned Swarm secret such as `noops_prod_DATABASE_URL_v2`. `secret list` shows metadata, not values.
+
+## Certificate commands
+
+`certificate import <name> <certificate.pem> <private-key.pem>` imports a supplied TLS certificate for nginx routes that use `expose.tls_certificate`. It is intended for trusted origin certificates such as Cloudflare Origin CA certificates.

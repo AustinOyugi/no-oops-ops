@@ -12,26 +12,10 @@ func TestResolveEffectiveExecutionUsesImageDefaults(t *testing.T) {
 		Cmd:        []string{"app.jar"},
 	}
 
-	exec := ResolveEffectiveExecution(img, nil, nil)
+	exec := ResolveEffectiveExecution(img, nil)
 
 	if len(exec.Entrypoint) != 2 || exec.Entrypoint[0] != "java" {
 		t.Errorf("entrypoint = %v, want [java -jar]", exec.Entrypoint)
-	}
-	if len(exec.Cmd) != 1 || exec.Cmd[0] != "app.jar" {
-		t.Errorf("cmd = %v, want [app.jar]", exec.Cmd)
-	}
-}
-
-func TestResolveEffectiveExecutionManifestOverridesEntrypoint(t *testing.T) {
-	img := ImageMetadata{
-		Entrypoint: []string{"java", "-jar"},
-		Cmd:        []string{"app.jar"},
-	}
-
-	exec := ResolveEffectiveExecution(img, []string{"python"}, nil)
-
-	if len(exec.Entrypoint) != 1 || exec.Entrypoint[0] != "python" {
-		t.Errorf("entrypoint = %v, want [python]", exec.Entrypoint)
 	}
 	if len(exec.Cmd) != 1 || exec.Cmd[0] != "app.jar" {
 		t.Errorf("cmd = %v, want [app.jar]", exec.Cmd)
@@ -44,26 +28,13 @@ func TestResolveEffectiveExecutionManifestOverridesCmd(t *testing.T) {
 		Cmd:        []string{"app.jar"},
 	}
 
-	exec := ResolveEffectiveExecution(img, nil, []string{"other.jar"})
+	exec := ResolveEffectiveExecution(img, []string{"other.jar"})
 
 	if len(exec.Entrypoint) != 2 || exec.Entrypoint[0] != "java" {
 		t.Errorf("entrypoint = %v, want [java -jar]", exec.Entrypoint)
 	}
 	if len(exec.Cmd) != 1 || exec.Cmd[0] != "other.jar" {
 		t.Errorf("cmd = %v, want [other.jar]", exec.Cmd)
-	}
-}
-
-func TestResolveEffectiveExecutionEmptyImage(t *testing.T) {
-	img := ImageMetadata{}
-
-	exec := ResolveEffectiveExecution(img, []string{"/bin/sh", "-c"}, []string{"echo", "hello"})
-
-	if len(exec.Entrypoint) != 2 || exec.Entrypoint[0] != "/bin/sh" {
-		t.Errorf("entrypoint = %v, want [/bin/sh -c]", exec.Entrypoint)
-	}
-	if len(exec.Cmd) != 2 || exec.Cmd[0] != "echo" || exec.Cmd[1] != "hello" {
-		t.Errorf("cmd = %v, want [echo hello]", exec.Cmd)
 	}
 }
 

@@ -51,7 +51,7 @@ make test
 
 ## Status
 
-The project currently supports a local Docker Swarm, a plain-HTTP internal registry, and a shared nginx ingress with manifest-driven HTTP and TLS routes. Registry garbage collection policy is not implemented. See [Current limitations](docs/limitations.md).
+The project currently supports a local Docker Swarm, a plain-HTTP internal registry, and a shared nginx ingress with manifest-driven HTTP and TLS routes. `noops cleanup --apply` removes selected release manifests and metadata, then runs offline registry garbage collection when needed. See [Current limitations](docs/limitations.md).
 
 ## License
 

@@ -10,6 +10,7 @@ services:
       - "{{ .ConfigPath }}:/etc/nginx/conf.d:ro"
       - "{{ .ACMEWebroot }}:/var/www/certbot:ro"
       - "{{ .CertificateDir }}:/etc/letsencrypt:ro"
+      - "{{ .ImportedCertificateDir }}:/etc/noops/certificates:ro"
     networks:
       "{{ .NetworkName }}":
         aliases:

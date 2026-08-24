@@ -22,13 +22,17 @@ const (
 )
 
 type Route struct {
-	Environment string `json:"environment"`
-	App         string `json:"app"`
-	Domain      string `json:"domain"`
-	PathPrefix  string `json:"path_prefix"`
-	Service     string `json:"service"`
-	Port        int    `json:"port"`
-	TLS         bool   `json:"tls"`
+	Environment       string   `json:"environment"`
+	App               string   `json:"app"`
+	Domain            string   `json:"domain"`
+	PathPrefix        string   `json:"path_prefix"`
+	Service           string   `json:"service"`
+	Port              int      `json:"port"`
+	TLS               bool     `json:"tls"`
+	TLSCertificate    string   `json:"tls_certificate,omitempty"`
+	Domains           []string `json:"domains,omitempty"`
+	Websocket         bool     `json:"websocket,omitempty"`
+	ClientMaxBodySize string   `json:"client_max_body_size,omitempty"`
 }
 
 type Service struct {
@@ -60,6 +64,9 @@ func (s *Service) Reconcile(ctx context.Context, environment string, m manifest.
 	}
 	if !changed {
 		return s.reload(ctx)
+	}
+	if err := s.validateImportedCertificates(updated); err != nil {
+		return err
 	}
 	// Write and load the HTTP configuration first. This makes the ACME
 	// challenge endpoint reachable before asking Let's Encrypt for a
@@ -121,6 +128,9 @@ func (s *Service) acmeWebroot() string {
 }
 func (s *Service) certificateDir() string {
 	return filepath.Join(s.config.DataDir, "nginx", "letsencrypt")
+}
+func (s *Service) importedCertificateDir() string {
+	return filepath.Join(s.config.DataDir, "nginx", "certificates")
 }
 
 func (s *Service) loadRoutes() ([]Route, error) {
@@ -197,6 +207,11 @@ func (s *Service) routesWithAvailableCertificates(routes []Route) []Route {
 	configured := append([]Route(nil), routes...)
 	for i := range configured {
 		if configured[i].TLS {
+			if configured[i].TLSCertificate != "" {
+				_, err := os.Stat(filepath.Join(s.importedCertificateDir(), configured[i].TLSCertificate, "fullchain.pem"))
+				configured[i].TLS = err == nil
+				continue
+			}
 			_, err := os.Stat(filepath.Join(s.certificateDir(), "live", configured[i].Domain, "fullchain.pem"))
 			configured[i].TLS = err == nil
 		}
@@ -204,10 +219,25 @@ func (s *Service) routesWithAvailableCertificates(routes []Route) []Route {
 	return configured
 }
 
+func (s *Service) validateImportedCertificates(routes []Route) error {
+	for _, route := range routes {
+		if route.TLSCertificate == "" {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(s.importedCertificateDir(), route.TLSCertificate, "fullchain.pem")); err != nil {
+			return fmt.Errorf("imported TLS certificate %q is unavailable: %w", route.TLSCertificate, err)
+		}
+		if _, err := os.Stat(filepath.Join(s.importedCertificateDir(), route.TLSCertificate, "privkey.pem")); err != nil {
+			return fmt.Errorf("imported TLS private key for %q is unavailable: %w", route.TLSCertificate, err)
+		}
+	}
+	return nil
+}
+
 func (s *Service) issueMissingCertificates(ctx context.Context, routes []Route) (bool, error) {
 	issued := make(map[string]bool)
 	for _, route := range routes {
-		if !route.TLS || issued[route.Domain] {
+		if !route.TLS || route.TLSCertificate != "" || issued[route.Domain] {
 			continue
 		}
 		if _, err := os.Stat(filepath.Join(s.certificateDir(), "live", route.Domain, "fullchain.pem")); err == nil {
@@ -263,13 +293,17 @@ func updateRoute(routes []Route, environment string, m manifest.Manifest, upstre
 		return nil, false, err
 	}
 	route := Route{
-		Environment: environment,
-		App:         m.Name,
-		Domain:      m.Expose.Domain,
-		PathPrefix:  m.Expose.PathPrefix,
-		Service:     upstreamService,
-		Port:        m.Service.InternalPort,
-		TLS:         m.Expose.TLS,
+		Environment:       environment,
+		App:               m.Name,
+		Domain:            m.Expose.Domain,
+		PathPrefix:        m.Expose.PathPrefix,
+		Service:           upstreamService,
+		Port:              m.Service.InternalPort,
+		TLS:               m.Expose.TLS || m.Expose.TLSCertificate != "",
+		TLSCertificate:    m.Expose.TLSCertificate,
+		Domains:           append([]string(nil), m.Expose.Domains...),
+		Websocket:         m.Expose.Proxy.Websocket,
+		ClientMaxBodySize: m.Expose.Proxy.ClientMaxBodySize,
 	}
 	for _, existing := range updated {
 		if existing.Domain == route.Domain && existing.PathPrefix == route.PathPrefix {
@@ -277,6 +311,9 @@ func updateRoute(routes []Route, environment string, m manifest.Manifest, upstre
 		}
 		if existing.Domain == route.Domain && existing.TLS != route.TLS {
 			return nil, false, fmt.Errorf("ingress domain %q cannot mix TLS and non-TLS routes", route.Domain)
+		}
+		if existing.Domain == route.Domain && existing.TLSCertificate != route.TLSCertificate {
+			return nil, false, fmt.Errorf("ingress domain %q cannot mix TLS certificate settings", route.Domain)
 		}
 	}
 	updated = append(updated, route)
@@ -290,6 +327,20 @@ func validateExposure(m manifest.Manifest) error {
 	}
 	if strings.ContainsAny(m.Expose.Domain, " /\\?#{};\"") {
 		return fmt.Errorf("expose.domain contains unsupported characters")
+	}
+	for _, domain := range m.Expose.Domains {
+		if domain == "" || strings.ContainsAny(domain, " /\\?#{};\"") {
+			return fmt.Errorf("expose.domains contains an invalid domain")
+		}
+	}
+	if m.Expose.TLS && m.Expose.TLSCertificate != "" {
+		return fmt.Errorf("expose.tls and expose.tls_certificate cannot both be set")
+	}
+	if m.Expose.TLSCertificate != "" && !certificateName.MatchString(m.Expose.TLSCertificate) {
+		return fmt.Errorf("expose.tls_certificate must contain only lowercase letters, numbers, and hyphens")
+	}
+	if m.Expose.Proxy.ClientMaxBodySize != "" && strings.ContainsAny(m.Expose.Proxy.ClientMaxBodySize, " ;\\\"") {
+		return fmt.Errorf("expose.proxy.client_max_body_size contains unsupported characters")
 	}
 	if !strings.HasPrefix(m.Expose.PathPrefix, "/") || strings.ContainsAny(m.Expose.PathPrefix, " ?#{};\"") {
 		return fmt.Errorf("expose.path_prefix must be an absolute HTTP path without query or fragment")
