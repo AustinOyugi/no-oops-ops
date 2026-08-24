@@ -30,6 +30,10 @@ func TestRenderConfigGroupsRoutesByDomainAndPrefersLongerPrefixes(t *testing.T) 
 		"set $upstream dev-api_dev-api;",
 		"proxy_pass http://$upstream:8080$request_uri;",
 		"proxy_set_header X-Forwarded-Proto $scheme;",
+		"server_name ingress.noops.internal;",
+		"location /dev/admin/ {",
+		"rewrite ^/dev/admin/?(.*)$ /$1 break;",
+		"proxy_pass http://$upstream:9090$uri$is_args$args;",
 	} {
 		if !strings.Contains(output, want) {
 			t.Errorf("rendered config does not contain %q:\n%s", want, output)

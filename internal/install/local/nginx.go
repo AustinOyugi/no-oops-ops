@@ -32,10 +32,11 @@ func (h *Host) nginxConfigPath() string {
 }
 
 type nginxStackTemplateData struct {
-	HTTPPort    string
-	HTTPSPort   string
-	NetworkName string
-	ConfigPath  string
+	HTTPPort     string
+	HTTPSPort    string
+	NetworkName  string
+	ConfigPath   string
+	InternalHost string
 }
 
 func (h *Host) WriteNginxStack(ctx context.Context) error {
@@ -60,10 +61,11 @@ func (h *Host) WriteNginxStack(ctx context.Context) error {
 	}
 
 	rendered, err := renderTemplate("nginx-stack.yml.tmpl", nginxStackTemplateContents, nginxStackTemplateData{
-		HTTPPort:    h.nginxHTTPPort,
-		HTTPSPort:   h.nginxHTTPSPort,
-		NetworkName: h.networkName,
-		ConfigPath:  h.nginxConfigDir(),
+		HTTPPort:     h.nginxHTTPPort,
+		HTTPSPort:    h.nginxHTTPSPort,
+		NetworkName:  h.networkName,
+		ConfigPath:   h.nginxConfigDir(),
+		InternalHost: internalIngressHost,
 	})
 	if err != nil {
 		return install.PrerequisiteError{Check: install.StepWriteNginxStack, Err: fmt.Errorf("render nginx stack: %w", err)}
@@ -74,6 +76,8 @@ func (h *Host) WriteNginxStack(ctx context.Context) error {
 	}
 	return nil
 }
+
+const internalIngressHost = "ingress.noops.internal"
 
 const defaultNginxConfig = `server {
   listen 80 default_server;

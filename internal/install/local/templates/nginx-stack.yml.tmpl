@@ -9,7 +9,9 @@ services:
     volumes:
       - "{{ .ConfigPath }}:/etc/nginx/conf.d:ro"
     networks:
-      - "{{ .NetworkName }}"
+      "{{ .NetworkName }}":
+        aliases:
+          - "{{ .InternalHost }}"
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/__noops/health || exit 1"]
       interval: 10s

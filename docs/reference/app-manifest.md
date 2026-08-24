@@ -67,3 +67,7 @@ The defaults are: update `order: start-first`, `parallelism: 1`, `delay: 10s`, `
 After the application successfully converges, `noops deploy` writes its enabled route to the platform-managed nginx ingress. nginx forwards requests to the application's private Swarm service and `service.internal_port`; no application port is published directly. `noops remove` removes the route before stopping the stack.
 
 Routes are currently plain HTTP only. A given domain/path-prefix pair can be owned by only one deployed app. `service.external_port` and `depends_on` remain unsupported.
+
+## Internal routing
+
+Services on the shared network can call exposed applications through the nginx alias `ingress.noops.internal`, without depending on a release-specific Swarm service name. The internal URL is `http://ingress.noops.internal/<environment>/<app>/...`; nginx strips the internal prefix before proxying the request. For example, the development `lango` app is reachable internally as `http://ingress.noops.internal/dev/lango/health` and receives `/health`.

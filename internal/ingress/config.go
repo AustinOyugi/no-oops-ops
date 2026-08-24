@@ -12,12 +12,18 @@ import (
 var routesConfigTemplate string
 
 type configTemplateData struct {
-	Domains []domainRoutes
+	Domains        []domainRoutes
+	InternalRoutes []internalRoute
 }
 
 type domainRoutes struct {
 	Domain string
 	Routes []Route
+}
+
+type internalRoute struct {
+	Route
+	Path string
 }
 
 func RenderConfig(routes []Route) ([]byte, error) {
@@ -35,7 +41,10 @@ func RenderConfig(routes []Route) ([]byte, error) {
 	}
 	sort.Strings(domains)
 
-	data := configTemplateData{Domains: make([]domainRoutes, 0, len(domains))}
+	data := configTemplateData{
+		Domains:        make([]domainRoutes, 0, len(domains)),
+		InternalRoutes: make([]internalRoute, 0, len(routes)),
+	}
 	for _, domain := range domains {
 		routesForDomain := byDomain[domain]
 		sort.Slice(routesForDomain, func(i, j int) bool {
@@ -43,6 +52,13 @@ func RenderConfig(routes []Route) ([]byte, error) {
 		})
 		data.Domains = append(data.Domains, domainRoutes{Domain: domain, Routes: routesForDomain})
 	}
+	for _, route := range routes {
+		data.InternalRoutes = append(data.InternalRoutes, internalRoute{
+			Route: route,
+			Path:  "/" + route.Environment + "/" + route.App,
+		})
+	}
+	sort.Slice(data.InternalRoutes, func(i, j int) bool { return data.InternalRoutes[i].Path < data.InternalRoutes[j].Path })
 
 	tpl, err := template.New("routes.conf.tmpl").Parse(routesConfigTemplate)
 	if err != nil {
