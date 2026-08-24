@@ -62,3 +62,22 @@ func TestRenderFilesSeparatesDomainsAndInternalServices(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderConfigRendersTLSVirtualHost(t *testing.T) {
+	rendered, err := RenderConfig([]Route{{Environment: "prod", App: "site", Domain: "example.test", PathPrefix: "/", Service: "prod-site_prod-site", Port: 8080, TLS: true}})
+	if err != nil {
+		t.Fatalf("render config: %v", err)
+	}
+	output := string(rendered)
+	for _, want := range []string{
+		"location ^~ /.well-known/acme-challenge/",
+		"listen 443 ssl;",
+		"ssl_certificate /etc/letsencrypt/live/example.test/fullchain.pem;",
+		"ssl_certificate_key /etc/letsencrypt/live/example.test/privkey.pem;",
+		"location / { return 308 https://$host$request_uri; }",
+	} {
+		if !strings.Contains(output, want) {
+			t.Errorf("rendered TLS config does not contain %q:\n%s", want, output)
+		}
+	}
+}

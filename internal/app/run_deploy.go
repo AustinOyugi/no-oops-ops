@@ -35,6 +35,9 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 		if err := a.config.RequireACMEEmail(bufio.NewReader(os.Stdin), os.Stderr); err != nil {
 			return err
 		}
+		if deployer, ok := a.deployer.(interface{ SetACMEEmail(string) }); ok {
+			deployer.SetACMEEmail(a.config.ACMEEmail)
+		}
 	}
 
 	result, err := a.deployer.Run(ctx, environment, manifestPath, optionalReleaseVersion)

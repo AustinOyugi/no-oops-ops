@@ -28,6 +28,7 @@ type Route struct {
 	PathPrefix  string `json:"path_prefix"`
 	Service     string `json:"service"`
 	Port        int    `json:"port"`
+	TLS         bool   `json:"tls"`
 }
 
 type Service struct {
@@ -38,6 +39,13 @@ type Service struct {
 
 func NewService(logger *slog.Logger, cfg config.Config) *Service {
 	return &Service{logger: logger, config: cfg, runner: command.NewRunner(logger)}
+}
+
+// SetACMEEmail updates the email used by certificates issued during this
+// process. The deploy command may obtain it interactively after services have
+// already been constructed.
+func (s *Service) SetACMEEmail(email string) {
+	s.config.ACMEEmail = email
 }
 
 func (s *Service) Reconcile(ctx context.Context, environment string, m manifest.Manifest, upstreamService string) error {
@@ -53,10 +61,27 @@ func (s *Service) Reconcile(ctx context.Context, environment string, m manifest.
 	if !changed {
 		return s.reload(ctx)
 	}
+	// Write and load the HTTP configuration first. This makes the ACME
+	// challenge endpoint reachable before asking Let's Encrypt for a
+	// certificate. writeConfig only enables TLS for certificates that are
+	// already present on disk.
 	if err := s.writeConfig(updated); err != nil {
 		return err
 	}
 	if err := s.writeRoutes(updated); err != nil {
+		return err
+	}
+	if err := s.reload(ctx); err != nil {
+		return err
+	}
+	issued, err := s.issueMissingCertificates(ctx, updated)
+	if err != nil {
+		return err
+	}
+	if !issued {
+		return nil
+	}
+	if err := s.writeConfig(updated); err != nil {
 		return err
 	}
 	return s.reload(ctx)
@@ -91,6 +116,12 @@ func (s *Service) ingressDir() string { return filepath.Join(s.config.StateDir, 
 func (s *Service) routesPath() string { return filepath.Join(s.ingressDir(), "routes.json") }
 func (s *Service) configPath() string { return filepath.Join(s.ingressDir(), "conf", "routes.conf") }
 func (s *Service) configDir() string  { return filepath.Join(s.ingressDir(), "conf") }
+func (s *Service) acmeWebroot() string {
+	return filepath.Join(s.config.DataDir, "nginx", "acme-webroot")
+}
+func (s *Service) certificateDir() string {
+	return filepath.Join(s.config.DataDir, "nginx", "letsencrypt")
+}
 
 func (s *Service) loadRoutes() ([]Route, error) {
 	data, err := os.ReadFile(s.routesPath())
@@ -116,7 +147,7 @@ func (s *Service) writeRoutes(routes []Route) error {
 }
 
 func (s *Service) writeConfig(routes []Route) error {
-	files, err := RenderFiles(routes)
+	files, err := RenderFiles(s.routesWithAvailableCertificates(routes))
 	if err != nil {
 		return err
 	}
@@ -158,6 +189,50 @@ func (s *Service) writeConfig(routes []Route) error {
 	return nil
 }
 
+func (s *Service) routesWithAvailableCertificates(routes []Route) []Route {
+	configured := append([]Route(nil), routes...)
+	for i := range configured {
+		if configured[i].TLS {
+			_, err := os.Stat(filepath.Join(s.certificateDir(), "live", configured[i].Domain, "fullchain.pem"))
+			configured[i].TLS = err == nil
+		}
+	}
+	return configured
+}
+
+func (s *Service) issueMissingCertificates(ctx context.Context, routes []Route) (bool, error) {
+	issued := make(map[string]bool)
+	for _, route := range routes {
+		if !route.TLS || issued[route.Domain] {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(s.certificateDir(), "live", route.Domain, "fullchain.pem")); err == nil {
+			continue
+		} else if !os.IsNotExist(err) {
+			return false, fmt.Errorf("inspect TLS certificate for %q: %w", route.Domain, err)
+		}
+		if s.config.ACMEEmail == "" {
+			return false, fmt.Errorf("ACME email is required to issue a TLS certificate for %q", route.Domain)
+		}
+
+		s.logger.InfoContext(ctx, "issuing TLS certificate", "domain", route.Domain)
+		result, err := s.runner.Run(ctx, "docker", []string{
+			"run", "--rm",
+			"--volume", s.acmeWebroot() + ":/var/www/certbot",
+			"--volume", s.certificateDir() + ":/etc/letsencrypt",
+			"certbot/certbot:latest",
+			"certonly", "--webroot", "--webroot-path", "/var/www/certbot",
+			"--email", s.config.ACMEEmail, "--agree-tos", "--non-interactive", "--keep-until-expiring",
+			"--domains", route.Domain,
+		}, command.RunOptions{LogCommand: true})
+		if err != nil {
+			return false, fmt.Errorf("issue TLS certificate for %q: %w: %s", route.Domain, err, strings.TrimSpace(string(result.Output)))
+		}
+		issued[route.Domain] = true
+	}
+	return len(issued) > 0, nil
+}
+
 const defaultConfig = "server {\n  listen 80 default_server;\n  listen [::]:80 default_server;\n  server_name _;\n  location = /__noops/health { return 200; }\n  location / { return 404; }\n}\n"
 const internalConfig = "server {\n  listen 80;\n  listen [::]:80;\n  server_name ingress.noops.internal;\n  include /etc/nginx/conf.d/internal/*.conf;\n}\n"
 
@@ -193,10 +268,14 @@ func updateRoute(routes []Route, environment string, m manifest.Manifest, upstre
 		PathPrefix:  m.Expose.PathPrefix,
 		Service:     upstreamService,
 		Port:        m.Service.InternalPort,
+		TLS:         m.Expose.TLS,
 	}
 	for _, existing := range updated {
 		if existing.Domain == route.Domain && existing.PathPrefix == route.PathPrefix {
 			return nil, false, fmt.Errorf("ingress route %s%s is already owned by %s/%s", route.Domain, route.PathPrefix, existing.Environment, existing.App)
+		}
+		if existing.Domain == route.Domain && existing.TLS != route.TLS {
+			return nil, false, fmt.Errorf("ingress domain %q cannot mix TLS and non-TLS routes", route.Domain)
 		}
 	}
 	updated = append(updated, route)

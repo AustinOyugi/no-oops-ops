@@ -50,6 +50,7 @@ env:
 | `rollout.*` | No | See below | Swarm update, rollback, restart, and convergence settings. |
 | `expose.enabled` | No | `false` | Adds the app to the shared nginx ingress when true. |
 | `expose.domain` | When enabled | — | HTTP host name served by nginx. |
+| `expose.tls` | No | `false` | Obtains and serves a Let's Encrypt certificate for `expose.domain`; all routes sharing that domain must use the same setting. |
 | `expose.path_prefix` | No | `/` | HTTP path prefix forwarded to the app. |
 | `env.file` | Effectively yes for deploy | — | Environment YAML file, relative to the manifest. |
 | `env.secrets` | No | — | Allow-listed secret references and delivery mode. |

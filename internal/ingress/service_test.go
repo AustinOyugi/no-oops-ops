@@ -25,6 +25,17 @@ func TestUpdateRouteAddsExposedApp(t *testing.T) {
 	}
 }
 
+func TestUpdateRouteCarriesTLSSetting(t *testing.T) {
+	m := manifest.Manifest{Name: "lango", Service: manifest.Service{InternalPort: 8080}, Expose: manifest.Expose{Enabled: true, TLS: true, Domain: "lango.example.test", PathPrefix: "/"}}
+	routes, _, err := updateRoute(nil, "dev", m, "dev-lango_dev-lango")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !routes[0].TLS {
+		t.Fatal("TLS route setting was not preserved")
+	}
+}
+
 func TestUpdateRouteRejectsDuplicateDomainAndPath(t *testing.T) {
 	existing := []Route{{Environment: "dev", App: "one", Domain: "example.test", PathPrefix: "/", Service: "dev-one_dev-one", Port: 8080}}
 	m := manifest.Manifest{Name: "two", Service: manifest.Service{InternalPort: 8080}, Expose: manifest.Expose{Enabled: true, Domain: "example.test", PathPrefix: "/"}}

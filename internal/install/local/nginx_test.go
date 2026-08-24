@@ -12,6 +12,7 @@ func TestRenderNginxStack(t *testing.T) {
 		NetworkName:  "noops-net",
 		ConfigPath:   "/var/lib/noops/nginx/conf",
 		InternalHost: "ingress.noops.internal",
+		NginxService: "noops-nginx_nginx",
 	})
 	if err != nil {
 		t.Fatalf("render nginx stack: %v", err)
@@ -27,6 +28,8 @@ func TestRenderNginxStack(t *testing.T) {
 		`- "ingress.noops.internal"`,
 		"wget -q --spider http://127.0.0.1/__noops/health || exit 1",
 		"external: true",
+		"--deploy-hook 'docker service update --force noops-nginx_nginx'",
+		"/var/run/docker.sock:/var/run/docker.sock",
 	} {
 		if !strings.Contains(output, want) {
 			t.Errorf("rendered stack does not contain %q:\n%s", want, output)

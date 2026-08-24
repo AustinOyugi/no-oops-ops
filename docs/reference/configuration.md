@@ -12,6 +12,7 @@ Settings may be set as environment variables or in `$XDG_CONFIG_HOME/noops/.env.
 | `NOOPS_NGINX_NAME` | `noops-nginx` | Shared nginx ingress stack name. |
 | `NOOPS_NGINX_HTTP_PORT` | `80` | Host port published to nginx HTTP. |
 | `NOOPS_NGINX_HTTPS_PORT` | `443` | Host port published to nginx HTTPS. |
+| `NOOPS_ACME_EMAIL` | — | Email address registered with Let's Encrypt when an exposed route enables TLS. If unset, `noops deploy` prompts for and securely stores it. |
 
 The state directory contains paths such as:
 

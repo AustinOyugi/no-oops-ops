@@ -22,16 +22,23 @@ services:
       start_period: 10s
     deploy:
       replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
       restart_policy:
         condition: any
   certbot:
     image: certbot/certbot:latest
-    command: ["/bin/sh", "-c", "while :; do certbot renew --webroot --webroot-path /var/www/certbot; sleep 12h; done"]
+    command: ["/bin/sh", "-c", "apk add --no-cache docker-cli && while :; do certbot renew --webroot --webroot-path /var/www/certbot --deploy-hook 'docker service update --force {{ .NginxService }}'; sleep 12h; done"]
     volumes:
       - "{{ .ACMEWebroot }}:/var/www/certbot:rw"
       - "{{ .CertificateDir }}:/etc/letsencrypt:rw"
+      - "/var/run/docker.sock:/var/run/docker.sock"
     deploy:
       replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
       restart_policy:
         condition: any
 

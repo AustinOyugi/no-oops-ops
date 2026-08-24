@@ -41,6 +41,7 @@ type nginxStackTemplateData struct {
 	InternalHost   string
 	ACMEWebroot    string
 	CertificateDir string
+	NginxService   string
 }
 
 func (h *Host) WriteNginxStack(ctx context.Context) error {
@@ -77,6 +78,7 @@ func (h *Host) WriteNginxStack(ctx context.Context) error {
 		InternalHost:   internalIngressHost,
 		ACMEWebroot:    h.nginxACMEWebroot(),
 		CertificateDir: h.nginxCertificateDir(),
+		NginxService:   h.nginxService,
 	})
 	if err != nil {
 		return install.PrerequisiteError{Check: install.StepWriteNginxStack, Err: fmt.Errorf("render nginx stack: %w", err)}

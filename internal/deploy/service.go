@@ -37,6 +37,11 @@ func NewService(logger *slog.Logger, cfg config.Config) *Service {
 	}
 }
 
+// SetACMEEmail propagates an interactively configured ACME email to ingress.
+func (s *Service) SetACMEEmail(email string) {
+	s.ingress.SetACMEEmail(email)
+}
+
 func (s *Service) Run(ctx context.Context, environment string, path string, optionalReleaseVersion string) (Result, error) {
 	return s.run(ctx, environment, path, optionalReleaseVersion, nil)
 }

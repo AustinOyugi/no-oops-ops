@@ -50,7 +50,9 @@ func safeFileName(value string) string {
 }
 
 func renderTemplate(data configTemplateData, mode string) ([]byte, error) {
-	tpl, err := template.New("routes.conf.tmpl").Parse(routesConfigTemplate)
+	tpl, err := template.New("routes.conf.tmpl").Funcs(template.FuncMap{
+		"tlsEnabled": func(routes []Route) bool { return len(routes) > 0 && routes[0].TLS },
+	}).Parse(routesConfigTemplate)
 	if err != nil {
 		return nil, fmt.Errorf("parse nginx routes template: %w", err)
 	}
