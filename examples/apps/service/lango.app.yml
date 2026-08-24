@@ -27,13 +27,13 @@ healthcheck:
   timeout: 10s
   retries: 3
 
-# Public HTTPS ingress. Replace this with a domain whose DNS A/AAAA record
-# points at the Swarm manager before enabling it.
-# expose:
-#   enabled: true
-#   domain: lango.example.com
-#   tls: true
-#   path_prefix: /
+# Blue/green promotion deploys a candidate for later releases, waits for its
+# health check, switches this route to it, then removes the prior release.
+expose:
+  enabled: true
+  blue_green: true
+  domain: lango.example.com
+  path_prefix: /
 
 env:
   file: lango.env.yml

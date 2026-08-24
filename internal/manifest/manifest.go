@@ -77,7 +77,15 @@ type Expose struct {
 	Domain     string `yaml:"domain"`
 	PathPrefix string `yaml:"path_prefix"`
 	Enabled    bool   `yaml:"enabled"`
+	BlueGreen  *bool  `yaml:"blue_green"`
 	TLS        bool   `yaml:"tls"`
+}
+
+// BlueGreenEnabled reports whether exposed releases should use blue/green
+// promotion. It defaults to true; an explicit false opts into in-place Swarm
+// updates instead.
+func (e Expose) BlueGreenEnabled() bool {
+	return e.BlueGreen == nil || *e.BlueGreen
 }
 
 type Env struct {

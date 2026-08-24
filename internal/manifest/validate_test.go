@@ -111,3 +111,26 @@ func TestValidateRequiresSafeExposureConfiguration(t *testing.T) {
 		t.Fatal("expected path with query to be rejected")
 	}
 }
+
+func TestValidateRequiresEnabledExposureForBlueGreen(t *testing.T) {
+	m := Manifest{
+		Name:        "test",
+		Image:       Image{Repository: "repo"},
+		Service:     Service{InternalPort: 8080},
+		Healthcheck: Healthcheck{Test: []string{"CMD", "true"}},
+		Source:      Source{Context: ".", Dockerfile: "Dockerfile"},
+		Expose:      Expose{BlueGreen: boolPtr(true)},
+	}
+	if err := m.Validate(); err == nil {
+		t.Fatal("expected blue-green validation error")
+	}
+}
+
+func TestExposeBlueGreenDefaultsToEnabled(t *testing.T) {
+	if !((Expose{}).BlueGreenEnabled()) {
+		t.Fatal("blue-green should default to enabled")
+	}
+	if (Expose{BlueGreen: boolPtr(false)}).BlueGreenEnabled() {
+		t.Fatal("explicit blue_green: false should disable blue-green")
+	}
+}

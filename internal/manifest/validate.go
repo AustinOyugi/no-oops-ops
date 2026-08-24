@@ -80,6 +80,9 @@ func (m Manifest) Validate() error {
 			return fmt.Errorf("expose.path_prefix must be an absolute HTTP path without query or fragment")
 		}
 	}
+	if m.Expose.BlueGreen != nil && *m.Expose.BlueGreen && !m.Expose.Enabled {
+		return fmt.Errorf("expose.blue_green requires expose.enabled")
+	}
 
 	return nil
 }

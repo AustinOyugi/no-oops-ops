@@ -24,6 +24,7 @@ healthcheck:
 
 expose:
   enabled: true
+  blue_green: true
   domain: app.example.com
   tls: true
   path_prefix: /
@@ -55,6 +56,7 @@ env:
 | `healthcheck.start_period` | No | `60s` | Go duration. |
 | `rollout.*` | No | See below | Swarm update, rollback, restart, and convergence settings. |
 | `expose.enabled` | No | `false` | Adds the app to the shared nginx ingress when true. |
+| `expose.blue_green` | No | `true` | Promotes a healthy release-specific candidate through nginx instead of updating the active service in place; requires `expose.enabled: true`. Set it to `false` to use an in-place Swarm update. |
 | `expose.domain` | When enabled | — | HTTP host name served by nginx. |
 | `expose.tls` | No | `false` | Obtains and serves a Let's Encrypt certificate for `expose.domain`; all routes sharing that domain must use the same setting. |
 | `expose.path_prefix` | No | `/` | HTTP path prefix forwarded to the app. |
@@ -73,7 +75,7 @@ The defaults are: update `order: start-first`, `parallelism: 1`, `delay: 10s`, `
 
 After the application successfully converges, `noops deploy` writes its enabled route to the platform-managed nginx ingress. nginx forwards requests to the application's private Swarm service and `service.internal_port`; no application port is published directly. `noops remove` removes the route before stopping the stack.
 
-Set `expose.tls: true` to serve HTTPS. The domain's DNS A/AAAA record must resolve to the Swarm manager and allow inbound ports 80 and 443. On its first deployment, No Oops Ops makes the HTTP-01 challenge path available, obtains a Let's Encrypt certificate, and then enables the HTTPS virtual host with HTTP-to-HTTPS redirects. Subsequent certificate renewals reload nginx automatically. A given domain/path-prefix pair can be owned by only one deployed app, and all routes sharing a domain must agree on its TLS setting. `service.external_port` and `depends_on` remain unsupported.
+Blue/green promotion is enabled by default for exposed apps. Set `expose.blue_green: false` to use an in-place Swarm update instead. Set `expose.tls: true` to serve HTTPS. The domain's DNS A/AAAA record must resolve to the Swarm manager and allow inbound ports 80 and 443. On its first deployment, No Oops Ops makes the HTTP-01 challenge path available, obtains a Let's Encrypt certificate, and then enables the HTTPS virtual host with HTTP-to-HTTPS redirects. Subsequent certificate renewals reload nginx automatically. A given domain/path-prefix pair can be owned by only one deployed app, and all routes sharing a domain must agree on its TLS setting. `service.external_port` and `depends_on` remain unsupported.
 
 ## Internal routing
 

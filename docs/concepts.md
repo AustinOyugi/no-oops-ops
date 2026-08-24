@@ -16,7 +16,7 @@ A deployment renders a Docker Stack using a recorded release. It first runs depl
 
 Docker Swarm controls scheduling, health checks, task replacement, and automatic rollback. No Oops Ops supplies the rendered update/rollback policy and reports the result; it does not run a competing health controller.
 
-After an initial deployment, No Oops Ops uses blue/green promotion for a new release: it creates a release-specific candidate service, waits for Docker Swarm to report its existing Docker health check as converged, then changes nginx to target the candidate before removing the previous active service. If the candidate fails, only that candidate is removed. Direct service-to-service callers should use the stable nginx internal URL rather than a release-specific application service name.
+For exposed apps, No Oops Ops uses blue/green promotion by default for a new release: it creates a release-specific candidate service, waits for Docker Swarm to report its existing Docker health check as converged, then changes nginx to target the candidate before removing the previous active service. Set `expose.blue_green: false` to use an in-place Swarm update instead. If the candidate fails, only that candidate is removed. Direct service-to-service callers should use the stable nginx internal URL rather than a release-specific application service name.
 
 ## Rollback
 

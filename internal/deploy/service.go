@@ -131,7 +131,7 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 	deploymentService := serviceName(environment, m.Name)
 	deploymentSwarmService := swarmServiceName(environment, m.Name)
 	deploymentStackPath := stackPath(s.config, m.Name, environment)
-	blueGreen := activeDeployment.ReleaseTag != "" && activeDeployment.ReleaseTag != releaseTag
+	blueGreen := m.Expose.Enabled && m.Expose.BlueGreenEnabled() && activeDeployment.ReleaseTag != "" && activeDeployment.ReleaseTag != releaseTag
 	if blueGreen {
 		if !m.Expose.Enabled {
 			return Result{}, fmt.Errorf("blue-green deployment requires expose.enabled so nginx can promote the candidate service")
