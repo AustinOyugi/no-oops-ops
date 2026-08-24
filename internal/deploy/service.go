@@ -199,7 +199,11 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		deployedImage = wrapperCfg.WrapperImage
 	}
 
-	stackPath, err := writeStackForService(s.config, environment, m, releaseMetadata.RegistryImage, secretBindings, wrapperCfg, deploymentService, deploymentStackPath)
+	network := s.config.EnvironmentNetwork(environment)
+	if err := s.ensureNetwork(ctx, network); err != nil {
+		return Result{}, err
+	}
+	stackPath, err := writeStackForService(s.config, environment, m, releaseMetadata.RegistryImage, secretBindings, wrapperCfg, network, deploymentService, deploymentStackPath)
 	if err != nil {
 		return Result{}, err
 	}
@@ -256,6 +260,11 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		return Result{}, err
 	}
 
+	if m.Expose.Enabled {
+		if err := s.ingress.EnsureNetwork(ctx, network); err != nil {
+			return Result{}, fmt.Errorf("connect ingress to environment network: %w", err)
+		}
+	}
 	if err := s.ingress.Reconcile(ctx, environment, m, deploymentSwarmService); err != nil {
 		return Result{}, fmt.Errorf("reconcile ingress route: %w", err)
 	}

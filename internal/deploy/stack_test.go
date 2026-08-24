@@ -48,7 +48,7 @@ secrets: {existing-secret: {external: true}}
 	if err != nil {
 		t.Fatal(err)
 	}
-	rendered, err := renderComposeStack(m, "secure.registry/api@sha256:abc", []SecretBinding{{EnvKey: "DB_PASSWORD", SwarmName: "noops_dev_DB_PASSWORD_v1"}}, WrapperConfig{}, "dev-api", "/state/.env")
+	rendered, err := renderComposeStack(m, "secure.registry/api@sha256:abc", []SecretBinding{{EnvKey: "DB_PASSWORD", SwarmName: "noops_dev_DB_PASSWORD_v1"}}, WrapperConfig{}, "noops-dev", "dev-api", "/state/.env")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,6 +57,7 @@ secrets: {existing-secret: {external: true}}
 		"entrypoint: ./entrypoint.sh", "command: [serve]", "owner: platform", "x-future-compose-field: retained",
 		"constraints: [node.role == worker]", "memory: 256M", "condition: any", "parallelism: 2",
 		"image: secure.registry/api@sha256:abc", "source: noops_dev_DB_PASSWORD_v1", "external: true",
+		"- noops-dev",
 		filepath.Join(filepath.Dir(path), ".env"), filepath.Join(filepath.Dir(path), "data") + ":/data", filepath.Join(filepath.Dir(path), "config.yml"),
 	} {
 		if !strings.Contains(output, want) {

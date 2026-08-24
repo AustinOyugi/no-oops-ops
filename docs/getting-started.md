@@ -46,6 +46,7 @@ deployment workspace; it creates the Git-ignored `.noops/` runtime store.
 ```bash
 noops init /srv/cranium/noops
 cd /srv/cranium/noops
+# Edit apps.yml with the workspace platform settings and app aliases.
 noops install
 noops doctor
 ```

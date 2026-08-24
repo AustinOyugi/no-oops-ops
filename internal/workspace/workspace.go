@@ -13,6 +13,26 @@ const (
 	ConfigName = "config.yml"
 )
 
+const initialAppsCatalog = `version: 1
+
+settings:
+  platform:
+    network:
+      name: noops-platform
+    registry:
+      name: noops-registry
+      port: 5000
+    ingress:
+      name: noops-nginx
+      http_port: 80
+      https_port: 443
+    networks:
+      default: "noops-{environment}"
+      environments: {}
+
+apps: {}
+`
+
 // Paths identifies the only runtime locations No Oops may write to.
 type Paths struct {
 	Root     string
@@ -41,6 +61,14 @@ func Initialize(root string) (Paths, error) {
 		}
 	} else if err != nil {
 		return Paths{}, fmt.Errorf("inspect workspace config %q: %w", configPath, err)
+	}
+	appsPath := filepath.Join(paths.Root, "apps.yml")
+	if _, err := os.Stat(appsPath); errors.Is(err, os.ErrNotExist) {
+		if err := os.WriteFile(appsPath, []byte(initialAppsCatalog), 0o600); err != nil {
+			return Paths{}, fmt.Errorf("write app catalog %q: %w", appsPath, err)
+		}
+	} else if err != nil {
+		return Paths{}, fmt.Errorf("inspect app catalog %q: %w", appsPath, err)
 	}
 	return paths, nil
 }

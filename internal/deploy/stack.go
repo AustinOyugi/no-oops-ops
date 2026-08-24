@@ -135,10 +135,10 @@ func writeEnvMap(cfg config.Config, appName string, environment string, values m
 }
 
 func writeStack(cfg config.Config, environment string, m manifest.Manifest, image string, secrets []SecretBinding, wrapperCfg WrapperConfig) (string, error) {
-	return writeStackForService(cfg, environment, m, image, secrets, wrapperCfg, serviceName(environment, m.Name), stackPath(cfg, m.Name, environment))
+	return writeStackForService(cfg, environment, m, image, secrets, wrapperCfg, cfg.EnvironmentNetwork(environment), serviceName(environment, m.Name), stackPath(cfg, m.Name, environment))
 }
 
-func writeStackForService(cfg config.Config, environment string, m manifest.Manifest, image string, secrets []SecretBinding, wrapperCfg WrapperConfig, service, path string) (string, error) {
+func writeStackForService(cfg config.Config, environment string, m manifest.Manifest, image string, secrets []SecretBinding, wrapperCfg WrapperConfig, network, service, path string) (string, error) {
 	dir := appDir(cfg, m.Name, environment)
 	if err := os.MkdirAll(dir, appDirMode); err != nil {
 		return "", fmt.Errorf("create app dir %q: %w", dir, err)
@@ -147,7 +147,7 @@ func writeStackForService(cfg config.Config, environment string, m manifest.Mani
 	// Compose manifests are the application contract. Patch the selected raw
 	// Compose document instead of recreating it from a limited Go schema.
 	if m.Compose != nil {
-		rendered, err := renderComposeStack(m, image, secrets, wrapperCfg, service, envPath(cfg, m.Name, environment))
+		rendered, err := renderComposeStack(m, image, secrets, wrapperCfg, network, service, envPath(cfg, m.Name, environment))
 		if err != nil {
 			return "", err
 		}
@@ -165,7 +165,7 @@ func writeStackForService(cfg config.Config, environment string, m manifest.Mani
 	rendered, err := renderStackTemplate(stackTemplateData{
 		ServiceName:             service,
 		Image:                   stackImage,
-		Network:                 m.Service.Network,
+		Network:                 network,
 		Replicas:                m.Service.Replicas,
 		HealthcheckTest:         m.Healthcheck.Test,
 		HealthcheckInterval:     m.Healthcheck.Interval,
@@ -212,7 +212,7 @@ func writeStackForService(cfg config.Config, environment string, m manifest.Mani
 // renderComposeStack changes only No Oops-owned deployment details. Every
 // other Compose value is retained as YAML, including fields unknown to this
 // version of No Oops Ops.
-func renderComposeStack(m manifest.Manifest, image string, bindings []SecretBinding, wrapper WrapperConfig, serviceName, generatedEnv string) ([]byte, error) {
+func renderComposeStack(m manifest.Manifest, image string, bindings []SecretBinding, wrapper WrapperConfig, network, serviceName, generatedEnv string) ([]byte, error) {
 	raw, err := yaml.Marshal(m.Compose)
 	if err != nil {
 		return nil, fmt.Errorf("copy Compose manifest: %w", err)
@@ -230,6 +230,7 @@ func renderComposeStack(m manifest.Manifest, image string, bindings []SecretBind
 	serviceKey.Value = serviceName
 	removeNoOpsMetadata(root)
 	setMapping(selected, "image", scalar(image))
+	setEnvironmentNetwork(root, selected, network)
 	normalizeServicePaths(selected, filepath.Dir(m.Path))
 	appendEnvFile(selected, generatedEnv)
 	if wrapper.UseWrapper {
@@ -239,6 +240,29 @@ func renderComposeStack(m manifest.Manifest, image string, bindings []SecretBind
 	appendTopLevelSecrets(root, bindings)
 	normalizeTopLevelConfigPaths(root, filepath.Dir(m.Path))
 	return yaml.Marshal(&doc)
+}
+
+func setEnvironmentNetwork(root, service *yaml.Node, network string) {
+	setMapping(service, "networks", &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq", Content: []*yaml.Node{scalar(network)}})
+	networks := mappingValue(root, "networks")
+	if networks == nil {
+		networks = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+		setMapping(root, "networks", networks)
+	}
+	if networks.Kind != yaml.MappingNode {
+		return
+	}
+	networks.Content = []*yaml.Node{
+		scalar(network),
+		{
+			Kind: yaml.MappingNode,
+			Tag:  "!!map",
+			Content: []*yaml.Node{
+				scalar("external"),
+				{Kind: yaml.ScalarNode, Tag: "!!bool", Value: "true"},
+			},
+		},
+	}
 }
 
 func removeNoOpsMetadata(node *yaml.Node) {

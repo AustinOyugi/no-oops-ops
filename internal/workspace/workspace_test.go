@@ -12,7 +12,7 @@ func TestInitializeCreatesOnlyOwnedStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("initialize workspace: %v", err)
 	}
-	for _, path := range []string{paths.StateDir, paths.DataDir, filepath.Join(paths.Store, ConfigName)} {
+	for _, path := range []string{paths.StateDir, paths.DataDir, filepath.Join(paths.Store, ConfigName), filepath.Join(root, "apps.yml")} {
 		if _, err := os.Stat(path); err != nil {
 			t.Errorf("expected %q: %v", path, err)
 		}

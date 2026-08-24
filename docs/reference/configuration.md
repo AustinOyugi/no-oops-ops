@@ -16,6 +16,40 @@ workspace/
 
 Commit `apps.yml` and `apps/`; add `.noops/` to `.gitignore`.
 
+`init` writes an initial `apps.yml` when none exists. It is the source of
+truth for platform settings and app aliases:
+
+```yaml
+version: 1
+
+settings:
+  platform:
+    network:
+      name: cranium-platform
+    registry:
+      name: cranium-registry
+      port: 5000
+    ingress:
+      name: cranium-ingress
+      http_port: 80
+      https_port: 443
+    networks:
+      default: "cranium-{environment}"
+      environments:
+        prod: cranium-prod
+        staging: cranium-staging
+
+apps:
+  nyota:
+    manifest: ./apps/nyota/app.yml
+```
+
+`platform.network.name` is used only by No Oops platform services. Application
+deployments use `platform.networks`: an explicit environment mapping wins, and
+otherwise `{environment}` in `default` is replaced by the selected environment.
+No Oops creates that overlay network on demand. The managed ingress joins an
+environment network only when it serves an exposed app in that environment.
+
 The workspace state directory contains paths such as:
 
 ```text

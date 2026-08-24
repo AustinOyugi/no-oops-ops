@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
+	"github.com/AustinOyugi/no-oops-ops/internal/catalog"
 	"github.com/AustinOyugi/no-oops-ops/internal/workspace"
 	"gopkg.in/yaml.v3"
 )
@@ -17,7 +19,9 @@ type Config struct {
 	DataDir        string
 	InstallVersion string
 
-	NetworkName string
+	NetworkName               string
+	EnvironmentNetworkDefault string
+	EnvironmentNetworks       map[string]string
 
 	RegistryName string
 	RegistryPort string
@@ -31,7 +35,7 @@ type Config struct {
 
 const defaultAppName = "noops"
 
-const defaultNetworkName = "noops-net"
+const defaultNetworkName = "noops-platform"
 
 const defaultRegistryName = "noops-registry"
 const defaultRegistryPort = "5000"
@@ -56,21 +60,56 @@ func Load(root string) (Config, error) {
 	if err := yaml.Unmarshal(data, &file); err != nil {
 		return Config{}, fmt.Errorf("decode workspace config %q: %w", configPath, err)
 	}
+	apps, err := catalog.Load(paths.Root)
+	if err != nil {
+		return Config{}, err
+	}
+	platform := apps.Settings.Platform
+	networkName := defaultString(platform.Network.Name, defaultNetworkName)
+	registryName := defaultString(platform.Registry.Name, defaultRegistryName)
+	registryPort := defaultInt(platform.Registry.Port, defaultRegistryPort)
+	ingressName := defaultString(platform.Ingress.Name, defaultNginxName)
+	httpPort := defaultInt(platform.Ingress.HTTPPort, defaultNginxHTTPPort)
+	httpsPort := defaultInt(platform.Ingress.HTTPSPort, defaultNginxHTTPSPort)
+	environmentNetworkDefault := defaultString(platform.Networks.Default, "noops-{environment}")
 	return Config{
-		AppName:        defaultAppName,
-		Workspace:      paths.Root,
-		StateDir:       paths.StateDir,
-		DataDir:        paths.DataDir,
-		InstallVersion: Version,
-		NetworkName:    defaultNetworkName,
-		RegistryName:   defaultRegistryName,
-		RegistryPort:   defaultRegistryPort,
-		NginxName:      defaultNginxName,
-		NginxHTTPPort:  defaultNginxHTTPPort,
-		NginxHTTPSPort: defaultNginxHTTPSPort,
-		ACMEEmail:      file.ACMEEmail,
-		ConfigPath:     configPath,
+		AppName:                   defaultAppName,
+		Workspace:                 paths.Root,
+		StateDir:                  paths.StateDir,
+		DataDir:                   paths.DataDir,
+		InstallVersion:            Version,
+		NetworkName:               networkName,
+		EnvironmentNetworkDefault: environmentNetworkDefault,
+		EnvironmentNetworks:       platform.Networks.Environments,
+		RegistryName:              registryName,
+		RegistryPort:              registryPort,
+		NginxName:                 ingressName,
+		NginxHTTPPort:             httpPort,
+		NginxHTTPSPort:            httpsPort,
+		ACMEEmail:                 file.ACMEEmail,
+		ConfigPath:                configPath,
 	}, nil
+}
+
+func (c Config) EnvironmentNetwork(environment string) string {
+	if name := c.EnvironmentNetworks[environment]; name != "" {
+		return name
+	}
+	return strings.ReplaceAll(c.EnvironmentNetworkDefault, "{environment}", environment)
+}
+
+func defaultString(value, fallback string) string {
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func defaultInt(value int, fallback string) string {
+	if value == 0 {
+		return fallback
+	}
+	return strconv.Itoa(value)
 }
 
 type workspaceConfig struct {

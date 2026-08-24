@@ -10,22 +10,63 @@ import (
 )
 
 type File struct {
-	Apps map[string]App `yaml:"apps"`
+	Settings Settings       `yaml:"settings"`
+	Apps     map[string]App `yaml:"apps"`
 }
 
 type App struct {
 	Manifest string `yaml:"manifest"`
 }
 
-func Resolve(workspace, name string) (string, error) {
+type Settings struct {
+	Platform Platform `yaml:"platform"`
+}
+
+type Platform struct {
+	Network  Network         `yaml:"network"`
+	Registry Registry        `yaml:"registry"`
+	Ingress  Ingress         `yaml:"ingress"`
+	Networks EnvironmentNets `yaml:"networks"`
+}
+
+type Network struct {
+	Name string `yaml:"name"`
+}
+
+type Registry struct {
+	Name string `yaml:"name"`
+	Port int    `yaml:"port"`
+}
+
+type Ingress struct {
+	Name      string `yaml:"name"`
+	HTTPPort  int    `yaml:"http_port"`
+	HTTPSPort int    `yaml:"https_port"`
+}
+
+type EnvironmentNets struct {
+	Default      string            `yaml:"default"`
+	Environments map[string]string `yaml:"environments"`
+}
+
+func Load(workspace string) (File, error) {
 	path := filepath.Join(workspace, "apps.yml")
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return "", fmt.Errorf("read app catalog %q: %w", path, err)
+		return File{}, fmt.Errorf("read app catalog %q: %w", path, err)
 	}
 	var file File
 	if err := yaml.Unmarshal(data, &file); err != nil {
-		return "", fmt.Errorf("decode app catalog %q: %w", path, err)
+		return File{}, fmt.Errorf("decode app catalog %q: %w", path, err)
+	}
+	return file, nil
+}
+
+func Resolve(workspace, name string) (string, error) {
+	path := filepath.Join(workspace, "apps.yml")
+	file, err := Load(workspace)
+	if err != nil {
+		return "", err
 	}
 	app, ok := file.Apps[name]
 	if !ok {

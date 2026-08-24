@@ -52,6 +52,29 @@ func (s *Service) SetACMEEmail(email string) {
 	s.config.ACMEEmail = email
 }
 
+// EnsureNetwork connects the managed ingress service to an application
+// environment network. The connection is retained in workspace state so later
+// applications in the same environment do not update nginx again.
+func (s *Service) EnsureNetwork(ctx context.Context, network string) error {
+	networks, err := s.loadNetworks()
+	if err != nil {
+		return err
+	}
+	if networks[network] {
+		return nil
+	}
+	service := s.config.NginxName + "_nginx"
+	if _, err := s.runner.Run(ctx, "docker", []string{"service", "update", "--network-add", network, service}, command.RunOptions{LogCommand: true}); err != nil {
+		return fmt.Errorf("attach ingress service %q to network %q: %w", service, network, err)
+	}
+	networks[network] = true
+	data, err := json.MarshalIndent(networks, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode ingress networks: %w", err)
+	}
+	return atomicWrite(s.networksPath(), append(data, '\n'))
+}
+
 func (s *Service) Reconcile(ctx context.Context, environment string, m manifest.Manifest, upstreamService string) error {
 	routes, err := s.loadRoutes()
 	if err != nil {
@@ -119,12 +142,28 @@ func (s *Service) Remove(ctx context.Context, environment, app string) error {
 	return s.reload(ctx)
 }
 
-func (s *Service) ingressDir() string { return filepath.Join(s.config.StateDir, "nginx") }
-func (s *Service) routesPath() string { return filepath.Join(s.ingressDir(), "routes.json") }
-func (s *Service) configPath() string { return filepath.Join(s.ingressDir(), "conf", "routes.conf") }
-func (s *Service) configDir() string  { return filepath.Join(s.ingressDir(), "conf") }
+func (s *Service) ingressDir() string   { return filepath.Join(s.config.StateDir, "nginx") }
+func (s *Service) routesPath() string   { return filepath.Join(s.ingressDir(), "routes.json") }
+func (s *Service) networksPath() string { return filepath.Join(s.ingressDir(), "networks.json") }
+func (s *Service) configPath() string   { return filepath.Join(s.ingressDir(), "conf", "routes.conf") }
+func (s *Service) configDir() string    { return filepath.Join(s.ingressDir(), "conf") }
 func (s *Service) acmeWebroot() string {
 	return filepath.Join(s.config.DataDir, "nginx", "acme-webroot")
+}
+
+func (s *Service) loadNetworks() (map[string]bool, error) {
+	data, err := os.ReadFile(s.networksPath())
+	if os.IsNotExist(err) {
+		return map[string]bool{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read ingress networks %q: %w", s.networksPath(), err)
+	}
+	var networks map[string]bool
+	if err := json.Unmarshal(data, &networks); err != nil {
+		return nil, fmt.Errorf("decode ingress networks %q: %w", s.networksPath(), err)
+	}
+	return networks, nil
 }
 func (s *Service) certificateDir() string {
 	return filepath.Join(s.config.DataDir, "nginx", "letsencrypt")
