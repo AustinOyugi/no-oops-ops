@@ -2,6 +2,7 @@
   listen 80 default_server;
   listen [::]:80 default_server;
   server_name _;
+  server_tokens off;
   location = /__noops/health { return 200; }
   location / { return 404; }
 }
@@ -14,6 +15,7 @@
   listen 80;
   listen [::]:80;
   server_name ingress.noops.internal;
+  server_tokens off;
   include /etc/nginx/conf.d/internal/*.conf;
 }
 {{ end }}{{ end }}
@@ -22,6 +24,7 @@
   listen 80 default_server;
   listen [::]:80 default_server;
   server_name _;
+  server_tokens off;
   location = /__noops/health { add_header Content-Type text/plain; return 200 'ok\\n'; }
   location / { return 404; }
 }
@@ -30,6 +33,7 @@
   listen 80;
   listen [::]:80;
   server_name ingress.noops.internal;
+  server_tokens off;
 {{ template "internal" . }}
 }
 {{ end }}{{ end }}
@@ -38,6 +42,7 @@
   listen 80;
   listen [::]:80;
   server_name {{ .Domain }}{{ range .Routes }}{{ range .Domains }} {{ . }}{{ end }}{{ end }};
+  server_tokens off;
   location ^~ /.well-known/acme-challenge/ {
     root /var/www/certbot;
   }
@@ -48,6 +53,7 @@ server {
   listen 443 ssl;
   listen [::]:443 ssl;
   server_name {{ .Domain }};
+  server_tokens off;
 {{ if (tlsCertificate .Routes) }}
   ssl_certificate /etc/noops/certificates/{{ tlsCertificate .Routes }}/fullchain.pem;
   ssl_certificate_key /etc/noops/certificates/{{ tlsCertificate .Routes }}/privkey.pem;

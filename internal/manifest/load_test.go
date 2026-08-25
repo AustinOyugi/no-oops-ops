@@ -108,13 +108,17 @@ func TestLoadRejectsLegacyManifest(t *testing.T) {
 }
 
 func TestLoadComposeShapedExamples(t *testing.T) {
-	for _, path := range []string{
-		"../../examples/apps/postgres/postgres.app.yml",
-		"../../examples/apps/keycloak/keycloak.app.yml",
-		"../../examples/apps/service/lango.app.yml",
+	for _, example := range []struct {
+		path    string
+		service string
+	}{
+		{"../../examples/paas/apps/postgres/postgres.app.yml", "postgres"},
+		{"../../examples/paas/apps/postgres/postgres.app.yml", "pgbouncer"},
+		{"../../examples/paas/apps/keycloak/keycloak.app.yml", "keycloak"},
+		{"../../examples/paas/apps/service/lango.app.yml", "lango"},
 	} {
-		if _, err := Load(path); err != nil {
-			t.Errorf("Load(%q): %v", path, err)
+		if _, err := LoadService(example.path, example.service); err != nil {
+			t.Errorf("LoadService(%q, %q): %v", example.path, example.service, err)
 		}
 	}
 }

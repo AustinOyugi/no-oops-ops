@@ -69,6 +69,9 @@ func TestRenderConfigRendersTLSVirtualHost(t *testing.T) {
 		t.Fatalf("render config: %v", err)
 	}
 	output := string(rendered)
+	if got, want := strings.Count(output, "server_tokens off;"), strings.Count(output, "server {"); got != want {
+		t.Errorf("server_tokens directives = %d, want one for each of %d virtual hosts:\n%s", got, want, output)
+	}
 	for _, want := range []string{
 		"location ^~ /.well-known/acme-challenge/",
 		"listen 443 ssl;",
@@ -100,6 +103,9 @@ func TestRenderConfigRendersImportedCertificateAndProxySettings(t *testing.T) {
 		t.Fatalf("render config: %v", err)
 	}
 	output := string(rendered)
+	if got, want := strings.Count(output, "server_tokens off;"), strings.Count(output, "server {"); got != want {
+		t.Errorf("server_tokens directives = %d, want one for each of %d virtual hosts:\n%s", got, want, output)
+	}
 	for _, want := range []string{
 		"server_name chat.vybes.africa support.vybes.africa;",
 		"ssl_certificate /etc/noops/certificates/vybes-cloudflare-origin/fullchain.pem;",
@@ -124,6 +130,9 @@ func TestRenderStaticIngressTemplates(t *testing.T) {
 	if !strings.Contains(string(defaultConfig), "listen 80 default_server;") {
 		t.Errorf("default config was not rendered:\n%s", defaultConfig)
 	}
+	if !strings.Contains(string(defaultConfig), "server_tokens off;") {
+		t.Errorf("default config exposes the nginx version:\n%s", defaultConfig)
+	}
 
 	internalConfig, err := renderTemplate(configTemplateData{HasInternal: true}, "internal-server")
 	if err != nil {
@@ -131,5 +140,8 @@ func TestRenderStaticIngressTemplates(t *testing.T) {
 	}
 	if !strings.Contains(string(internalConfig), "include /etc/nginx/conf.d/internal/*.conf;") {
 		t.Errorf("internal config was not rendered:\n%s", internalConfig)
+	}
+	if !strings.Contains(string(internalConfig), "server_tokens off;") {
+		t.Errorf("internal config exposes the nginx version:\n%s", internalConfig)
 	}
 }
