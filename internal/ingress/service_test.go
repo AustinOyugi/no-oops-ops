@@ -1,11 +1,25 @@
 package ingress
 
 import (
+	"context"
+	"log/slog"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
+	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 )
+
+type recordingRunner struct {
+	calls [][]string
+}
+
+func (r *recordingRunner) Run(_ context.Context, name string, args []string, _ command.RunOptions) (command.Result, error) {
+	r.calls = append(r.calls, append([]string{name}, args...))
+	return command.Result{}, nil
+}
 
 func TestUpdateRouteAddsExposedApp(t *testing.T) {
 	m := manifest.Manifest{
@@ -52,5 +66,26 @@ func TestUpdateRouteRemovesDisabledExposure(t *testing.T) {
 	}
 	if !changed || len(routes) != 0 {
 		t.Fatalf("changed=%v routes=%v", changed, routes)
+	}
+}
+
+func TestReconcileSkipsReloadForUnexposedAppWithoutRoute(t *testing.T) {
+	temp := t.TempDir()
+	runner := &recordingRunner{}
+	service := &Service{
+		logger: slog.Default(),
+		config: config.Config{
+			StateDir:  filepath.Join(temp, "state"),
+			DataDir:   filepath.Join(temp, "data"),
+			NginxName: "noops-nginx",
+		},
+		runner: runner,
+	}
+
+	if err := service.Reconcile(context.Background(), "dev", manifest.Manifest{Name: "postgres"}, "dev-postgres_dev-postgres"); err != nil {
+		t.Fatal(err)
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("unexpected nginx command: %v", runner.calls)
 	}
 }

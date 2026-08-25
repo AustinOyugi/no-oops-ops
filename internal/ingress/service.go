@@ -38,7 +38,11 @@ type Route struct {
 type Service struct {
 	logger *slog.Logger
 	config config.Config
-	runner *command.Runner
+	runner commandRunner
+}
+
+type commandRunner interface {
+	Run(context.Context, string, []string, command.RunOptions) (command.Result, error)
 }
 
 func NewService(logger *slog.Logger, cfg config.Config) *Service {
@@ -86,7 +90,7 @@ func (s *Service) Reconcile(ctx context.Context, environment string, m manifest.
 		return err
 	}
 	if !changed {
-		return s.reload(ctx)
+		return nil
 	}
 	if err := s.validateImportedCertificates(updated); err != nil {
 		return err
@@ -131,7 +135,7 @@ func (s *Service) Remove(ctx context.Context, environment, app string) error {
 		updated = append(updated, route)
 	}
 	if len(updated) == len(routes) {
-		return s.reload(ctx)
+		return nil
 	}
 	if err := s.writeConfig(updated); err != nil {
 		return err
