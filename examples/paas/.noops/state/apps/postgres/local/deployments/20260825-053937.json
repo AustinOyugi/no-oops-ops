@@ -1,0 +1,24 @@
+{
+  "app": "postgres",
+  "created_at": "2026-08-25T05:39:37.536863Z",
+  "environment": "local",
+  "outcome": "completed",
+  "release_image": "127.0.0.1:5000/postgres:20260825-053706",
+  "release_tag": "20260825-053706",
+  "stack_name": "local-postgres",
+  "service_name": "local-postgres_local-postgres",
+  "secret_bindings": [
+    {
+      "env_key": "POSTGRES_USER",
+      "secret_name": "POSTGRES_USER_SECRET",
+      "swarm_name": "noops_local_POSTGRES_USER_SECRET_v1",
+      "version": 1
+    },
+    {
+      "env_key": "POSTGRES_PASSWORD",
+      "secret_name": "POSTGRES_PASSWORD_SECRET",
+      "swarm_name": "noops_local_POSTGRES_PASSWORD_SECRET_v1",
+      "version": 1
+    }
+  ]
+}

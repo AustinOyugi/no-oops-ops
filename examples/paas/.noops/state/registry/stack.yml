@@ -1,0 +1,20 @@
+version: "3.9"
+
+services:
+  registry:
+    image: registry:2
+    ports:
+      - "5000:5000"
+    networks:
+      - "noops-platform"
+    volumes:
+      - "/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/examples/paas/.noops/state/registry/config.yml:/etc/docker/registry/config.yml:ro"
+      - "/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/examples/paas/.noops/data/data:/var/lib/registry"
+    deploy:
+      restart_policy:
+        condition: any
+
+networks:
+  "noops-platform":
+    external: true
+

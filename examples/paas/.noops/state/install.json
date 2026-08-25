@@ -1,0 +1,31 @@
+{
+  "version": "0.0.1",
+  "installed_at": "2026-08-25T05:32:03Z",
+  "state_dir": "/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/examples/paas/.noops/state",
+  "data_dir": "/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/examples/paas/.noops/data",
+  "swarm": {
+    "initialized": true,
+    "local_node_state": "active",
+    "manager_address": "192.168.65.3"
+  },
+  "network": {
+    "name": "noops-platform"
+  },
+  "registry": {
+    "name": "noops-registry",
+    "port": "5000",
+    "config_path": "/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/examples/paas/.noops/state/registry/config.yml",
+    "stack_path": "/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/examples/paas/.noops/state/registry/stack.yml",
+    "data_path": "/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/examples/paas/.noops/data/data",
+    "service_name": "noops-registry_registry",
+    "ready": true
+  },
+  "nginx": {
+    "name": "noops-nginx",
+    "http_port": "80",
+    "https_port": "443",
+    "stack_path": "/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/examples/paas/.noops/state/nginx/stack.yml",
+    "service_name": "noops-nginx_nginx",
+    "ready": true
+  }
+}

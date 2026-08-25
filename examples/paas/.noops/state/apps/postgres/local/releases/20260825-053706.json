@@ -1,0 +1,10 @@
+{
+  "app": "postgres",
+  "build": false,
+  "create_at": "2026-08-25T05:37:09.180005Z",
+  "environment": "local",
+  "image": "postgres:20260825-053706",
+  "registry_image": "127.0.0.1:5000/postgres:20260825-053706",
+  "source_tag": "postgres:17.11",
+  "tag": "20260825-053706"
+}

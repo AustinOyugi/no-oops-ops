@@ -1,0 +1,10 @@
+{
+  "app": "pgbouncer",
+  "build": false,
+  "create_at": "2026-08-25T05:39:42.389298Z",
+  "environment": "local",
+  "image": "edoburu/pgbouncer:20260825-053937",
+  "registry_image": "127.0.0.1:5000/edoburu/pgbouncer:20260825-053937",
+  "source_tag": "edoburu/pgbouncer:v1.25.2-p0",
+  "tag": "20260825-053937"
+}

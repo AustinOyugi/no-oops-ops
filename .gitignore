@@ -45,3 +45,4 @@ go.work.sum
 /.noops/
 # Added by goreleaser init:
 dist/
+/examples/paas/.noops/data/data/docker/registry/

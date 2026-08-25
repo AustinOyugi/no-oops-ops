@@ -1,0 +1,56 @@
+version: "3.9"
+
+services:
+  nginx:
+    image: nginx:1.28-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/examples/paas/.noops/state/nginx/conf:/etc/nginx/conf.d:ro"
+      - "/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/examples/paas/.noops/data/nginx/acme-webroot:/var/www/certbot:ro"
+      - "/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/examples/paas/.noops/data/nginx/letsencrypt:/etc/letsencrypt:ro"
+      - "/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/examples/paas/.noops/data/nginx/certificates:/etc/noops/certificates:ro"
+    networks:
+      "noops-platform":
+        aliases:
+          - "ingress.noops.internal"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/__noops/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+  certbot:
+    image: certbot/certbot:latest
+    # The image entrypoint is `certbot`; override it so this is a long-running
+    # renewal service rather than arguments passed to the certbot CLI.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        apk add --no-cache docker-cli && while :; do certbot renew --webroot
+        --webroot-path /var/www/certbot --deploy-hook 'docker service update
+        --force noops-nginx_nginx'; sleep 12h; done
+    volumes:
+      - "/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/examples/paas/.noops/data/nginx/acme-webroot:/var/www/certbot:rw"
+      - "/Users/odu/Documents/alien/code-innate/personal/no-oops-ops/examples/paas/.noops/data/nginx/letsencrypt:/etc/letsencrypt:rw"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+
+networks:
+  "noops-platform":
+    external: true
+
