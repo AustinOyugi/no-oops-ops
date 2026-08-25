@@ -1,0 +1,26 @@
+version: 0.0.1
+
+settings:
+  platform:
+    network:
+      name: noops-platform
+    registry:
+      name: noops-registry
+      port: 5000
+    ingress:
+      name: noops-nginx
+      http_port: 80
+      https_port: 443
+    networks:
+      default: "noops-{environment}"
+      environments: {}
+
+apps:
+  postgres:
+    manifest: ./apps/postgres/postgres.app.yml
+  redis:
+    manifest: ./apps/redis/app.yml
+  neo4j:
+    manifest: ./apps/neo4j/app.yml
+  chatwoot:
+    manifest: ./apps/chatwoot/app.yml

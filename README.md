@@ -23,7 +23,7 @@ noops deploy prod lango --service lango
 
 `init` creates an empty, version-matched `apps.yml` catalog. Add each app's stable alias and Compose-shaped manifest
 path before releasing it; see [Configuration and generated state](docs/reference/configuration.md) for the catalog
-format and the [`lango` example](examples/apps/service/lango.app.yml) for a manifest.
+format and the [`lango` example](examples/paas/apps/service/lango.app.yml) for a manifest.
 
 If the app uses secrets, create them before deployment:
 

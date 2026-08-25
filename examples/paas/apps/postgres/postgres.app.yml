@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgres:17.11
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready", "-U$$POSTGRES_USER"]
+      start_period: 60s
+      interval: 10s
+      timeout: 10s
+      retries: 6
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    deploy:
+      replicas: 1
+      update_config:
+        order: stop-first
+        parallelism: 1
+        failure_action: rollback
+      restart_policy:
+        condition: any
+
+    x-noops:
+      service:
+        internal_port: 5432
+      env:
+        file: postgres.env.yml
+        secrets:
+          resolution: file
+          resolvable: [ POSTGRES_USER, POSTGRES_PASSWORD ]
+
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.25.2-p0
+
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+        parallelism: 1
+        failure_action: rollback
+      restart_policy:
+        condition: any
+
+    x-noops:
+      service:
+        internal_port: 5432
+      depends_on:
+        - postgres
+      env:
+        file: pgbouncer.env.yml
+        secrets:
+          resolution: env
+          resolvable: [ DB_USER, DB_PASSWORD ]
+
+volumes:
+  postgres_data:
