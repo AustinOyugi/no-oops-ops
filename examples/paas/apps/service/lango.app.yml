@@ -20,7 +20,7 @@ services:
             environments:
               dev:
                 ref: isolate-build
-                secret: rolengi
+                secret: mysecret
               staging:
                 ref: main
                 secret: github-readonly
