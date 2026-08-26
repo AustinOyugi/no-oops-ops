@@ -60,8 +60,15 @@ if [[ -n "$SNAPSHOT_REF" ]]; then
   curl --fail --location --silent --show-error -H "Authorization: Bearer $GITHUB_TOKEN" \
     --output "$TEMP_DIR/snapshot.zip" \
     "https://api.github.com/repos/${REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip"
-  command -v unzip >/dev/null || { echo "Snapshot installation requires unzip." >&2; exit 1; }
-  unzip -q "$TEMP_DIR/snapshot.zip" -d "$TEMP_DIR/artifact"
+  if command -v unzip >/dev/null; then
+    unzip -q "$TEMP_DIR/snapshot.zip" -d "$TEMP_DIR/artifact"
+  elif command -v python3 >/dev/null; then
+    python3 -c 'import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])' \
+      "$TEMP_DIR/snapshot.zip" "$TEMP_DIR/artifact"
+  else
+    echo "Snapshot installation requires unzip or python3." >&2
+    exit 1
+  fi
   ARCHIVE_PATH="$(find "$TEMP_DIR/artifact" -name "$ARCHIVE" -type f -print -quit)"
   CHECKSUM_PATH="$(find "$TEMP_DIR/artifact" -name checksums.txt -type f -print -quit)"
   [[ -n "$ARCHIVE_PATH" && -n "$CHECKSUM_PATH" ]] || { echo "Snapshot artifact is missing $ARCHIVE or checksums.txt." >&2; exit 1; }
