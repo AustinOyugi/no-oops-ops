@@ -47,9 +47,19 @@ if [[ -n "$SNAPSHOT_REF" ]]; then
     exit 1
   fi
   if [[ "$SNAPSHOT_REF" == "latest" ]]; then
-    ARTIFACT_ID="$(curl --fail --location --silent --show-error -H "Authorization: Bearer $GITHUB_TOKEN" \
-      "https://api.github.com/repos/${REPOSITORY}/actions/artifacts?per_page=1" \
-      | sed -n 's/^[[:space:]]*"id": \([0-9][0-9]*\),$/\1/p' | head -n 1)"
+    command -v python3 >/dev/null || { echo "Snapshot installation from latest requires python3." >&2; exit 1; }
+    curl --fail --location --silent --show-error -H "Authorization: Bearer $GITHUB_TOKEN" \
+      --output "$TEMP_DIR/artifacts.json" \
+      "https://api.github.com/repos/${REPOSITORY}/actions/artifacts?per_page=100"
+    ARTIFACT_ID="$(python3 -c '
+import json
+import sys
+
+for artifact in json.load(open(sys.argv[1], encoding="utf-8")).get("artifacts", []):
+    if artifact["name"].startswith("noops-snapshot-") and not artifact["expired"]:
+        print(artifact["id"])
+        break
+' "$TEMP_DIR/artifacts.json")"
     if [[ -z "$ARTIFACT_ID" ]]; then
       echo "No GitHub Actions snapshot artifact is available." >&2
       exit 1
