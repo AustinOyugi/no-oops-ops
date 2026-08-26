@@ -51,8 +51,7 @@ func (a *App) runReleaseService(ctx context.Context, environment, manifestPath s
 		"pushed", result.Pushed,
 		"source_context", manifest.Source.Context,
 		"source_dockerfile", manifest.Source.Dockerfile,
-		"build_command", manifest.Source.Build.Command,
-		"prebuild_configured", len(manifest.Source.Build.Command) > 0,
+		"git_source", manifest.Build.Source.Git != nil,
 		"built", result.Built,
 		"build_executed", result.Built,
 	)

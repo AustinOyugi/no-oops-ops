@@ -6,14 +6,15 @@ import (
 )
 
 type Metadata struct {
-	App           string    `json:"app"`
-	Build         bool      `json:"build"`
-	CreateAt      time.Time `json:"create_at"`
-	Environment   string    `json:"environment"`
-	Image         string    `json:"image"`
-	RegistryImage string    `json:"registry_image"`
-	SourceTag     string    `json:"source_tag,omitempty"`
-	Tag           string    `json:"tag"`
+	App           string       `json:"app"`
+	Build         bool         `json:"build"`
+	CreateAt      time.Time    `json:"create_at"`
+	Environment   string       `json:"environment"`
+	Image         string       `json:"image"`
+	RegistryImage string       `json:"registry_image"`
+	Git           *GitMetadata `json:"git,omitempty"`
+	SourceTag     string       `json:"source_tag,omitempty"`
+	Tag           string       `json:"tag"`
 }
 
 type ActiveRelease struct {

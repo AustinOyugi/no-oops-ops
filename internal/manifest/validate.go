@@ -2,7 +2,9 @@ package manifest
 
 import (
 	"fmt"
+	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -59,6 +61,12 @@ func (m Manifest) Validate() error {
 			return fmt.Errorf("source.dockerfile is required when image.build is true")
 		}
 	}
+	if err := m.Build.Validate(m.Image.ShouldBuild()); err != nil {
+		return err
+	}
+	if len(m.Source.Build.Command) > 0 {
+		return fmt.Errorf("x-noops.source.build.command is unsupported; move build steps into the Dockerfile")
+	}
 
 	if m.Env.Secrets != nil {
 		if err := m.Env.Secrets.Validate(); err != nil {
@@ -84,6 +92,43 @@ func (m Manifest) Validate() error {
 		return err
 	}
 
+	return nil
+}
+
+func (b NoOpsBuild) Validate(imageBuild bool) error {
+	if b.Timeout != "" {
+		if _, err := time.ParseDuration(b.Timeout); err != nil {
+			return fmt.Errorf("x-noops.build.timeout must be a Go duration: %w", err)
+		}
+	}
+	if b.Resources.CPUs != "" {
+		cpus, err := strconv.ParseFloat(b.Resources.CPUs, 64)
+		if err != nil || cpus <= 0 {
+			return fmt.Errorf("x-noops.build.resources.cpus must be a positive number")
+		}
+	}
+	if b.Resources.Memory != "" && !regexp.MustCompile(`^[1-9][0-9]*[kKmMgGtT]i?[bB]?$`).MatchString(b.Resources.Memory) {
+		return fmt.Errorf("x-noops.build.resources.memory must be a positive byte value such as 2Gi")
+	}
+	if b.Source.Git == nil {
+		return nil
+	}
+	if !imageBuild {
+		return fmt.Errorf("x-noops.build.source.git requires a Compose build")
+	}
+	git := b.Source.Git
+	u, err := url.Parse(git.URL)
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
+		return fmt.Errorf("x-noops.build.source.git.url must be an HTTPS repository URL without embedded credentials")
+	}
+	if len(git.Environments) == 0 {
+		return fmt.Errorf("x-noops.build.source.git.environments is required")
+	}
+	for environment, settings := range git.Environments {
+		if strings.TrimSpace(environment) == "" || strings.TrimSpace(settings.Ref) == "" {
+			return fmt.Errorf("x-noops.build.source.git.environments entries require an environment and ref")
+		}
+	}
 	return nil
 }
 

@@ -97,6 +97,45 @@ func TestLoadSupportsCompactIngressMetadataAndWorkerWithoutHealthcheck(t *testin
 	}
 }
 
+func TestLoadBuildGitSource(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "app.yml")
+	data := []byte(`services:
+  api:
+    image: example/api
+    build: {context: ., dockerfile: Dockerfile}
+    x-noops:
+      build:
+        source:
+          git:
+            url: https://github.com/example/api.git
+            environments:
+              prod: {ref: refs/tags/v1.2.3, credential: github-readonly}
+        resources: {cpus: "1.5", memory: 2Gi}
+        timeout: 20m
+`)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Build.Source.Git == nil || m.Build.Source.Git.Environments["prod"].Ref != "refs/tags/v1.2.3" {
+		t.Fatalf("Git build source was not mapped: %#v", m.Build)
+	}
+}
+
+func TestLoadRejectsHostPrebuildCommand(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "app.yml")
+	data := []byte("services:\n  api:\n    image: example/api\n    build: {context: ., dockerfile: Dockerfile}\n    x-noops:\n      source:\n        build:\n          command: [mvn, package]\n")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "unsupported") {
+		t.Fatalf("expected host pre-build command rejection, got %v", err)
+	}
+}
+
 func TestLoadRejectsLegacyManifest(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "app.yml")
 	if err := os.WriteFile(path, []byte("name: legacy\nimage: {repository: example/app}\n"), 0o600); err != nil {

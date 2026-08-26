@@ -126,6 +126,10 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		return a.runSecret(ctx, args[1:])
 	}
 
+	if args[0] == "source" {
+		return a.runSource(ctx, args[1:])
+	}
+
 	if args[0] == "certificate" {
 		return a.runCertificate(args[1:])
 	}

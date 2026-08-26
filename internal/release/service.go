@@ -12,19 +12,22 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
+	"github.com/AustinOyugi/no-oops-ops/internal/secret"
 )
 
 type Service struct {
-	logger *slog.Logger
-	config config.Config
-	runner *command.Runner
+	logger  *slog.Logger
+	config  config.Config
+	runner  *command.Runner
+	secrets *secret.Service
 }
 
 func NewService(logger *slog.Logger, cfg config.Config) *Service {
 	return &Service{
-		logger: logger,
-		config: cfg,
-		runner: command.NewRunner(logger),
+		logger:  logger,
+		config:  cfg,
+		runner:  command.NewRunner(logger),
+		secrets: secret.NewService(logger, cfg),
 	}
 }
 
@@ -46,17 +49,69 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 	registryImage := registryImage(s.config, image)
 
 	if m.Image.ShouldBuild() {
+		unlock, err := s.acquireBuildLock(ctx)
+		if err != nil {
+			return Result{}, err
+		}
+		defer unlock()
 		baseDir := filepath.Dir(absPath)
-		contextDir := resolveSourcePath(baseDir, m.Source.Context)
-		dockerfile := resolveSourcePath(baseDir, m.Source.Dockerfile)
-
-		if err := s.runBuildCommand(ctx, contextDir, m.Source.Build.Command); err != nil {
-			return Result{}, err
+		var gitMetadata *GitMetadata
+		cleanup := func() {}
+		if m.Build.Source.Git != nil {
+			gitBase, metadata, releaseCleanup, err := s.gitBuildContext(ctx, environment, m.Build)
+			if err != nil {
+				return Result{}, err
+			}
+			baseDir, cleanup = gitBase, releaseCleanup
+			gitMetadata = &metadata
+		}
+		defer cleanup()
+		var contextDir, dockerfile string
+		if m.Build.Source.Git != nil {
+			contextDir, err = resolveGitSourcePath(baseDir, m.Source.Context)
+			if err == nil {
+				dockerfile, err = resolveGitSourcePath(baseDir, m.Source.Dockerfile)
+			}
+			if err != nil {
+				return Result{}, err
+			}
+		} else {
+			contextDir = resolveSourcePath(baseDir, m.Source.Context)
+			dockerfile = resolveSourcePath(baseDir, m.Source.Dockerfile)
 		}
 
-		if err := s.buildImage(ctx, registryImage, dockerfile, contextDir); err != nil {
+		buildCtx := ctx
+		if m.Build.Timeout != "" {
+			limit, err := time.ParseDuration(m.Build.Timeout)
+			if err != nil {
+				return Result{}, fmt.Errorf("parse build timeout: %w", err)
+			}
+			var cancel context.CancelFunc
+			buildCtx, cancel = context.WithTimeout(ctx, limit)
+			defer cancel()
+		}
+		if err := s.buildImage(buildCtx, registryImage, dockerfile, contextDir, m.Build.Resources); err != nil {
 			return Result{}, err
 		}
+		m.Source.Context = contextDir
+		m.Source.Dockerfile = dockerfile
+		if err := s.pushImage(ctx, registryImage); err != nil {
+			return Result{}, err
+		}
+		metadataHistoryPath, err := saveMetadataHistory(s.config, m.Name, Metadata{
+			App:           m.Name,
+			Build:         true,
+			CreateAt:      time.Now().UTC(),
+			Environment:   environment,
+			Image:         image,
+			RegistryImage: registryImage,
+			Git:           gitMetadata,
+			Tag:           tag,
+		})
+		if err != nil {
+			return Result{}, err
+		}
+		return Result{Environment: environment, MetadataPath: metadataHistoryPath, ManifestPath: absPath, Image: image, RegistryImage: registryImage, Built: true, Tag: tag, Pushed: true, Manifest: m}, nil
 	} else {
 		sourceReference := m.Image.SourceReference
 		if sourceReference == "" {
@@ -117,7 +172,7 @@ func (s *Service) buildPulledImage(ctx context.Context, targetImage, sourceImage
 		return fmt.Errorf("write temporary Dockerfile: %w", err)
 	}
 
-	if err := s.buildImage(ctx, targetImage, dockerfile, contextDir); err != nil {
+	if err := s.buildImage(ctx, targetImage, dockerfile, contextDir, manifest.BuildResources{}); err != nil {
 		return fmt.Errorf("build release image from %q: %w", sourceImage, err)
 	}
 
@@ -130,6 +185,18 @@ func resolveSourcePath(baseDir string, value string) string {
 	}
 
 	return filepath.Join(baseDir, value)
+}
+
+func resolveGitSourcePath(baseDir, value string) (string, error) {
+	if filepath.IsAbs(value) {
+		return "", fmt.Errorf("Git build contexts require relative build.context and build.dockerfile paths")
+	}
+	path := filepath.Clean(filepath.Join(baseDir, value))
+	rel, err := filepath.Rel(baseDir, path)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("Git build path %q escapes the checked-out repository", value)
+	}
+	return path, nil
 }
 
 func registryImage(cfg config.Config, image string) string {

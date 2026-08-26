@@ -2,8 +2,8 @@ services:
   lango:
     image: lango-service
     build:
-      context: /Users/odu/Documents/alien/code-innate/enterprise/rolengi/security/lango-service
-      dockerfile: /Users/odu/Documents/alien/code-innate/enterprise/rolengi/security/lango-service/Dockerfile
+      context: .
+      dockerfile: Dockerfile
     healthcheck:
       test: [ CMD, curl, -f, http://localhost:8080/lango/liveness ]
       start_period: 60s
@@ -13,9 +13,20 @@ services:
     deploy:
       replicas: 1
     x-noops:
-      source:
-        build:
-          command: [ mvn, package, -DskipTests ]
+      build:
+        source:
+          git:
+            url: https://github.com/example/lango.git
+            environments:
+              dev:
+                ref: isolate-build
+                credential: rolengi
+              staging:
+                ref: main
+                credential: github-readonly
+              prod:
+                ref: refs/tags/v1.0.0
+                credential: github-readonly
       service:
         internal_port: 8080
       expose:
