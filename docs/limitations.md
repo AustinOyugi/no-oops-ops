@@ -12,3 +12,5 @@
 - No Oops Ops manages a local Docker Swarm deployment platform; it is not a multi-host control plane.
 - Docker Swarm determines health and automatic update rollback. No Oops Ops reports the final rollout outcome and task
   diagnostics.
+- BuildKit dependency caches are local to the Docker builder. They can be shared between builds on that server using a
+  common cache ID, but No Oops does not currently export or synchronize them between servers.

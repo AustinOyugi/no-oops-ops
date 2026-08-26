@@ -19,6 +19,19 @@ registry is plain HTTP.
 On Docker Desktop, a host process can occupy port 5000 while the registry is healthy inside Docker's network. Use
 `noops doctor` rather than a host-level `curl` request as the registry health check.
 
+## Private Git source cannot be fetched
+
+Save a source credential in the same environment as the release. Enter only the provider token—not a URL or
+credential-store entry:
+
+```bash
+noops source credential set prod github-readonly
+```
+
+For GitHub, use a fine-grained token restricted to the repository with Contents read access. Confirm the manifest's
+`credential` key matches `github-readonly`. The source token is a versioned Swarm secret and is available only to the
+temporary Git-fetch task.
+
 ## Deploy fails before a stack is applied
 
 `deploy` runs the deploy-readiness profile. Resolve the failed remediation reported by the command: Docker must be

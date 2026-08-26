@@ -61,8 +61,9 @@ services, and rejects plainly embedded credential-like environment values. Move 
 ## Git build contexts
 
 When `x-noops.build.source.git` is present, No Oops fetches the configured environment's repository/ref in a temporary
-Git container. The Compose `build.context` and `build.dockerfile` paths are resolved from that checkout; no application
-toolchain or Git installation is required on the host.
+Swarm Git-fetch task. Private-source tokens are mounted only into that task as a Swarm secret. The Compose
+`build.context` and `build.dockerfile` paths are resolved from that checkout; no application toolchain or Git
+installation is required on the host.
 
 ```yaml
 build:
@@ -85,7 +86,7 @@ x-noops:
 
 No Oops resolves and records the resulting commit SHA with the release. A Git credential is optional for public
 repositories; when configured, create it for the same environment with `noops source credential set` and supply only
-the provider access-token value.
+the provider access-token value. The credential key is an identifier, not the token itself.
 `x-noops.source.build.command` is unsupported: build commands belong in Dockerfile stages so they cannot leak language
 runtimes onto the host. Builds are serialized per workspace to avoid competing for a single server's resources.
 

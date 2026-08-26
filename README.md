@@ -1,7 +1,8 @@
 # No Oops Ops
 
-No Oops Ops is a self-hosted CLI for repeatable Docker Swarm deployments. It creates immutable releases in an internal
-registry, deploys them with Docker Stack, records deployment history, and manages environment-scoped Swarm secrets.
+No Oops Ops is a self-hosted CLI for repeatable Docker Swarm deployments. It fetches application source from Git,
+builds images in isolated containers, creates immutable releases in an internal registry, deploys them with Docker
+Stack, records deployment history, and manages environment-scoped Swarm secrets.
 
 It is intended for small Docker-based services that need a dependable deployment workflow without operating a full
 platform.
@@ -17,6 +18,7 @@ noops init /srv/noops/example
 cd /srv/noops/example
 # Add the `lango` app alias and its manifest path to apps.yml.
 noops install
+noops source credential set prod github-readonly # only for private Git sources
 noops release prod lango --service lango
 noops deploy prod lango --service lango
 ```
@@ -52,10 +54,12 @@ install → secret set (when needed) → release → deploy → rollback or remo
 standard Compose and Swarm fields remain the application's source of truth. Lifecycle commands require
 `--service <name>` or `--all`; `--all` uses a stable dependency order and stops at the first failure.
 
-`release` creates and pushes an immutable timestamped image. `deploy` uses the latest recorded release by default, waits
-for the configured health and rollout result, and records the final Swarm outcome. `install` waits for the managed
-registry and nginx services to become ready; `status` reports their task readiness and marks partially running services
-as degraded.
+`release` creates and pushes an immutable timestamped image. For `x-noops.build.source.git`, it starts a short-lived
+Swarm Git-fetch task, mounts an environment-scoped source secret only into that task, then builds the checked-out source
+with Docker. Build toolchains such as Maven, Java, Node, or Go belong in the Dockerfile—not on the deployment host.
+`deploy` uses the latest recorded release by default, waits for the configured health and rollout result, and records
+the final Swarm outcome. `install` waits for the managed registry and nginx services to become ready; `status` reports
+their task readiness and marks partially running services as degraded.
 
 ## Development
 
@@ -68,9 +72,9 @@ make test
 
 ## Current capabilities
 
-The project currently supports a local Docker Swarm, a plain-HTTP internal registry, and a shared nginx ingress with
-manifest-driven HTTP and TLS routes. `noops cleanup --apply` removes selected release manifests and metadata, then runs
-offline registry garbage collection when needed. See [Current limitations](docs/limitations.md).
+The project currently supports a local Docker Swarm, a plain-HTTP internal registry, Git-backed container builds, and a
+shared nginx ingress with manifest-driven HTTP and TLS routes. `noops cleanup --apply` removes selected release
+manifests and metadata, then runs offline registry garbage collection when needed. See [Current limitations](docs/limitations.md).
 
 ## License
 

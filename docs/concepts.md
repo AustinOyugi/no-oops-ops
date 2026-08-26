@@ -14,6 +14,17 @@ into the internal registry. A digest image reference is also accepted as an upst
 
 Release metadata is retained per app and environment. A release does not change a running service.
 
+### Git-backed container builds
+
+A service can declare `x-noops.build.source.git` to build from a repository rather than from a checkout on the server.
+No Oops creates a temporary workspace under `.noops/data`, starts a one-shot Swarm Git-fetch task, and removes both the
+task and workspace after Docker has built the image. For a private repository, the Git token is a versioned Swarm secret
+mounted only at `/run/secrets/git-token` in that one-shot task; No Oops stores secret metadata, never its value.
+
+The Dockerfile owns the build toolchain. For example, a Java service uses a Maven build stage and can share a BuildKit
+cache mount such as `id=noops-maven-repository,target=/root/.m2,sharing=locked`. Caches are local to the Docker builder:
+they reuse dependencies between builds but do not contain application source or become part of the runtime image.
+
 ## Deployments and rollouts
 
 A deployment renders a Docker Stack using a recorded release. It first runs deploy-readiness checks, then waits for
@@ -21,7 +32,7 @@ Swarm to converge and records the outcome and the secret versions used.
 
 Docker Swarm controls scheduling, health checks, task replacement, and automatic rollback. No Oops preserves the
 service's existing Compose deployment policy, waits for the configured result, and does not run a competing health
-controller.
+controller. The default convergence timeout is two minutes and can be overridden with `rollout.convergence_timeout`.
 
 For exposed apps, No Oops Ops uses blue/green promotion by default after the first deployment: it creates a
 deployment-specific candidate service, waits for Docker Swarm to report its existing Docker health check as converged,

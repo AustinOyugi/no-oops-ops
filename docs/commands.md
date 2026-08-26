@@ -2,6 +2,8 @@
 
 ```text
 noops
+noops version
+noops --version
 noops init <workspace>
 noops [--workspace <workspace>] install
 noops [--workspace <workspace>] uninstall [--purge]
@@ -18,7 +20,9 @@ noops [--workspace <workspace>] certificate import <name> <certificate.pem> <pri
 noops [--workspace <workspace>] cleanup [--apply] [--orphaned] [--keep <count>]
 ```
 
-Running `noops` without arguments prints its name and build version.
+Running `noops` without arguments prints its name and build version. `version`, `--version`, and `-v` print the same
+version without loading a workspace. Every other command runs in the current directory's workspace unless
+`--workspace <workspace>` is supplied.
 
 ## Platform commands
 
@@ -40,8 +44,8 @@ directories.
 
 | Command                                                    | Behavior                                                                                                                                                                                                                                                                                                       |
 |------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `release <env> <app> (--service <name> \| --all)`          | Builds or snapshots selected services, pushes immutable images, and records release metadata.                                                                                                                                                                                                                  |
-| `deploy [--quick] <env> <app> (--service <name> \| --all)` | Deploys selected services using their latest recorded releases. `--quick` uses the health-check start period as its monitor window.                                                                                                                                                                            |
+| `release <env> <app> (--service <name> \| --all)`          | Builds selected services or snapshots image-only services, pushes immutable images, and records release metadata. Git-backed builds fetch into a temporary workspace and run the Dockerfile's build stages; no language runtime is installed on the host. |
+| `deploy [--quick] <env> <app> (--service <name> \| --all)` | Deploys selected services using their latest recorded releases. `--quick` uses the health-check start period as its monitor window. The normal rollout convergence timeout defaults to two minutes unless the manifest overrides it. |
 | `rollback <env> <app> (--service <name> \| --all)`         | Redeploys each selected service's previous successful deployment, including pinned secret versions.                                                                                                                                                                                                            |
 | `remove <env> <app> (--service <name> \| --all)`           | Removes selected app stacks and generated state. Named volumes and environment secrets are preserved.                                                                                                                                                                                                          |
 | `cleanup [--apply] [--orphaned] [--keep <count>]`          | Plans retention cleanup across releases, deployments, and registry images. `--orphaned` selects app environments with no actually running recorded service, overriding normal retention. Dry-run is the default; `--apply` deletes selected manifests and metadata, then runs offline registry GC when needed. |
@@ -68,6 +72,9 @@ repository's contents.
 ```bash
 printf '%s' 'github_pat_YOUR_TOKEN' | noops source credential set prod github-readonly
 ```
+
+The configured credential key is referenced by `x-noops.build.source.git.environments.<environment>.credential`.
+Public Git sources omit it.
 
 ## Certificate commands
 
