@@ -47,7 +47,9 @@ services, and rejects plainly embedded credential-like environment values. Move 
 | `services.<name>.image`                         | Yes                                   | —         | Upstream image reference. It is replaced in the generated stack with the recorded immutable release image.                                                       |
 | `services.<name>.build`                         | No                                    | —         | Standard Compose build configuration. When present, No Oops builds it before release.                                                                            |
 | `services.<name>.x-noops.service.internal_port` | Yes for ingress                       | —         | Private application port used by managed nginx ingress.                                                                                                          |
-| `services.<name>.x-noops.source.build.command`  | No                                    | —         | Command run in the build context before a Compose build.                                                                                                         |
+| `services.<name>.x-noops.build.source.git`      | No                                    | —         | Environment-scoped Git repository used as the isolated build context.                                                                                            |
+| `services.<name>.x-noops.build.resources`       | No                                    | —         | CPU and memory limits applied to Docker build steps.                                                                                                              |
+| `services.<name>.x-noops.build.timeout`         | No                                    | —         | Maximum duration of a build.                                                                                                                                        |
 | `services.<name>.x-noops.env.file`              | When using No Oops environment values | —         | Environment YAML file, relative to the manifest.                                                                                                                 |
 | `services.<name>.x-noops.env.secrets`           | No                                    | —         | Allow-listed versioned secret references and delivery mode.                                                                                                      |
 | `services.<name>.x-noops.ingress.*`             | No                                    | disabled  | Managed nginx route, TLS, and blue/green settings.                                                                                                               |
@@ -55,6 +57,37 @@ services, and rejects plainly embedded credential-like environment values. Move 
 | `services.<name>.x-noops.depends_on`            | No                                    | `[]`      | Deployment ordering for `--all`; not a runtime readiness guarantee.                                                                                              |
 
 `healthcheck.test` must be an array accepted by Docker. Duration values use Go duration syntax, such as `30s` or `2m`.
+
+## Git build contexts
+
+When `x-noops.build.source.git` is present, No Oops fetches the configured environment's repository/ref in a temporary
+Git container. The Compose `build.context` and `build.dockerfile` paths are resolved from that checkout; no application
+toolchain or Git installation is required on the host.
+
+```yaml
+build:
+  context: .
+  dockerfile: Dockerfile
+x-noops:
+  build:
+    source:
+      git:
+        url: https://github.com/example/api.git
+        environments:
+          prod:
+            ref: refs/tags/v1.2.3
+            credential: github-readonly
+    resources:
+      cpus: "1.5"
+      memory: 2Gi
+    timeout: 20m
+```
+
+No Oops resolves and records the resulting commit SHA with the release. A Git credential is optional for public
+repositories; when configured, create it for the same environment with `noops source credential set` and supply only
+the provider access-token value.
+`x-noops.source.build.command` is unsupported: build commands belong in Dockerfile stages so they cannot leak language
+runtimes onto the host. Builds are serialized per workspace to avoid competing for a single server's resources.
 
 ## Rollout defaults
 

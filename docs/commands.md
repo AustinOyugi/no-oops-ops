@@ -13,6 +13,7 @@ noops [--workspace <workspace>] rollback <environment> <app> (--service <name> |
 noops [--workspace <workspace>] remove <environment> <app> (--service <name> | --all)
 noops [--workspace <workspace>] secret set <environment> <key>
 noops [--workspace <workspace>] secret list <environment>
+noops [--workspace <workspace>] source credential set <environment> <key>
 noops [--workspace <workspace>] certificate import <name> <certificate.pem> <private-key.pem>
 noops [--workspace <workspace>] cleanup [--apply] [--orphaned] [--keep <count>]
 ```
@@ -56,6 +57,17 @@ noops secret list prod
 
 Each update creates a versioned Swarm secret such as `noops_prod_DATABASE_URL_v2`. `secret list` shows metadata, not
 values.
+
+## Git build-source credentials
+
+`source credential set` creates a versioned Docker Swarm secret scoped to a build environment. Only its name and
+version are recorded locally. The token is mounted read-only at `/run/secrets/git-token` in a short-lived Git-fetch
+Swarm task, then that task is removed. For GitHub, use a fine-grained personal access token with read access to the
+repository's contents.
+
+```bash
+printf '%s' 'github_pat_YOUR_TOKEN' | noops source credential set prod github-readonly
+```
 
 ## Certificate commands
 

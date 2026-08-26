@@ -259,7 +259,7 @@ func composeManifest(compose ComposeFile) (Manifest, error) {
 			ingress = service.NoOps.Expose
 		}
 		normalizeIngress(&ingress)
-		return Manifest{Name: name, Source: source, Image: image, Service: serviceConfig, Healthcheck: service.Healthcheck, Rollout: service.NoOps.Rollout, Expose: ingress, Env: service.NoOps.Env, DependsOn: service.NoOps.DependsOn, Volumes: service.Volumes}, nil
+		return Manifest{Name: name, Source: source, Image: image, Service: serviceConfig, Healthcheck: service.Healthcheck, Rollout: service.NoOps.Rollout, Expose: ingress, Env: service.NoOps.Env, Build: service.NoOps.Build, DependsOn: service.NoOps.DependsOn, Volumes: service.Volumes}, nil
 	}
 	panic("unreachable")
 }

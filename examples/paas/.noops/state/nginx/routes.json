@@ -1,0 +1,11 @@
+[
+  {
+    "environment": "dev",
+    "app": "lango",
+    "domain": "lango.example.com",
+    "path_prefix": "/",
+    "service": "dev-lango_dev-lango",
+    "port": 8080,
+    "tls": false
+  }
+]

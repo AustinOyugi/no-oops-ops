@@ -15,6 +15,7 @@ type Manifest struct {
 	Rollout     Rollout     `yaml:"rollout"`
 	Expose      Expose      `yaml:"expose"`
 	Env         Env         `yaml:"env"`
+	Build       NoOpsBuild  `yaml:"build"`
 	DependsOn   []string    `yaml:"depends_on"`
 	Volumes     []string    `yaml:"volumes"`
 	// Compose is the selected, Compose-shaped document. It is deliberately a
@@ -63,7 +64,8 @@ type ComposeDeploy struct {
 }
 
 type ComposeNoOps struct {
-	Env Env `yaml:"env"`
+	Env   Env        `yaml:"env"`
+	Build NoOpsBuild `yaml:"build"`
 	// Ingress is the Compose-preserving public-routing metadata. Expose remains
 	// accepted as a backwards-compatible alias for existing manifests.
 	Ingress   Expose   `yaml:"ingress"`
@@ -72,6 +74,34 @@ type ComposeNoOps struct {
 	DependsOn []string `yaml:"depends_on"`
 	Source    Source   `yaml:"source"`
 	Service   Service  `yaml:"service"`
+}
+
+// NoOpsBuild describes how No Oops obtains an isolated build context. Compose
+// retains ownership of build.context and build.dockerfile; these settings are
+// specific to the No Oops release workflow.
+type NoOpsBuild struct {
+	Source    BuildSource    `yaml:"source"`
+	Resources BuildResources `yaml:"resources"`
+	Timeout   string         `yaml:"timeout"`
+}
+
+type BuildSource struct {
+	Git *GitSource `yaml:"git"`
+}
+
+type GitSource struct {
+	URL          string                    `yaml:"url"`
+	Environments map[string]GitEnvironment `yaml:"environments"`
+}
+
+type GitEnvironment struct {
+	Ref        string `yaml:"ref"`
+	Credential string `yaml:"credential"`
+}
+
+type BuildResources struct {
+	CPUs   string `yaml:"cpus"`
+	Memory string `yaml:"memory"`
 }
 
 type Source struct {
