@@ -90,11 +90,15 @@ func (s *Service) gitBuildContextWithSwarmSecret(ctx context.Context, root, repo
 		cleanup()
 		return "", GitMetadata{}, nil, fmt.Errorf("start Git fetch service: %w", err)
 	}
-	if err := s.waitForGitFetchTask(ctx, name); err != nil {
-		cleanup()
-		return "", GitMetadata{}, nil, err
-	}
+	waitErr := s.waitForGitFetchTask(ctx, name)
 	result, err := s.runner.Run(ctx, "docker", []string{"service", "logs", "--raw", name}, command.RunOptions{})
+	if waitErr != nil {
+		cleanup()
+		if err == nil && len(strings.TrimSpace(string(result.Output))) > 0 {
+			return "", GitMetadata{}, nil, fmt.Errorf("fetch Git build source: %s", gitFailure(result.Output))
+		}
+		return "", GitMetadata{}, nil, waitErr
+	}
 	if err != nil {
 		cleanup()
 		return "", GitMetadata{}, nil, fmt.Errorf("fetch Git build source: %s", gitFailure(result.Output))
