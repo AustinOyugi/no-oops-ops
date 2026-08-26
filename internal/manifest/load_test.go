@@ -109,7 +109,7 @@ func TestLoadBuildGitSource(t *testing.T) {
           git:
             url: https://github.com/example/api.git
             environments:
-              prod: {ref: refs/tags/v1.2.3, credential: github-readonly}
+              prod: {ref: refs/tags/v1.2.3, secret: github-readonly}
         resources: {cpus: "1.5", memory: 2Gi}
         timeout: 20m
 `)

@@ -95,8 +95,8 @@ type GitSource struct {
 }
 
 type GitEnvironment struct {
-	Ref        string `yaml:"ref"`
-	Credential string `yaml:"credential"`
+	Ref    string `yaml:"ref"`
+	Secret string `yaml:"secret"`
 }
 
 type BuildResources struct {

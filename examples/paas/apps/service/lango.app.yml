@@ -20,13 +20,13 @@ services:
             environments:
               dev:
                 ref: isolate-build
-                credential: rolengi
+                secret: rolengi
               staging:
                 ref: main
-                credential: github-readonly
+                secret: github-readonly
               prod:
                 ref: refs/tags/v1.0.0
-                credential: github-readonly
+                secret: github-readonly
       service:
         internal_port: 8080
       expose:

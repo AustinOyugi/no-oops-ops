@@ -76,14 +76,14 @@ noops secret set prod DATABASE_URL
 ```
 
 For a private Git build source, create a fine-grained GitHub token with repository Contents read access and save only
-the token value as a source credential. No Oops creates a versioned Swarm secret; it does not save the token in the
+the token value as a normal environment secret. No Oops creates a versioned Swarm secret; it does not save the token in the
 workspace or application manifest.
 
 ```bash
-noops source credential set prod github-readonly
+noops secret set prod github-readonly
 ```
 
-Use that credential key from `x-noops.build.source.git.environments.<environment>.credential`; see the [manifest
+Use that secret key from `x-noops.build.source.git.environments.<environment>.secret`; see the [manifest
 reference](reference/app-manifest.md).
 
 See the [manifest reference](reference/app-manifest.md) and [environment-file reference](reference/env-file.md) before

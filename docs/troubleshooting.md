@@ -21,11 +21,11 @@ On Docker Desktop, a host process can occupy port 5000 while the registry is hea
 
 ## Private Git source cannot be fetched
 
-Save a source credential in the same environment as the release. Enter only the provider token—not a URL or
+Save the Git token as a normal secret in the same environment as the release. Enter only the provider token—not a URL or
 credential-store entry:
 
 ```bash
-noops source credential set prod github-readonly
+noops secret set prod github-readonly
 ```
 
 For GitHub, use a fine-grained token restricted to the repository with Contents read access. Confirm the manifest's

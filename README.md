@@ -18,7 +18,7 @@ noops init /srv/noops/example
 cd /srv/noops/example
 # Add the `lango` app alias and its manifest path to apps.yml.
 noops install
-noops source credential set prod github-readonly # only for private Git sources
+noops secret set prod github-readonly # only for private Git sources
 noops release prod lango --service lango
 noops deploy prod lango --service lango
 ```

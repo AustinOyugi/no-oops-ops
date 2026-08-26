@@ -77,7 +77,7 @@ x-noops:
         environments:
           prod:
             ref: refs/tags/v1.2.3
-            credential: github-readonly
+            secret: github-readonly
     resources:
       cpus: "1.5"
       memory: 2Gi
@@ -85,8 +85,8 @@ x-noops:
 ```
 
 No Oops resolves and records the resulting commit SHA with the release. A Git credential is optional for public
-repositories; when configured, create it for the same environment with `noops source credential set` and supply only
-the provider access-token value. The credential key is an identifier, not the token itself.
+repositories; when configured, create it for the same environment with `noops secret set` and supply only the provider
+access-token value. The `secret` value is the secret key, not the token itself.
 `x-noops.source.build.command` is unsupported: build commands belong in Dockerfile stages so they cannot leak language
 runtimes onto the host. Builds are serialized per workspace to avoid competing for a single server's resources.
 

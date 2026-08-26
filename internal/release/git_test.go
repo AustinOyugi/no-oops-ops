@@ -4,12 +4,6 @@ import (
 	"testing"
 )
 
-func TestGitCredentialSecretKeyUsesDedicatedNamespace(t *testing.T) {
-	if got := GitCredentialSecretKey("github-readonly"); got != "git.github-readonly" {
-		t.Fatalf("GitCredentialSecretKey = %q", got)
-	}
-}
-
 func TestGitFailurePrefersFatalLine(t *testing.T) {
 	got := gitFailure([]byte("pull output\nfatal: could not read Username for 'https://github.com': No such device or address\n"))
 	if got != "Git credential was rejected or does not have access to the repository" {

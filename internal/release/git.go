@@ -23,13 +23,11 @@ var gitFetchScript []byte
 var gitCommitPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 type GitMetadata struct {
-	URL        string `json:"url"`
-	Ref        string `json:"ref"`
-	Commit     string `json:"commit"`
-	Credential string `json:"credential,omitempty"`
+	URL    string `json:"url"`
+	Ref    string `json:"ref"`
+	Commit string `json:"commit"`
+	Secret string `json:"secret,omitempty"`
 }
-
-func GitCredentialSecretKey(key string) string { return "git." + key }
 
 func (s *Service) gitBuildContext(ctx context.Context, environment string, build manifest.NoOpsBuild) (string, GitMetadata, func(), error) {
 	git := build.Source.Git
@@ -37,7 +35,7 @@ func (s *Service) gitBuildContext(ctx context.Context, environment string, build
 	if !ok {
 		return "", GitMetadata{}, nil, fmt.Errorf("x-noops.build.source.git has no configuration for environment %q", environment)
 	}
-	s.logger.InfoContext(ctx, "fetching Git build source", "environment", environment, "repository", git.URL, "ref", settings.Ref, "credential_configured", settings.Credential != "")
+	s.logger.InfoContext(ctx, "fetching Git build source", "environment", environment, "repository", git.URL, "ref", settings.Ref, "secret_configured", settings.Secret != "")
 	root, err := os.MkdirTemp(s.config.DataDir, "build-source-")
 	if err != nil {
 		return "", GitMetadata{}, nil, fmt.Errorf("create temporary Git build context: %w", err)
@@ -49,13 +47,13 @@ func (s *Service) gitBuildContext(ctx context.Context, environment string, build
 		return "", GitMetadata{}, nil, fmt.Errorf("write Git fetch script: %w", err)
 	}
 	args := []string{"run", "--rm", "--entrypoint", "/bin/sh", "--mount", "type=bind,src=" + root + ",dst=/work"}
-	if settings.Credential != "" {
-		metadata, err := s.secrets.Latest(ctx, environment, GitCredentialSecretKey(settings.Credential))
+	if settings.Secret != "" {
+		metadata, err := s.secrets.Latest(ctx, environment, settings.Secret)
 		if err != nil {
 			cleanup()
-			return "", GitMetadata{}, nil, fmt.Errorf("read source credential %q for environment %q: %w", settings.Credential, environment, err)
+			return "", GitMetadata{}, nil, fmt.Errorf("read source secret %q for environment %q: %w", settings.Secret, environment, err)
 		}
-		return s.gitBuildContextWithSwarmSecret(ctx, root, git.URL, settings.Ref, metadata.SwarmName, settings.Credential, cleanup)
+		return s.gitBuildContextWithSwarmSecret(ctx, root, git.URL, settings.Ref, metadata.SwarmName, settings.Secret, cleanup)
 	}
 	args = append(args, gitClientImage, "/work/git-fetch.sh", git.URL, settings.Ref)
 	result, err := s.runner.Run(ctx, "docker", args, command.RunOptions{})
@@ -74,7 +72,7 @@ func (s *Service) gitBuildContext(ctx context.Context, environment string, build
 		return "", GitMetadata{}, nil, fmt.Errorf("fetch Git build source: did not receive a commit SHA")
 	}
 	s.logger.InfoContext(ctx, "Git build source fetched", "environment", environment, "repository", git.URL, "commit", commit)
-	return filepath.Join(root, "repository"), GitMetadata{URL: git.URL, Ref: settings.Ref, Commit: commit, Credential: settings.Credential}, cleanup, nil
+	return filepath.Join(root, "repository"), GitMetadata{URL: git.URL, Ref: settings.Ref, Commit: commit, Secret: settings.Secret}, cleanup, nil
 }
 
 func (s *Service) gitBuildContextWithSwarmSecret(ctx context.Context, root, repository, ref, secretName, credential string, cleanup func()) (string, GitMetadata, func(), error) {
@@ -112,7 +110,7 @@ func (s *Service) gitBuildContextWithSwarmSecret(ctx context.Context, root, repo
 		return "", GitMetadata{}, nil, fmt.Errorf("fetch Git build source: did not receive a commit SHA")
 	}
 	s.logger.InfoContext(ctx, "Git build source fetched", "repository", repository, "commit", commit)
-	return filepath.Join(root, "repository"), GitMetadata{URL: repository, Ref: ref, Commit: commit, Credential: credential}, cleanup, nil
+	return filepath.Join(root, "repository"), GitMetadata{URL: repository, Ref: ref, Commit: commit, Secret: credential}, cleanup, nil
 }
 
 func (s *Service) waitForGitFetchTask(ctx context.Context, name string) error {
