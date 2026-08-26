@@ -45,6 +45,7 @@ type doctorRunner interface {
 
 type secretRunner interface {
 	Set(context.Context, string, string, io.Reader) (secret.Metadata, error)
+	Delete(context.Context, string, string) ([]secret.Metadata, error)
 	List(context.Context, string) ([]secret.Metadata, error)
 }
 

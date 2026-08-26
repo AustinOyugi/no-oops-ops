@@ -13,7 +13,7 @@ import (
 
 func (a *App) runSecret(ctx context.Context, args []string) error {
 	if len(args) == 0 {
-		return errors.New("secret requires a subcommand: set or list")
+		return errors.New("secret requires a subcommand: set, delete, or list")
 	}
 
 	switch args[0] {
@@ -33,6 +33,19 @@ func (a *App) runSecret(ctx context.Context, args []string) error {
 		}
 
 		a.logger.InfoContext(ctx, "secret created", "environment", result.Environment, "key", result.Key, "version", result.Version, "swarm_name", result.SwarmName)
+		return nil
+	case "delete":
+		if len(args) != 3 {
+			return errors.New("secret delete requires an environment and key")
+		}
+
+		items, err := a.secrets.Delete(ctx, args[1], args[2])
+		if err != nil {
+			return err
+		}
+		for _, item := range items {
+			a.logger.InfoContext(ctx, "secret deleted", "environment", item.Environment, "key", item.Key, "version", item.Version, "swarm_name", item.SwarmName)
+		}
 		return nil
 	case "list":
 		if len(args) != 2 {

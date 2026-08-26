@@ -112,6 +112,52 @@ func (s *Service) List(ctx context.Context, environment string) ([]Metadata, err
 	return s.store.List(s.config.StateDir, environment)
 }
 
+// Delete removes every Swarm-secret version associated with a logical key.
+// Docker refuses to delete a secret that is still referenced by a service; in
+// that case its metadata is retained so a later deploy or rollback remains
+// consistent with the actual Swarm state.
+func (s *Service) Delete(ctx context.Context, environment string, key string) ([]Metadata, error) {
+	if err := validateIdentifier("environment", environment); err != nil {
+		return nil, err
+	}
+	if err := validateIdentifier("secret key", key); err != nil {
+		return nil, err
+	}
+
+	items, err := s.store.List(s.config.StateDir, environment)
+	if err != nil {
+		return nil, err
+	}
+
+	versions := make([]Metadata, 0)
+	for _, item := range items {
+		if item.Key == key {
+			versions = append(versions, item)
+		}
+	}
+	if len(versions) == 0 {
+		return nil, fmt.Errorf("secret %q was not found in environment %q", key, environment)
+	}
+
+	for index := len(versions) - 1; index >= 0; index-- {
+		metadata := versions[index]
+		s.logger.InfoContext(ctx, "deleting secret", "environment", environment, "key", key, "version", metadata.Version)
+		result, err := s.runner.Run(ctx, "docker", []string{"secret", "rm", metadata.SwarmName}, command.RunOptions{})
+		if err != nil {
+			output := strings.TrimSpace(string(result.Output))
+			if output != "" {
+				return versions[index:], fmt.Errorf("delete Docker Swarm secret %q: %w: %s", metadata.SwarmName, err, output)
+			}
+			return versions[index:], fmt.Errorf("delete Docker Swarm secret %q: %w", metadata.SwarmName, err)
+		}
+		if err := s.store.Delete(s.config.StateDir, metadata); err != nil {
+			return versions[index:], err
+		}
+	}
+
+	return versions, nil
+}
+
 func (s *Service) Latest(ctx context.Context, environment string, key string) (Metadata, error) {
 	if err := validateIdentifier("environment", environment); err != nil {
 		return Metadata{}, err

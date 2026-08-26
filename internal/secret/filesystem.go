@@ -2,10 +2,12 @@ package secret
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"syscall"
 )
 
 type filesystemStore struct{}
@@ -82,6 +84,23 @@ func (filesystemStore) List(stateDir string, environment string) ([]Metadata, er
 	})
 
 	return metadata, nil
+}
+
+func (filesystemStore) Delete(stateDir string, metadata Metadata) error {
+	path := metadataPath(metadataDir(stateDir, metadata.Environment, metadata.Key), metadata.Version)
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove secret metadata %q: %w", path, err)
+	}
+
+	keyDir := filepath.Dir(path)
+	if err := os.Remove(keyDir); err != nil && !os.IsNotExist(err) && !isDirectoryNotEmpty(err) {
+		return fmt.Errorf("remove empty secret metadata directory %q: %w", keyDir, err)
+	}
+	return nil
+}
+
+func isDirectoryNotEmpty(err error) bool {
+	return errors.Is(err, syscall.ENOTEMPTY) || errors.Is(err, syscall.EEXIST)
 }
 
 func metadataDir(stateDir string, environment string, key string) string {
