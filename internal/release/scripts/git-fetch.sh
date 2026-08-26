@@ -23,4 +23,5 @@ fi
 git -C /work/repository fetch --depth 1 origin "$ref"
 commit="$(git -C /work/repository rev-parse FETCH_HEAD)"
 git -C /work/repository reset --hard "$commit"
+git -C /work/repository submodule update --init --recursive
 git -C /work/repository rev-parse HEAD
