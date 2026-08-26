@@ -24,7 +24,7 @@ func TestApplyDefaultsDerivesConservativeSwarmRolloutPolicy(t *testing.T) {
 	if got, want := m.Rollout.Monitor, "1m50s"; got != want {
 		t.Errorf("rollout.monitor = %q, want %q", got, want)
 	}
-	if got, want := m.Rollout.ConvergenceTimeout, "5m"; got != want {
+	if got, want := m.Rollout.ConvergenceTimeout, "2m"; got != want {
 		t.Errorf("rollout.convergence_timeout = %q, want %q", got, want)
 	}
 	if got, want := m.Rollout.FailureAction, "rollback"; got != want {

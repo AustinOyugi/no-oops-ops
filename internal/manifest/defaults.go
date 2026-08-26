@@ -21,7 +21,7 @@ const (
 	defaultRestartDelay           = "10s"
 	defaultRestartMaxAttempts     = 5
 	defaultRestartWindow          = "70s"
-	defaultConvergenceTimeout     = "5m"
+	defaultConvergenceTimeout     = "2m"
 	defaultRollbackOrder          = "start-first"
 	defaultRollbackParallelism    = 1
 	defaultRollbackDelay          = "0s"

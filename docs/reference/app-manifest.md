@@ -93,7 +93,7 @@ runtimes onto the host. Builds are serialized per workspace to avoid competing f
 
 The defaults are: update `order: start-first`, `parallelism: 1`, `delay: 10s`, `failure_action: rollback`; restart
 `condition: on-failure`, `delay: 10s`, `max_attempts: 5`, `window: 70s`; rollback `order: start-first`,
-`parallelism: 1`, `delay: 0s`, `failure_action: pause`; and `convergence_timeout: 5m`.
+`parallelism: 1`, `delay: 0s`, `failure_action: pause`; and `convergence_timeout: 2m`.
 
 `rollout.monitor` defaults to `healthcheck.start_period + retries × interval + timeout + 10s`. Override it only when the
 application needs a longer or shorter Swarm monitoring window. `max_failure_ratio` for both update and rollback must be
