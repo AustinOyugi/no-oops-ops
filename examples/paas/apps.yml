@@ -13,7 +13,7 @@ settings:
       https_port: 443
     networks:
       default: "noops-{environment}"
-      environments: {}
+      environments: { }
 
 apps:
   postgres:

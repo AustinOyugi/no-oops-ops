@@ -74,7 +74,8 @@ make test
 
 The project currently supports a local Docker Swarm, a plain-HTTP internal registry, Git-backed container builds, and a
 shared nginx ingress with manifest-driven HTTP and TLS routes. `noops cleanup --apply` removes selected release
-manifests and metadata, then runs offline registry garbage collection when needed. See [Current limitations](docs/limitations.md).
+manifests and metadata, then runs offline registry garbage collection when needed.
+See [Current limitations](docs/limitations.md).
 
 ## License
 

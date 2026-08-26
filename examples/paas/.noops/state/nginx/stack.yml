@@ -16,7 +16,7 @@ services:
         aliases:
           - "ingress.noops.internal"
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/__noops/health || exit 1"]
+      test: [ "CMD-SHELL", "wget -q --spider http://127.0.0.1/__noops/health || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -32,7 +32,7 @@ services:
     image: certbot/certbot:latest
     # The image entrypoint is `certbot`; override it so this is a long-running
     # renewal service rather than arguments passed to the certbot CLI.
-    entrypoint: ["/bin/sh", "-c"]
+    entrypoint: [ "/bin/sh", "-c" ]
     command:
       - >-
         apk add --no-cache docker-cli && while :; do certbot renew --webroot

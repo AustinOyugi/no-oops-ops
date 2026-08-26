@@ -1,41 +1,41 @@
 services:
-    local-postgres:
-        image: 127.0.0.1:5000/postgres:20260825-053706
-        healthcheck:
-            test: ["CMD-SHELL", "pg_isready", "-U$$POSTGRES_USER"]
-            start_period: 60s
-            interval: 10s
-            timeout: 10s
-            retries: 6
-        volumes:
-            - postgres_data:/var/lib/postgresql/data
-        deploy:
-            replicas: 1
-            update_config:
-                order: stop-first
-                parallelism: 1
-                failure_action: rollback
-            restart_policy:
-                condition: any
-        networks:
-            - noops-local
-        env_file:
-            - /Users/odu/Documents/alien/code-innate/personal/no-oops-ops/examples/paas/.noops/state/apps/postgres/local/.env
-        secrets:
-            - source: noops_local_POSTGRES_USER_SECRET_v1
-              target: POSTGRES_USER
-              mode: 0444
-            - source: noops_local_POSTGRES_PASSWORD_SECRET_v1
-              target: POSTGRES_PASSWORD
-              mode: 0444
+  local-postgres:
+    image: 127.0.0.1:5000/postgres:20260825-053706
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready", "-U$$POSTGRES_USER" ]
+      start_period: 60s
+      interval: 10s
+      timeout: 10s
+      retries: 6
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    deploy:
+      replicas: 1
+      update_config:
+        order: stop-first
+        parallelism: 1
+        failure_action: rollback
+      restart_policy:
+        condition: any
+    networks:
+      - noops-local
+    env_file:
+      - /Users/odu/Documents/alien/code-innate/personal/no-oops-ops/examples/paas/.noops/state/apps/postgres/local/.env
+    secrets:
+      - source: noops_local_POSTGRES_USER_SECRET_v1
+        target: POSTGRES_USER
+        mode: 0444
+      - source: noops_local_POSTGRES_PASSWORD_SECRET_v1
+        target: POSTGRES_PASSWORD
+        mode: 0444
 volumes:
-    postgres_data:
+  postgres_data:
 networks:
-    noops-local:
-        external: true
+  noops-local:
+    external: true
 secrets:
-    noops_local_POSTGRES_USER_SECRET_v1:
-        external: true
-    noops_local_POSTGRES_PASSWORD_SECRET_v1:
-        external: true
+  noops_local_POSTGRES_USER_SECRET_v1:
+    external: true
+  noops_local_POSTGRES_PASSWORD_SECRET_v1:
+    external: true
 
