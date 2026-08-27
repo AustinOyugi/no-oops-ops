@@ -19,19 +19,23 @@ sections:
 
 For ordinary values, `values[environment]` takes precedence over `value`. When neither is provided, that key is omitted.
 
-For a source build, those ordinary values are also passed to `docker build` as `--build-arg KEY=value`. This makes
-public compile-time configuration available to tools such as `next build`. A Dockerfile must declare the argument and
-export it in the build stage when the build tool reads it:
+An app can also materialize its ordinary values into a dotenv file in No Oops' temporary build context. This makes
+compile-time configuration available to tools such as `next build` without Dockerfile-specific configuration:
 
-```dockerfile
-ARG NEXT_PUBLIC_APP_URI
-ENV NEXT_PUBLIC_APP_URI=$NEXT_PUBLIC_APP_URI
-RUN npm run build
+```yaml
+env:
+  file: app.env.yml
+  build:
+    file: .env.production
 ```
 
-Only ordinary values are supplied this way. `from_secret` values are never Docker build arguments and are injected only
-when Swarm starts the service. Do not use a managed secret for a client-side `NEXT_PUBLIC_*` value: anything embedded in
-a browser bundle is public by design.
+No Oops writes the generated file before `docker build`, temporarily overrides `.dockerignore` if necessary so it is
+included, and restores the build context afterward. Frameworks that load dotenv files conventionally, including Next.js,
+need no Dockerfile changes.
+
+Only ordinary values are supplied this way. `from_secret` values are never present in the build context and are injected
+only when Swarm starts the service. Do not use a managed secret for a client-side `NEXT_PUBLIC_*` value: anything
+embedded in a browser bundle is public by design.
 
 `from_secret` does not put a secret in `.env`. To activate a secret reference, list its environment key under
 `env.secrets.resolvable` in the app manifest:

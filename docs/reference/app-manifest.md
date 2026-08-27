@@ -51,6 +51,7 @@ services, and rejects plainly embedded credential-like environment values. Move 
 | `services.<name>.x-noops.build.resources`       | No              | —         | CPU and memory limits applied to Docker build steps.                                                                                                             |
 | `services.<name>.x-noops.build.timeout`         | No              | —         | Maximum duration of a build.                                                                                                                                     |
 | `services.<name>.x-noops.env.file`              | No              | —         | Environment YAML file, relative to the manifest. Omit `x-noops.env` entirely when the service has no environment values or secret bindings.                      |
+| `services.<name>.x-noops.env.build.file`        | No              | —         | Relative dotenv file to generate in the temporary build context from ordinary environment values.                                                               |
 | `services.<name>.x-noops.env.secrets`           | No              | —         | Allow-listed versioned secret references and delivery mode.                                                                                                      |
 | `services.<name>.x-noops.ingress.*`             | No              | disabled  | Managed nginx route, TLS, and blue/green settings.                                                                                                               |
 | `services.<name>.x-noops.rollout.*`             | No              | See below | No Oops convergence monitoring settings. It does not replace existing `deploy.update_config`, `rollback_config`, or restart policy.                              |
@@ -84,9 +85,9 @@ x-noops:
     timeout: 20m
 ```
 
-No Oops resolves and records the resulting commit SHA with the release. Ordinary values in the configured
-`x-noops.env.file` are passed as Docker build arguments; `from_secret` values remain runtime-only and are never exposed
-to an image build. A Git credential is optional for public
+No Oops resolves and records the resulting commit SHA with the release. When `x-noops.env.build.file` is configured,
+ordinary values from `x-noops.env.file` are materialized into that ephemeral dotenv file before Docker builds;
+`from_secret` values remain runtime-only and are never exposed to an image build. A Git credential is optional for public
 repositories; when configured, create it for the same environment with `noops secret set` and supply only the provider
 access-token value. The `secret` value is the secret key, not the token itself.
 `x-noops.source.build.command` is unsupported: build commands belong in Dockerfile stages so they cannot leak language

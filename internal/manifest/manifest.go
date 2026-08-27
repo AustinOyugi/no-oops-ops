@@ -191,7 +191,15 @@ func (e Expose) BlueGreenEnabled() bool {
 
 type Env struct {
 	File    string      `yaml:"file"`
+	Build   *EnvBuild   `yaml:"build"`
 	Secrets *EnvSecrets `yaml:"secrets"`
+}
+
+// EnvBuild declares an ephemeral dotenv file that No Oops materializes in the
+// isolated build context. It is useful for tools such as Next.js that already
+// discover dotenv files without any Dockerfile-specific integration.
+type EnvBuild struct {
+	File string `yaml:"file"`
 }
 
 type EnvSecrets struct {

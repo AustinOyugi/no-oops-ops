@@ -3,6 +3,7 @@ package manifest
 import (
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -71,6 +72,15 @@ func (m Manifest) Validate() error {
 	if m.Env.Secrets != nil {
 		if err := m.Env.Secrets.Validate(); err != nil {
 			return err
+		}
+	}
+	if m.Env.Build != nil {
+		path := filepath.Clean(m.Env.Build.File)
+		if !m.Image.ShouldBuild() {
+			return fmt.Errorf("env.build.file requires a Compose build")
+		}
+		if m.Env.Build.File == "" || filepath.IsAbs(m.Env.Build.File) || path == ".." || strings.HasPrefix(path, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("env.build.file must be a relative path within the build context")
 		}
 	}
 
