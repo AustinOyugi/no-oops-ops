@@ -103,6 +103,9 @@ func (s *Service) Reconcile(ctx context.Context, environment string, m manifest.
 	if err := s.validateImportedCertificates(updated); err != nil {
 		return err
 	}
+	if err := s.validateCloudflareRoutes(updated); err != nil {
+		return err
+	}
 	// Write and load the HTTP configuration first. This makes the ACME
 	// challenge endpoint reachable before asking Let's Encrypt for a
 	// certificate. writeConfig only enables TLS for certificates that are
@@ -288,6 +291,18 @@ func (s *Service) validateImportedCertificates(routes []Route) error {
 		}
 		if _, err := os.Stat(filepath.Join(s.importedCertificateDir(), route.TLSCertificate, "privkey.pem")); err != nil {
 			return fmt.Errorf("imported TLS private key for %q is unavailable: %w", route.TLSCertificate, err)
+		}
+	}
+	return nil
+}
+
+func (s *Service) validateCloudflareRoutes(routes []Route) error {
+	if !s.config.NginxCloudflare {
+		return nil
+	}
+	for _, route := range routes {
+		if route.TLS && route.TLSCertificate == "" {
+			return fmt.Errorf("Cloudflare ingress requires tls_certificate for HTTPS route %q; import a Cloudflare Origin certificate with `noops certificate import`", route.Domain)
 		}
 	}
 	return nil

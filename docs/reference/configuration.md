@@ -58,7 +58,10 @@ for Cloudflare's published IPv4 and IPv6 proxy networks and uses
 `CF-Connecting-IP` as the verified client address. This makes the generated
 `X-Real-IP` and `X-Forwarded-For` headers contain the visitor address while
 preventing direct callers from spoofing it. Keep the proxy enabled (orange
-cloud) for every hostname served by that ingress.
+cloud) for every hostname served by that ingress. Cloudflare mode never uses
+Let's Encrypt or prompts for an ACME email. Each HTTPS app must instead set
+`x-noops.ingress.tls_certificate` to the name of a certificate imported with
+`noops certificate import`.
 
 The `version` value must exactly match `noops --version`. A release binary
 creates a matching value during `noops init`; update the catalog in the same

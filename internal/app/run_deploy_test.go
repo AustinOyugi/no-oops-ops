@@ -14,6 +14,7 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/deploy"
 	"github.com/AustinOyugi/no-oops-ops/internal/doctor"
+	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 )
 
 type failingDoctor struct{}
@@ -92,6 +93,30 @@ func TestParseDeployArgsQuick(t *testing.T) {
 	}
 	if environment != "dev" || path != "api.yml" || len(services) != 1 || services[0] != "api" || !quick {
 		t.Errorf("parseDeployArgs = (%q, %q, %v, %t), want quick dev deployment", environment, path, services, quick)
+	}
+}
+
+func TestRequiresACME(t *testing.T) {
+	plainTLS := manifest.Manifest{Expose: manifest.Expose{TLS: true}}
+	if !requiresACME(plainTLS, false) {
+		t.Fatal("expected plain TLS route to require ACME")
+	}
+	if requiresACME(plainTLS, true) {
+		t.Fatal("Cloudflare TLS route must not require ACME")
+	}
+	imported := manifest.Manifest{Expose: manifest.Expose{TLSCertificate: "cloudflare-origin"}}
+	if requiresACME(imported, false) {
+		t.Fatal("imported certificate must not require ACME")
+	}
+}
+
+func TestValidateIngressTLSRequiresImportedCloudflareCertificate(t *testing.T) {
+	err := validateIngressTLS(manifest.Manifest{Expose: manifest.Expose{TLS: true}}, true)
+	if err == nil || !strings.Contains(err.Error(), "tls_certificate") {
+		t.Fatalf("error = %v, want missing tls_certificate error", err)
+	}
+	if err := validateIngressTLS(manifest.Manifest{Expose: manifest.Expose{TLS: true, TLSCertificate: "cloudflare-origin"}}, true); err != nil {
+		t.Fatalf("error = %v, want nil", err)
 	}
 }
 

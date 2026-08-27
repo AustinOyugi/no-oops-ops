@@ -89,3 +89,14 @@ func TestReconcileSkipsReloadForUnexposedAppWithoutRoute(t *testing.T) {
 		t.Fatalf("unexpected nginx command: %v", runner.calls)
 	}
 }
+
+func TestValidateCloudflareRoutesRequiresImportedCertificate(t *testing.T) {
+	service := &Service{config: config.Config{NginxCloudflare: true}}
+	err := service.validateCloudflareRoutes([]Route{{Domain: "app.example.com", TLS: true}})
+	if err == nil || !strings.Contains(err.Error(), "tls_certificate") {
+		t.Fatalf("error = %v, want missing tls_certificate error", err)
+	}
+	if err := service.validateCloudflareRoutes([]Route{{Domain: "app.example.com", TLS: true, TLSCertificate: "cloudflare-origin"}}); err != nil {
+		t.Fatalf("error = %v, want nil", err)
+	}
+}

@@ -34,7 +34,10 @@ func (a *App) runDeployService(ctx context.Context, environment, manifestPath, o
 	if err != nil {
 		return err
 	}
-	if loadedManifest.Expose.TLS {
+	if err := validateIngressTLS(loadedManifest, a.config.NginxCloudflare); err != nil {
+		return err
+	}
+	if requiresACME(loadedManifest, a.config.NginxCloudflare) {
 		if err := a.config.RequireACMEEmail(bufio.NewReader(os.Stdin), os.Stderr); err != nil {
 			return err
 		}
@@ -143,6 +146,17 @@ func (a *App) runDeployService(ctx context.Context, environment, manifestPath, o
 		"env_path", result.EnvPath,
 	)
 
+	return nil
+}
+
+func requiresACME(m manifest.Manifest, cloudflare bool) bool {
+	return m.Expose.TLS && m.Expose.TLSCertificate == "" && !cloudflare
+}
+
+func validateIngressTLS(m manifest.Manifest, cloudflare bool) error {
+	if cloudflare && m.Expose.TLS && m.Expose.TLSCertificate == "" {
+		return errors.New("Cloudflare ingress requires x-noops.ingress.tls_certificate for an HTTPS route; import a Cloudflare Origin certificate with `noops certificate import`")
+	}
 	return nil
 }
 
