@@ -126,6 +126,9 @@ For an existing Cloudflare Origin certificate, import a rotated certificate/key 
 Imported keys are stored in the platform nginx data directory with owner-only permissions and mounted read-only in
 nginx. Cloudflare must remain proxied with SSL/TLS mode set to Full (strict).
 
+Managed HTTPS virtual hosts enable HTTP/2, allow TLS 1.2 and TLS 1.3 only, prefer the client cipher order, and use
+the X25519 and P-256 ECDH curves.
+
 ## Internal routing
 
 Services on the shared network can call exposed applications through the nginx alias `ingress.noops.internal`, without

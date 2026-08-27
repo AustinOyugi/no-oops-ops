@@ -52,8 +52,12 @@
 server {
   listen 443 ssl;
   listen [::]:443 ssl;
+  http2 on;
   server_name {{ .Domain }};
   server_tokens off;
+  ssl_protocols TLSv1.2 TLSv1.3;
+  ssl_prefer_server_ciphers off;
+  ssl_ecdh_curve X25519:secp256r1;
 {{ if (tlsCertificate .Routes) }}
   ssl_certificate /etc/noops/certificates/{{ tlsCertificate .Routes }}/fullchain.pem;
   ssl_certificate_key /etc/noops/certificates/{{ tlsCertificate .Routes }}/privkey.pem;

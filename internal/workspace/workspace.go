@@ -26,6 +26,8 @@ settings:
       name: noops-nginx
       http_port: 80
       https_port: 443
+      # Enable only when every public ingress hostname is Cloudflare-proxied.
+      cloudflare: false
     networks:
       default: "noops-{environment}"
       environments: {}

@@ -75,6 +75,10 @@ func TestRenderConfigRendersTLSVirtualHost(t *testing.T) {
 	for _, want := range []string{
 		"location ^~ /.well-known/acme-challenge/",
 		"listen 443 ssl;",
+		"http2 on;",
+		"ssl_protocols TLSv1.2 TLSv1.3;",
+		"ssl_prefer_server_ciphers off;",
+		"ssl_ecdh_curve X25519:secp256r1;",
 		"ssl_certificate /etc/letsencrypt/live/example.test/fullchain.pem;",
 		"ssl_certificate_key /etc/letsencrypt/live/example.test/privkey.pem;",
 		"location / { return 308 https://$host$request_uri; }",
@@ -143,5 +147,19 @@ func TestRenderStaticIngressTemplates(t *testing.T) {
 	}
 	if !strings.Contains(string(internalConfig), "server_tokens off;") {
 		t.Errorf("internal config exposes the nginx version:\n%s", internalConfig)
+	}
+}
+
+func TestCloudflareRealIPConfigTrustsOnlyCloudflareNetworks(t *testing.T) {
+	for _, want := range []string{
+		"set_real_ip_from 173.245.48.0/20;",
+		"set_real_ip_from 2400:cb00::/32;",
+		"set_real_ip_from 2c0f:f248::/32;",
+		"real_ip_header CF-Connecting-IP;",
+		"real_ip_recursive on;",
+	} {
+		if !strings.Contains(cloudflareRealIPConfig, want) {
+			t.Errorf("Cloudflare real IP config does not contain %q", want)
+		}
 	}
 }

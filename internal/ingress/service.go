@@ -90,7 +90,15 @@ func (s *Service) Reconcile(ctx context.Context, environment string, m manifest.
 		return err
 	}
 	if !changed {
-		return nil
+		if len(routes) == 0 {
+			return nil
+		}
+		// Platform-wide ingress settings, including Cloudflare trusted proxy
+		// configuration, may have changed even when this app's route did not.
+		if err := s.writeConfig(routes); err != nil {
+			return err
+		}
+		return s.reload(ctx)
 	}
 	if err := s.validateImportedCertificates(updated); err != nil {
 		return err
@@ -211,6 +219,14 @@ func (s *Service) writeConfig(routes []Route) error {
 	}
 	if err := os.Remove(s.configPath()); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove legacy nginx routes config: %w", err)
+	}
+	cloudflarePath := filepath.Join(s.configDir(), "cloudflare.conf")
+	if s.config.NginxCloudflare {
+		if err := atomicWrite(cloudflarePath, []byte(cloudflareRealIPConfig)); err != nil {
+			return fmt.Errorf("write Cloudflare real IP config: %w", err)
+		}
+	} else if err := os.Remove(cloudflarePath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove Cloudflare real IP config: %w", err)
 	}
 	var hasExternal, hasInternal bool
 	for path := range files {

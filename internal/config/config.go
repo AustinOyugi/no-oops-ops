@@ -26,11 +26,12 @@ type Config struct {
 	RegistryName string
 	RegistryPort string
 
-	NginxName      string
-	NginxHTTPPort  string
-	NginxHTTPSPort string
-	ACMEEmail      string
-	ConfigPath     string
+	NginxName       string
+	NginxHTTPPort   string
+	NginxHTTPSPort  string
+	NginxCloudflare bool
+	ACMEEmail       string
+	ConfigPath      string
 }
 
 const defaultAppName = "noops"
@@ -92,6 +93,7 @@ func Load(root string) (Config, error) {
 		NginxName:                 ingressName,
 		NginxHTTPPort:             httpPort,
 		NginxHTTPSPort:            httpsPort,
+		NginxCloudflare:           platform.Ingress.Cloudflare,
 		ACMEEmail:                 file.ACMEEmail,
 		ConfigPath:                configPath,
 	}, nil

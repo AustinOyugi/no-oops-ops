@@ -33,6 +33,8 @@ settings:
       name: cranium-ingress
       http_port: 80
       https_port: 443
+	  # Trust Cloudflare's client-IP header only from Cloudflare networks.
+	  cloudflare: true
     networks:
       default: "cranium-{environment}"
       environments:
@@ -49,6 +51,14 @@ deployments use `platform.networks`: an explicit environment mapping wins, and
 otherwise `{environment}` in `default` is replaced by the selected environment.
 No Oops creates that overlay network on demand. The managed ingress joins an
 environment network only when it serves an exposed app in that environment.
+
+Set `platform.ingress.cloudflare: true` only when public ingress hostnames are
+Cloudflare-proxied. No Oops then generates Nginx `set_real_ip_from` directives
+for Cloudflare's published IPv4 and IPv6 proxy networks and uses
+`CF-Connecting-IP` as the verified client address. This makes the generated
+`X-Real-IP` and `X-Forwarded-For` headers contain the visitor address while
+preventing direct callers from spoofing it. Keep the proxy enabled (orange
+cloud) for every hostname served by that ingress.
 
 The `version` value must exactly match `noops --version`. A release binary
 creates a matching value during `noops init`; update the catalog in the same

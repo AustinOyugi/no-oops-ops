@@ -26,6 +26,7 @@ settings:
       name: cranium-ingress
       http_port: 8080
       https_port: 8443
+      cloudflare: true
     networks:
       default: "cranium-{environment}"
       environments:
@@ -44,6 +45,9 @@ apps: {}
 	}
 	if got, want := cfg.RegistryPort, "5100"; got != want {
 		t.Errorf("registry port = %q, want %q", got, want)
+	}
+	if !cfg.NginxCloudflare {
+		t.Error("expected Cloudflare ingress support to be enabled")
 	}
 	if got, want := cfg.EnvironmentNetwork("prod"), "cranium-production"; got != want {
 		t.Errorf("prod network = %q, want %q", got, want)
