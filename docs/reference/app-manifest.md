@@ -41,20 +41,20 @@ services, and rejects plainly embedded credential-like environment values. Move 
 
 ## Supported fields
 
-| Field                                           | Required                              | Default   | Meaning                                                                                                                                                          |
-|-------------------------------------------------|---------------------------------------|-----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `services.<name>`                               | Yes                                   | —         | A Compose service. Its `image`, `build`, execution, environment, networks, volumes, configs, secrets, health check, labels, and `deploy` settings are preserved. |
-| `services.<name>.image`                         | Yes                                   | —         | Upstream image reference. It is replaced in the generated stack with the recorded immutable release image.                                                       |
-| `services.<name>.build`                         | No                                    | —         | Standard Compose build configuration. When present, No Oops builds it before release.                                                                            |
-| `services.<name>.x-noops.service.internal_port` | Yes for ingress                       | —         | Private application port used by managed nginx ingress.                                                                                                          |
-| `services.<name>.x-noops.build.source.git`      | No                                    | —         | Environment-scoped Git repository used as the isolated build context.                                                                                            |
-| `services.<name>.x-noops.build.resources`       | No                                    | —         | CPU and memory limits applied to Docker build steps.                                                                                                             |
-| `services.<name>.x-noops.build.timeout`         | No                                    | —         | Maximum duration of a build.                                                                                                                                     |
-| `services.<name>.x-noops.env.file`              | No                                    | —         | Environment YAML file, relative to the manifest. Omit `x-noops.env` entirely when the service has no environment values or secret bindings.                     |
-| `services.<name>.x-noops.env.secrets`           | No                                    | —         | Allow-listed versioned secret references and delivery mode.                                                                                                      |
-| `services.<name>.x-noops.ingress.*`             | No                                    | disabled  | Managed nginx route, TLS, and blue/green settings.                                                                                                               |
-| `services.<name>.x-noops.rollout.*`             | No                                    | See below | No Oops convergence monitoring settings. It does not replace existing `deploy.update_config`, `rollback_config`, or restart policy.                              |
-| `services.<name>.x-noops.depends_on`            | No                                    | `[]`      | Deployment ordering for `--all`; not a runtime readiness guarantee.                                                                                              |
+| Field                                           | Required        | Default   | Meaning                                                                                                                                                          |
+|-------------------------------------------------|-----------------|-----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `services.<name>`                               | Yes             | —         | A Compose service. Its `image`, `build`, execution, environment, networks, volumes, configs, secrets, health check, labels, and `deploy` settings are preserved. |
+| `services.<name>.image`                         | Yes             | —         | Upstream image reference. It is replaced in the generated stack with the recorded immutable release image.                                                       |
+| `services.<name>.build`                         | No              | —         | Standard Compose build configuration. When present, No Oops builds it before release.                                                                            |
+| `services.<name>.x-noops.service.internal_port` | Yes for ingress | —         | Private application port used by managed nginx ingress.                                                                                                          |
+| `services.<name>.x-noops.build.source.git`      | No              | —         | Environment-scoped Git repository used as the isolated build context.                                                                                            |
+| `services.<name>.x-noops.build.resources`       | No              | —         | CPU and memory limits applied to Docker build steps.                                                                                                             |
+| `services.<name>.x-noops.build.timeout`         | No              | —         | Maximum duration of a build.                                                                                                                                     |
+| `services.<name>.x-noops.env.file`              | No              | —         | Environment YAML file, relative to the manifest. Omit `x-noops.env` entirely when the service has no environment values or secret bindings.                      |
+| `services.<name>.x-noops.env.secrets`           | No              | —         | Allow-listed versioned secret references and delivery mode.                                                                                                      |
+| `services.<name>.x-noops.ingress.*`             | No              | disabled  | Managed nginx route, TLS, and blue/green settings.                                                                                                               |
+| `services.<name>.x-noops.rollout.*`             | No              | See below | No Oops convergence monitoring settings. It does not replace existing `deploy.update_config`, `rollback_config`, or restart policy.                              |
+| `services.<name>.x-noops.depends_on`            | No              | `[]`      | Deployment ordering for `--all`; not a runtime readiness guarantee.                                                                                              |
 
 `healthcheck.test` must be an array accepted by Docker. Duration values use Go duration syntax, such as `30s` or `2m`.
 
@@ -113,18 +113,21 @@ port is published directly. `noops remove` removes the route before stopping the
 Blue/green promotion is enabled by default for stateless ingress-managed apps. Named volumes are rejected in blue/green
 mode; set `x-noops.ingress.blue_green: false` to use an in-place Swarm update for stateful services. Set
 `x-noops.ingress.tls: true` to serve HTTPS. The domain's DNS A/AAAA record must resolve to the Swarm manager and allow
-inbound ports 80 and 443. On its first deployment, No Oops Ops makes the HTTP-01 challenge path available, obtains a
+inbound ports 80 and 443. With the default platform ingress, the first deployment makes the HTTP-01 challenge path available, obtains a
 Let's Encrypt certificate, and then enables the HTTPS virtual host with HTTP-to-HTTPS redirects. Subsequent certificate
 renewals reload nginx automatically. The current renewal service mounts the Docker daemon socket to force that reload;
 this grants it root-equivalent Docker-host access and is suitable only for the trusted single-node platform. A given
 domain/path-prefix pair can be owned by only one deployed app, and all routes sharing a domain must agree on its TLS
 setting. Compose `depends_on` is preserved but should not be used as a readiness guarantee.
 
-For an existing Cloudflare Origin certificate, import a rotated certificate/key pair with
+When `settings.platform.ingress.cloudflare: true`, HTTPS routes must use an imported certificate and must not use
+`x-noops.ingress.tls: true`. Cloudflare mode does not use ACME or prompt for an email. Import a Cloudflare Origin
+certificate/key pair with
 `noops certificate import <name> <certificate.pem> <private-key.pem>`, then set
 `x-noops.ingress.tls_certificate: <name>`.
 Imported keys are stored in the platform nginx data directory with owner-only permissions and mounted read-only in
-nginx. Cloudflare must remain proxied with SSL/TLS mode set to Full (strict).
+nginx. Cloudflare must remain proxied with SSL/TLS mode set to Full (strict). No Oops restores the visitor IP from
+`CF-Connecting-IP` only when a request originates from a published Cloudflare proxy network.
 
 Managed HTTPS virtual hosts enable HTTP/2, allow TLS 1.2 and TLS 1.3 only, prefer the client cipher order, and use
 the X25519 and P-256 ECDH curves.

@@ -32,14 +32,15 @@ Swarm to converge and records the outcome and the secret versions used.
 
 Docker Swarm controls scheduling, health checks, task replacement, and automatic rollback. No Oops preserves the
 service's existing Compose deployment policy, waits for the configured result, and does not run a competing health
-controller. The default convergence timeout is two minutes and can be overridden with `rollout.convergence_timeout`.
+controller. The default convergence timeout is four minutes and can be overridden with `rollout.convergence_timeout`.
 
 For exposed apps, No Oops Ops uses blue/green promotion by default after the first deployment: it creates a
 deployment-specific candidate service, waits for Docker Swarm to report its existing Docker health check as converged,
 then changes nginx to target the candidate before removing the previous active service. This happens even when the
 release tag is unchanged. Blue/green is limited to stateless services: manifests with named volumes are rejected because
 candidate and active releases must not receive independent stack-scoped state. Set `expose.blue_green: false` to use an
-in-place Swarm update for stateful services. If the candidate fails, only that candidate is removed. Direct
+in-place Swarm update for stateful services. If any candidate validation or ingress-promotion step fails, No Oops
+removes the unpromoted candidate stack. Direct
 service-to-service callers should use the stable nginx internal URL rather than a release-specific application service
 name.
 

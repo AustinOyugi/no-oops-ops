@@ -33,8 +33,8 @@ settings:
       name: cranium-ingress
       http_port: 80
       https_port: 443
-	  # Trust Cloudflare's client-IP header only from Cloudflare networks.
-	  cloudflare: true
+      # Trust Cloudflare's client-IP header only from Cloudflare networks.
+      cloudflare: true
     networks:
       default: "cranium-{environment}"
       environments:

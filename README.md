@@ -41,6 +41,7 @@ noops secret set prod AUTH_SERVER_API_CLIENT_SECRET
 - [App manifest reference](docs/reference/app-manifest.md) — supported manifest fields and defaults
 - [Environment-file reference](docs/reference/env-file.md) — generated `.env` values and secret references
 - [Configuration and generated state](docs/reference/configuration.md)
+- [Networking and TLS](docs/networking-tls.md) — ingress ports, routing, Let's Encrypt, and Cloudflare Origin TLS
 - [Troubleshooting](docs/troubleshooting.md)
 - [Current limitations](docs/limitations.md)
 
@@ -72,8 +73,9 @@ make test
 
 ## Current capabilities
 
-The project currently supports a local Docker Swarm, a plain-HTTP internal registry, Git-backed container builds, and a
-shared nginx ingress with manifest-driven HTTP and TLS routes. `noops cleanup --apply` removes selected release
+The project currently supports a local Docker Swarm, a plain-HTTP internal registry, Git-backed container builds,
+environment-scoped Swarm secrets, imported origin certificates, and a shared nginx ingress with manifest-driven HTTP,
+Let's Encrypt TLS, or Cloudflare Origin TLS routes. `noops cleanup --apply` removes selected release
 manifests and metadata, then runs offline registry garbage collection when needed.
 See [Current limitations](docs/limitations.md).
 

@@ -9,8 +9,10 @@
 - A No Oops workspace directory containing `apps.yml` and application manifests
 
 For a public TLS route, the domain's DNS A/AAAA record must point to the Swarm manager and ports 80 and 443 must be
-reachable from the internet. The first TLS deployment prompts for the ACME contact email and stores it in the
-workspace configuration.
+reachable from the internet. With the default ingress, the first TLS deployment prompts for the ACME contact email and
+stores it in the workspace configuration. For Cloudflare-proxied routes, set
+`settings.platform.ingress.cloudflare: true`, import a Cloudflare Origin certificate with `noops certificate import`,
+and use `x-noops.ingress.tls_certificate`; Cloudflare mode does not use ACME.
 
 The bundled registry uses HTTP. For Docker Desktop, add the following to the Docker Engine configuration and restart
 Docker Desktop:

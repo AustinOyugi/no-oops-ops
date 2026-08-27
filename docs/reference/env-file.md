@@ -1,6 +1,7 @@
 # Environment-file reference
 
-When declared, the environment file is YAML and is rendered into a Docker-compatible `.env` file during deployment. A service with no environment values or secret bindings can omit `x-noops.env` entirely.
+When declared, the environment file is YAML and is rendered into a Docker-compatible `.env` file during deployment. A
+service with no environment values or secret bindings can omit `x-noops.env` entirely.
 
 ```yaml
 sections:
