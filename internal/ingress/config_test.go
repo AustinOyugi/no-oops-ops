@@ -56,6 +56,26 @@ func TestRenderConfigKeepsExactHostnameSeparateFromWildcard(t *testing.T) {
 	}
 }
 
+func TestRenderConfigMapsPrimaryAndWildcardAliasForTLS(t *testing.T) {
+	rendered, err := RenderConfig([]Route{{
+		Environment:    "prod",
+		App:            "web",
+		Domain:         "vybes.africa",
+		Domains:        []string{"*.vybes.africa"},
+		PathPrefix:     "/",
+		Service:        "prod-web_app",
+		Port:           3000,
+		TLS:            true,
+		TLSCertificate: "origin",
+	}})
+	if err != nil {
+		t.Fatalf("RenderConfig() error = %v", err)
+	}
+	if got, want := strings.Count(string(rendered), "server_name vybes.africa *.vybes.africa;"), 2; got != want {
+		t.Fatalf("primary and wildcard hostname occur %d times, want %d; config:\n%s", got, want, rendered)
+	}
+}
+
 func TestRenderFilesSeparatesDomainsAndInternalServices(t *testing.T) {
 	files, err := RenderFiles([]Route{
 		{Environment: "dev", App: "lango", Domain: "lango.example.test", PathPrefix: "/", Service: "dev-lango_dev-lango", Port: 8080},

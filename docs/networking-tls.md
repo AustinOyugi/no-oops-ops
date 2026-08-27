@@ -55,6 +55,16 @@ Ingress accepts a leftmost wildcard such as `*.vybes.africa`. nginx always selec
 for `api.vybes.africa` overrides the wildcard route for that host. Wildcard HTTPS routes require an imported
 `tls_certificate`; No Oops does not use ACME HTTP-01 for wildcards.
 
+To serve the apex and every first-level subdomain from one app, use the apex as `domain` and the wildcard as an alias:
+
+```yaml
+ingress:
+  enabled: true
+  domain: vybes.africa
+  domains: ["*.vybes.africa"]
+  tls_certificate: cranium-cloudflare
+```
+
 ## Cloudflare Origin TLS
 
 Use Cloudflare mode when every public hostname served by the shared ingress is Cloudflare-proxied. Enable it once in
