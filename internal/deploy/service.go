@@ -212,18 +212,12 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 	}
 
 	if err := s.verifyService(ctx, deploymentSwarmService); err != nil {
-		if blueGreen {
-			_ = s.removeStack(ctx, deploymentStack)
-		}
-		return Result{}, err
+		return Result{}, s.cleanupFailedCandidate(ctx, blueGreen, deploymentStack, err)
 	}
 
 	timeout, monitor, err := convergenceConfig(m)
 	if err != nil {
-		if blueGreen {
-			_ = s.removeStack(ctx, deploymentStack)
-		}
-		return Result{}, err
+		return Result{}, s.cleanupFailedCandidate(ctx, blueGreen, deploymentStack, err)
 	}
 
 	outcome, runningTasks, err := s.waitForSwarmConvergence(
@@ -235,9 +229,6 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		monitor,
 	)
 	if err != nil {
-		if blueGreen {
-			_ = s.removeStack(ctx, deploymentStack)
-		}
 		if outcome == "" {
 			outcome = SwarmOutcomeFailed
 		}
@@ -254,27 +245,18 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 			SecretBindings: secretBindings,
 		}
 		if _, saveErr := s.deployments.Save(s.config, failure); saveErr != nil {
-			return Result{}, fmt.Errorf("%w; record deployment outcome: %v", err, saveErr)
+			err = fmt.Errorf("%w; record deployment outcome: %v", err, saveErr)
 		}
-		return Result{}, err
+		return Result{}, s.cleanupFailedCandidate(ctx, blueGreen, deploymentStack, err)
 	}
 
 	if m.Expose.Enabled {
 		if err := s.ingress.EnsureNetwork(ctx, network); err != nil {
-			return Result{}, fmt.Errorf("connect ingress to environment network: %w", err)
+			return Result{}, s.cleanupFailedCandidate(ctx, blueGreen, deploymentStack, fmt.Errorf("connect ingress to environment network: %w", err))
 		}
 	}
 	if err := s.ingress.Reconcile(ctx, environment, m, deploymentSwarmService); err != nil {
-		return Result{}, fmt.Errorf("reconcile ingress route: %w", err)
-	}
-	if blueGreen {
-		previousStack := activeDeployment.StackName
-		if previousStack == "" {
-			previousStack = stackName(environment, m.Name)
-		}
-		if err := s.removeStack(ctx, previousStack); err != nil {
-			return Result{}, fmt.Errorf("remove previous active stack %q: %w", previousStack, err)
-		}
+		return Result{}, s.cleanupFailedCandidate(ctx, blueGreen, deploymentStack, fmt.Errorf("reconcile ingress route: %w", err))
 	}
 
 	deploymentPath, err := s.deployments.Save(s.config, Deployment{
@@ -297,6 +279,20 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		return Result{}, err
 	}
 
+	// The candidate is now the recorded active deployment and ingress already
+	// targets it. Only after persisting that fact may the previous stack be
+	// removed; otherwise a failed cleanup could leave the new active stack
+	// untracked and cause later deployments to accumulate candidates.
+	if blueGreen {
+		previousStack := activeDeployment.StackName
+		if previousStack == "" {
+			previousStack = stackName(environment, m.Name)
+		}
+		if err := s.removeStack(ctx, previousStack); err != nil {
+			s.logger.WarnContext(ctx, "could not remove previous blue-green stack after promotion", "stack", previousStack, "error", err)
+		}
+	}
+
 	return Result{
 		DeploymentPath: deploymentPath,
 		Environment:    environment,
@@ -314,6 +310,19 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		EnvPath:        envPath,
 		Manifest:       m,
 	}, nil
+}
+
+// cleanupFailedCandidate removes a blue/green stack whenever it has been
+// created but cannot be promoted. The original error remains first so callers
+// see why the deployment failed, while a cleanup problem is still actionable.
+func (s *Service) cleanupFailedCandidate(ctx context.Context, blueGreen bool, stack string, cause error) error {
+	if !blueGreen {
+		return cause
+	}
+	if err := s.removeStack(ctx, stack); err != nil {
+		return fmt.Errorf("%w; remove failed blue-green candidate stack %q: %v", cause, stack, err)
+	}
+	return cause
 }
 
 func (s *Service) Rollback(ctx context.Context, environment string, path string) (Result, error) {
