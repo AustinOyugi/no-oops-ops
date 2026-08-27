@@ -84,7 +84,9 @@ x-noops:
     timeout: 20m
 ```
 
-No Oops resolves and records the resulting commit SHA with the release. A Git credential is optional for public
+No Oops resolves and records the resulting commit SHA with the release. Ordinary values in the configured
+`x-noops.env.file` are passed as Docker build arguments; `from_secret` values remain runtime-only and are never exposed
+to an image build. A Git credential is optional for public
 repositories; when configured, create it for the same environment with `noops secret set` and supply only the provider
 access-token value. The `secret` value is the secret key, not the token itself.
 `x-noops.source.build.command` is unsupported: build commands belong in Dockerfile stages so they cannot leak language
@@ -94,7 +96,7 @@ runtimes onto the host. Builds are serialized per workspace to avoid competing f
 
 The defaults are: update `order: start-first`, `parallelism: 1`, `delay: 10s`, `failure_action: rollback`; restart
 `condition: on-failure`, `delay: 10s`, `max_attempts: 5`, `window: 70s`; rollback `order: start-first`,
-`parallelism: 1`, `delay: 0s`, `failure_action: pause`; and `convergence_timeout: 2m`.
+`parallelism: 1`, `delay: 0s`, `failure_action: pause`; and `convergence_timeout: 4m`.
 
 `rollout.monitor` defaults to `healthcheck.start_period + retries × interval + timeout + 10s`. Override it only when the
 application needs a longer or shorter Swarm monitoring window. `max_failure_ratio` for both update and rollback must be

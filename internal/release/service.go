@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
+	"github.com/AustinOyugi/no-oops-ops/internal/environment"
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"github.com/AustinOyugi/no-oops-ops/internal/secret"
@@ -90,7 +91,11 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 			buildCtx, cancel = context.WithTimeout(ctx, limit)
 			defer cancel()
 		}
-		if err := s.buildImage(buildCtx, registryImage, dockerfile, contextDir, m.Build.Resources); err != nil {
+		buildArgs, err := buildEnvironmentValues(absPath, m, environment)
+		if err != nil {
+			return Result{}, err
+		}
+		if err := s.buildImage(buildCtx, registryImage, dockerfile, contextDir, m.Build.Resources, buildArgs); err != nil {
 			return Result{}, err
 		}
 		m.Source.Context = contextDir
@@ -172,11 +177,26 @@ func (s *Service) buildPulledImage(ctx context.Context, targetImage, sourceImage
 		return fmt.Errorf("write temporary Dockerfile: %w", err)
 	}
 
-	if err := s.buildImage(ctx, targetImage, dockerfile, contextDir, manifest.BuildResources{}); err != nil {
+	if err := s.buildImage(ctx, targetImage, dockerfile, contextDir, manifest.BuildResources{}, nil); err != nil {
 		return fmt.Errorf("build release image from %q: %w", sourceImage, err)
 	}
 
 	return nil
+}
+
+// buildEnvironmentValues deliberately resolves only ordinary values. Managed
+// secrets are injected by Swarm when the service starts and must never become
+// Docker build arguments or image layers.
+func buildEnvironmentValues(manifestPath string, m manifest.Manifest, target string) (map[string]string, error) {
+	path := ""
+	if m.Env.File != "" {
+		path = filepath.Join(filepath.Dir(manifestPath), m.Env.File)
+	}
+	file, err := environment.LoadOptional(path)
+	if err != nil {
+		return nil, err
+	}
+	return environment.Resolve(file, target, nil).Values, nil
 }
 
 func resolveSourcePath(baseDir string, value string) string {

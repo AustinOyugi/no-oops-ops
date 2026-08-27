@@ -1,45 +1,10 @@
 package deploy
 
-type ResolvedEnv struct {
-	SecretRefs []EnvSecretRef
-	Values     map[string]string
-}
+import "github.com/AustinOyugi/no-oops-ops/internal/environment"
 
-type EnvSecretRef struct {
-	Key        string
-	SecretName string
-}
+type ResolvedEnv = environment.Resolved
+type EnvSecretRef = environment.SecretRef
 
-func ResolveEnvFile(envFile EnvFile, environment string, resolvable []string) ResolvedEnv {
-	resolved := ResolvedEnv{Values: map[string]string{}}
-
-	allowset := make(map[string]struct{}, len(resolvable))
-	for _, key := range resolvable {
-		allowset[key] = struct{}{}
-	}
-
-	for _, section := range envFile.Sections {
-		for _, item := range section.Items {
-			if item.Key == "" {
-				continue
-			}
-			if item.FromSecret != "" {
-				if _, ok := allowset[item.Key]; ok {
-					resolved.SecretRefs = append(resolved.SecretRefs, EnvSecretRef{Key: item.Key, SecretName: item.FromSecret})
-				}
-				continue
-			}
-
-			if value, ok := item.Values[environment]; ok {
-				resolved.Values[item.Key] = value
-				continue
-			}
-
-			if item.Value != "" {
-				resolved.Values[item.Key] = item.Value
-			}
-		}
-	}
-
-	return resolved
+func ResolveEnvFile(envFile EnvFile, target string, resolvable []string) ResolvedEnv {
+	return environment.Resolve(envFile, target, resolvable)
 }
