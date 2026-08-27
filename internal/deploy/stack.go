@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"bytes"
+	"crypto/sha256"
 	_ "embed"
 	"fmt"
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
@@ -16,10 +17,12 @@ import (
 )
 
 const (
-	appDirMode       = 0o700
-	stackFileMode    = 0o600
-	envFileMode      = 0o600
-	appStackTemplate = "internal/deploy/templates/app-stack.yml.tmpl"
+	appDirMode                    = 0o700
+	stackFileMode                 = 0o600
+	envFileMode                   = 0o600
+	appStackTemplate              = "internal/deploy/templates/app-stack.yml.tmpl"
+	maxSwarmServiceNameLength     = 63
+	blueGreenCandidateServiceName = "app"
 )
 
 //go:embed templates/app-stack.yml.tmpl
@@ -109,7 +112,24 @@ func releaseStackName(environment, appName, tag string) string {
 // candidates distinct when the same immutable release is deployed repeatedly.
 func candidateStackName(environment, appName, tag string, createdAt time.Time) string {
 	deploymentID := fmt.Sprintf("%d", createdAt.UTC().UnixNano())
-	return releaseStackName(environment, appName, tag+"-"+deploymentID)
+	name := releaseStackName(environment, appName, tag+"-"+deploymentID)
+	maxLength := maxSwarmServiceNameLength - len("_") - len(blueGreenCandidateServiceName)
+	return compactStackName(name, maxLength)
+}
+
+// compactStackName keeps the generated Swarm service name within Docker's
+// 63-character limit. A stable digest preserves uniqueness when truncation is
+// necessary, including for repeated deployments of the same release.
+func compactStackName(name string, maxLength int) string {
+	if len(name) <= maxLength {
+		return name
+	}
+
+	digest := sha256.Sum256([]byte(name))
+	suffix := fmt.Sprintf("-%x", digest[:5])
+	prefixLength := maxLength - len(suffix)
+	prefix := strings.TrimRight(name[:prefixLength], "-")
+	return prefix + suffix
 }
 
 func writeEnvMap(cfg config.Config, appName string, environment string, values map[string]string) (string, error) {

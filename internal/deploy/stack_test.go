@@ -1,6 +1,8 @@
 package deploy
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -84,6 +86,25 @@ func TestCandidateStackNameIsUniquePerDeployment(t *testing.T) {
 	}
 	if !strings.HasPrefix(first, "dev-lango-r20260824-133728-") {
 		t.Errorf("candidate stack name = %q, want release-specific prefix", first)
+	}
+}
+
+func TestCandidateStackNameFitsDockerSwarmServiceLimit(t *testing.T) {
+	createdAt := time.Date(2026, 8, 27, 19, 38, 37, 1, time.UTC)
+	stack := candidateStackName(
+		"prod",
+		"vybe-builder-service",
+		"20260827-025448",
+		createdAt,
+	)
+	service := stack + "_" + blueGreenCandidateServiceName
+	if len(service) > maxSwarmServiceNameLength {
+		t.Fatalf("Swarm service name %q has length %d, want at most %d", service, len(service), maxSwarmServiceNameLength)
+	}
+	fullName := releaseStackName("prod", "vybe-builder-service", "20260827-025448-"+fmt.Sprintf("%d", createdAt.UnixNano()))
+	digest := sha256.Sum256([]byte(fullName))
+	if !strings.HasSuffix(stack, "-"+fmt.Sprintf("%x", digest[:5])) {
+		t.Fatalf("candidate stack %q should retain a digest suffix after truncation", stack)
 	}
 }
 
