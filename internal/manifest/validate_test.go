@@ -112,6 +112,20 @@ func TestValidateRequiresSafeExposureConfiguration(t *testing.T) {
 	}
 }
 
+func TestValidateAllowsWildcardIngressDomain(t *testing.T) {
+	m := Manifest{
+		Name:        "test",
+		Image:       Image{Repository: "repo"},
+		Service:     Service{InternalPort: 8080},
+		Healthcheck: Healthcheck{Test: []string{"CMD", "true"}},
+		Source:      Source{Context: ".", Dockerfile: "Dockerfile"},
+		Expose:      Expose{Enabled: true, Domain: "*.vybes.africa", PathPrefix: "/"},
+	}
+	if err := m.Validate(); err != nil {
+		t.Fatalf("wildcard ingress domain rejected: %v", err)
+	}
+}
+
 func TestValidateRequiresEnabledExposureForBlueGreen(t *testing.T) {
 	m := Manifest{
 		Name:        "test",

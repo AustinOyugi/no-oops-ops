@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	domainPattern     = regexp.MustCompile(`(?i)^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$`)
+	domainPattern     = regexp.MustCompile(`(?i)^(?:\*\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$`)
 	pathPrefixPattern = regexp.MustCompile(`^/[A-Za-z0-9._~%/@:+-]*$`)
 )
 
@@ -90,6 +90,11 @@ func (m Manifest) Validate() error {
 		}
 		if !domainPattern.MatchString(m.Expose.Domain) {
 			return fmt.Errorf("expose.domain must be a valid hostname")
+		}
+		for _, domain := range m.Expose.Domains {
+			if !domainPattern.MatchString(domain) {
+				return fmt.Errorf("expose.domains must contain valid hostnames")
+			}
 		}
 		if !pathPrefixPattern.MatchString(m.Expose.PathPrefix) {
 			return fmt.Errorf("expose.path_prefix must be an absolute HTTP path without query or fragment")

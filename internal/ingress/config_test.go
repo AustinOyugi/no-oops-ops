@@ -41,6 +41,21 @@ func TestRenderConfigGroupsRoutesByDomainAndPrefersLongerPrefixes(t *testing.T) 
 	}
 }
 
+func TestRenderConfigKeepsExactHostnameSeparateFromWildcard(t *testing.T) {
+	rendered, err := RenderConfig([]Route{
+		{Environment: "prod", App: "wildcard", Domain: "*.vybes.africa", PathPrefix: "/", Service: "prod-wildcard_app", Port: 3000, TLS: true, TLSCertificate: "origin"},
+		{Environment: "prod", App: "api", Domain: "api.vybes.africa", PathPrefix: "/", Service: "prod-api_app", Port: 8080, TLS: true, TLSCertificate: "origin"},
+	})
+	if err != nil {
+		t.Fatalf("RenderConfig() error = %v", err)
+	}
+	for _, serverName := range []string{"server_name *.vybes.africa;", "server_name api.vybes.africa;"} {
+		if !strings.Contains(string(rendered), serverName) {
+			t.Fatalf("rendered config missing %q", serverName)
+		}
+	}
+}
+
 func TestRenderFilesSeparatesDomainsAndInternalServices(t *testing.T) {
 	files, err := RenderFiles([]Route{
 		{Environment: "dev", App: "lango", Domain: "lango.example.test", PathPrefix: "/", Service: "dev-lango_dev-lango", Port: 8080},

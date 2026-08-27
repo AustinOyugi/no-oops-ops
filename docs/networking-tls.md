@@ -49,6 +49,12 @@ On the first deployment, No Oops prompts for an ACME contact email, exposes the 
 Let's Encrypt certificate. The managed certbot service renews it and reloads Nginx. Do not use this mode with
 `tls_certificate`.
 
+## Wildcard hostnames
+
+Ingress accepts a leftmost wildcard such as `*.vybes.africa`. nginx always selects an exact hostname first, so a route
+for `api.vybes.africa` overrides the wildcard route for that host. Wildcard HTTPS routes require an imported
+`tls_certificate`; No Oops does not use ACME HTTP-01 for wildcards.
+
 ## Cloudflare Origin TLS
 
 Use Cloudflare mode when every public hostname served by the shared ingress is Cloudflare-proxied. Enable it once in

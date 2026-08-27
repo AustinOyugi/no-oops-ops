@@ -314,6 +314,9 @@ func (s *Service) issueMissingCertificates(ctx context.Context, routes []Route) 
 		if !route.TLS || route.TLSCertificate != "" || issued[route.Domain] {
 			continue
 		}
+		if strings.HasPrefix(route.Domain, "*.") {
+			return false, fmt.Errorf("wildcard ingress domain %q requires tls_certificate; ACME HTTP-01 cannot issue wildcard certificates", route.Domain)
+		}
 		if _, err := os.Stat(filepath.Join(s.certificateDir(), "live", route.Domain, "fullchain.pem")); err == nil {
 			continue
 		} else if !os.IsNotExist(err) {
