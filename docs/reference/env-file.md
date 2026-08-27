@@ -1,6 +1,6 @@
 # Environment-file reference
 
-The environment file is YAML and is rendered into a Docker-compatible `.env` file during deployment.
+When declared, the environment file is YAML and is rendered into a Docker-compatible `.env` file during deployment. A service with no environment values or secret bindings can omit `x-noops.env` entirely.
 
 ```yaml
 sections:
@@ -33,5 +33,6 @@ env:
 Every resolvable key must exist in the environment file and be backed by `from_secret`. The referenced secret name is
 the value of `from_secret`; it must have been set for the deployment environment with `noops secret set`.
 
-With `resolution: file`, the service gets `DATABASE_URL_FILE=/run/secrets/DATABASE_URL`. With `resolution: env`, a
-generated wrapper reads the secret file and exports `DATABASE_URL` before the app starts.
+With `resolution: file`, the secret is mounted at `/run/secrets/DATABASE_URL` and no secret value is exported as an
+environment variable. With `resolution: env`, a generated wrapper reads the secret file and exports `DATABASE_URL`
+before the app starts.

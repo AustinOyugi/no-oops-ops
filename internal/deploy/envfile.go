@@ -35,3 +35,13 @@ func LoadEnvFile(path string) (EnvFile, error) {
 
 	return envFile, nil
 }
+
+// LoadOptionalEnvFile returns an empty environment when a manifest does not
+// declare x-noops.env.file. Static applications commonly need no deployment
+// environment or secret bindings.
+func LoadOptionalEnvFile(path string) (EnvFile, error) {
+	if path == "" {
+		return EnvFile{}, nil
+	}
+	return LoadEnvFile(path)
+}

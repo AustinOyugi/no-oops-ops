@@ -56,7 +56,8 @@ registry and nginx ingress, waits for both services to be ready, and writes inst
 
 ## Release and deploy an app
 
-Create an app manifest and environment file next to one another. The examples in `examples/` show the expected shape.
+Create an app manifest next to an environment file when the service needs environment values or secret bindings. Static
+services with neither can omit the environment file. The examples in `examples/` show both shapes.
 
 ```bash
 noops release prod api --service api

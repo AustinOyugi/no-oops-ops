@@ -82,8 +82,7 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 	}
 
 	envFilePath := resolveEnvFilePath(absPath, m.Env.File)
-
-	envFile, err := LoadEnvFile(envFilePath)
+	envFile, err := LoadOptionalEnvFile(envFilePath)
 	if err != nil {
 		return Result{}, err
 	}
@@ -366,6 +365,9 @@ func (s *Service) resolveSecretBindings(ctx context.Context, environment string,
 }
 
 func resolveEnvFilePath(manifestPath string, envFile string) string {
+	if envFile == "" {
+		return ""
+	}
 	return filepath.Join(filepath.Dir(manifestPath), envFile)
 }
 
