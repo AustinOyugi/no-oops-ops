@@ -85,18 +85,8 @@ func (s *Service) buildImageWithSwarmSecrets(ctx context.Context, image, dockerf
 	for _, secret := range secrets {
 		args = append(args, "--secret", "source="+secret.SwarmName+",target="+secret.ID+",mode=0400")
 	}
-	args = append(args, "--entrypoint", "/bin/sh", buildRunnerImage, "-ec", "DOCKER_BUILDKIT=1 docker build \"$@\"", "sh", "build", "-t", image, "-f", "/work/"+filepath.ToSlash(relativeDockerfile))
-	if resources.Memory != "" {
-		args = append(args, "--memory", resources.Memory)
-	}
-	if resources.CPUs != "" {
-		cpus, _ := strconv.ParseFloat(resources.CPUs, 64)
-		args = append(args, "--cpu-period", "100000", "--cpu-quota", strconv.FormatInt(int64(cpus*100000), 10))
-	}
-	for _, secret := range secrets {
-		args = append(args, "--secret", "id="+secret.ID+",src=/run/secrets/"+secret.ID)
-	}
-	args = append(args, "/work")
+	args = append(args, "--entrypoint", "/bin/sh", buildRunnerImage, "-ec", "DOCKER_BUILDKIT=1 docker build \"$@\"", "sh")
+	args = append(args, isolatedBuildArgs(image, filepath.ToSlash(relativeDockerfile), resources, secrets)...)
 
 	s.logger.InfoContext(ctx, "running isolated build with mounted secrets", "image", image, "secrets", len(secrets))
 	if _, err := s.runner.Run(ctx, "docker", args, command.RunOptions{}); err != nil {
@@ -117,6 +107,24 @@ func (s *Service) buildImageWithSwarmSecrets(ctx context.Context, image, dockerf
 		return fmt.Errorf("read isolated build logs: %w", err)
 	}
 	return nil
+}
+
+// isolatedBuildArgs are passed after `sh` to `docker build "$@"`. In
+// particular, the first argument is a Docker build option, not the literal
+// word "build", because the shell command has already selected that subcommand.
+func isolatedBuildArgs(image, relativeDockerfile string, resources manifest.BuildResources, secrets []BuildSecretBinding) []string {
+	args := []string{"-t", image, "-f", "/work/" + relativeDockerfile}
+	if resources.Memory != "" {
+		args = append(args, "--memory", resources.Memory)
+	}
+	if resources.CPUs != "" {
+		cpus, _ := strconv.ParseFloat(resources.CPUs, 64)
+		args = append(args, "--cpu-period", "100000", "--cpu-quota", strconv.FormatInt(int64(cpus*100000), 10))
+	}
+	for _, secret := range secrets {
+		args = append(args, "--secret", "id="+secret.ID+",src=/run/secrets/"+secret.ID)
+	}
+	return append(args, "/work")
 }
 
 func (s *Service) waitForBuildTask(ctx context.Context, name string) error {
