@@ -15,7 +15,7 @@ import (
 // build-context file. The generated file and the .dockerignore override are
 // restored after the build, so neither reaches the application's repository.
 func materializeBuildEnvironment(contextDir string, settings *manifest.EnvBuild, values map[string]string) (func() error, error) {
-	if settings == nil {
+	if settings == nil || settings.File == "" {
 		return func() error { return nil }, nil
 	}
 

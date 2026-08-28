@@ -87,6 +87,34 @@ func TestEnvSecretsValidateRejectsEmptyResolution(t *testing.T) {
 	}
 }
 
+func TestValidateAcceptsBuildSecretsWithoutDotenvFile(t *testing.T) {
+	m := Manifest{
+		Name:        "test",
+		Image:       Image{Repository: "repo"},
+		Service:     Service{InternalPort: 8080},
+		Healthcheck: Healthcheck{Test: []string{"CMD", "true"}},
+		Source:      Source{Context: ".", Dockerfile: "Dockerfile"},
+		Env:         Env{Build: &EnvBuild{Secrets: []string{"SENTRY_AUTH_TOKEN"}}},
+	}
+	if err := m.Validate(); err != nil {
+		t.Fatalf("build secrets without a dotenv file should be valid: %v", err)
+	}
+}
+
+func TestValidateRejectsDuplicateBuildSecrets(t *testing.T) {
+	m := Manifest{
+		Name:        "test",
+		Image:       Image{Repository: "repo"},
+		Service:     Service{InternalPort: 8080},
+		Healthcheck: Healthcheck{Test: []string{"CMD", "true"}},
+		Source:      Source{Context: ".", Dockerfile: "Dockerfile"},
+		Env:         Env{Build: &EnvBuild{Secrets: []string{"SENTRY_AUTH_TOKEN", "SENTRY_AUTH_TOKEN"}}},
+	}
+	if err := m.Validate(); err == nil {
+		t.Fatal("expected duplicate build secret validation error")
+	}
+}
+
 func TestValidateRequiresSafeExposureConfiguration(t *testing.T) {
 	base := Manifest{
 		Name:        "test",

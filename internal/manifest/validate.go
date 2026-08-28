@@ -13,6 +13,7 @@ import (
 var (
 	domainPattern     = regexp.MustCompile(`(?i)^(?:\*\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$`)
 	pathPrefixPattern = regexp.MustCompile(`^/[A-Za-z0-9._~%/@:+-]*$`)
+	envKeyPattern     = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 )
 
 func (m Manifest) Validate() error {
@@ -75,12 +76,24 @@ func (m Manifest) Validate() error {
 		}
 	}
 	if m.Env.Build != nil {
-		path := filepath.Clean(m.Env.Build.File)
 		if !m.Image.ShouldBuild() {
-			return fmt.Errorf("env.build.file requires a Compose build")
+			return fmt.Errorf("env.build requires a Compose build")
 		}
-		if m.Env.Build.File == "" || filepath.IsAbs(m.Env.Build.File) || path == ".." || strings.HasPrefix(path, ".."+string(filepath.Separator)) {
-			return fmt.Errorf("env.build.file must be a relative path within the build context")
+		if m.Env.Build.File != "" {
+			path := filepath.Clean(m.Env.Build.File)
+			if filepath.IsAbs(m.Env.Build.File) || path == ".." || strings.HasPrefix(path, ".."+string(filepath.Separator)) {
+				return fmt.Errorf("env.build.file must be a relative path within the build context")
+			}
+		}
+		seenBuildSecrets := map[string]struct{}{}
+		for _, key := range m.Env.Build.Secrets {
+			if !envKeyPattern.MatchString(key) {
+				return fmt.Errorf("env.build.secrets contains invalid environment key %q", key)
+			}
+			if _, exists := seenBuildSecrets[key]; exists {
+				return fmt.Errorf("env.build.secrets contains duplicate environment key %q", key)
+			}
+			seenBuildSecrets[key] = struct{}{}
 		}
 	}
 

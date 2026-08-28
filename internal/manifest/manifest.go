@@ -199,7 +199,8 @@ type Env struct {
 // isolated build context. It is useful for tools such as Next.js that already
 // discover dotenv files without any Dockerfile-specific integration.
 type EnvBuild struct {
-	File string `yaml:"file"`
+	File    string   `yaml:"file"`
+	Secrets []string `yaml:"secrets"`
 }
 
 type EnvSecrets struct {

@@ -10,7 +10,11 @@ import (
 	"strings"
 )
 
-func (s *Service) buildImage(ctx context.Context, image string, dockerfile string, contextDir string, resources manifest.BuildResources) error {
+func (s *Service) buildImage(ctx context.Context, image string, dockerfile string, contextDir string, resources manifest.BuildResources, secrets []BuildSecretBinding) error {
+	if len(secrets) > 0 {
+		return s.buildImageWithSwarmSecrets(ctx, image, dockerfile, contextDir, resources, secrets)
+	}
+
 	args := []string{"build", "-t", image, "-f", dockerfile}
 	if resources.Memory != "" {
 		args = append(args, "--memory", resources.Memory)

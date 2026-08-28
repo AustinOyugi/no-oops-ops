@@ -48,3 +48,13 @@ func TestMaterializeBuildEnvironmentWritesAndRestoresFiles(t *testing.T) {
 		t.Fatalf("restored .dockerignore = %q, want %q", got, want)
 	}
 }
+
+func TestMaterializeBuildEnvironmentSkipsEmptyFile(t *testing.T) {
+	cleanup, err := materializeBuildEnvironment(t.TempDir(), &manifest.EnvBuild{Secrets: []string{"SENTRY_AUTH_TOKEN"}}, nil)
+	if err != nil {
+		t.Fatalf("materializeBuildEnvironment() error = %v", err)
+	}
+	if err := cleanup(); err != nil {
+		t.Fatalf("cleanup() error = %v", err)
+	}
+}

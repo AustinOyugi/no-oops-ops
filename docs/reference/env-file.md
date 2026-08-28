@@ -37,6 +37,40 @@ Only ordinary values are supplied this way. `from_secret` values are never prese
 only when Swarm starts the service. Do not use a managed secret for a client-side `NEXT_PUBLIC_*` value: anything
 embedded in a browser bundle is public by design.
 
+## BuildKit secret mounts
+
+For a genuinely private credential required by a build tool, explicitly select the `from_secret` keys that the
+Dockerfile consumes with a standard BuildKit secret mount:
+
+```yaml
+env:
+  file: app.env.yml
+  build:
+    file: .env
+    secrets:
+      - SENTRY_AUTH_TOKEN
+```
+
+```yaml
+sections:
+  - name: telemetry
+    items:
+      - key: SENTRY_AUTH_TOKEN
+        from_secret: SENTRY_AUTH_TOKEN
+```
+
+No Oops runs this build in a one-shot Swarm task, mounting the existing Swarm secret only into that task. It passes the
+value to BuildKit as secret ID `SENTRY_AUTH_TOKEN`; the value is never written to the Git checkout or emitted into the
+final image. The Dockerfile must consume it on the exact build instruction:
+
+```dockerfile
+RUN --mount=type=secret,id=SENTRY_AUTH_TOKEN,env=SENTRY_AUTH_TOKEN \
+    npm run build
+```
+
+Use this only for private build credentials. `NEXT_PUBLIC_*` values are browser-public and should remain ordinary build
+values or be served through a runtime configuration endpoint.
+
 `from_secret` does not put a secret in `.env`. To activate a secret reference, list its environment key under
 `env.secrets.resolvable` in the app manifest:
 

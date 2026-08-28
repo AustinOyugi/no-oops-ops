@@ -87,7 +87,8 @@ x-noops:
 
 No Oops resolves and records the resulting commit SHA with the release. When `x-noops.env.build.file` is configured,
 ordinary values from `x-noops.env.file` are materialized into that ephemeral dotenv file before Docker builds;
-`from_secret` values remain runtime-only and are never exposed to an image build. A Git credential is optional for public
+`from_secret` values remain runtime-only by default. An explicit `env.build.secrets` allow-list can make a private secret
+available only as a standard BuildKit secret mount; see [environment files](env-file.md). A Git credential is optional for public
 repositories; when configured, create it for the same environment with `noops secret set` and supply only the provider
 access-token value. The `secret` value is the secret key, not the token itself.
 `x-noops.source.build.command` is unsupported: build commands belong in Dockerfile stages so they cannot leak language
