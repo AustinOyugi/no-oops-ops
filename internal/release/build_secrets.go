@@ -92,19 +92,32 @@ func (s *Service) buildImageWithSwarmSecrets(ctx context.Context, image, dockerf
 	if _, err := s.runner.Run(ctx, "docker", args, command.RunOptions{}); err != nil {
 		return fmt.Errorf("start isolated build: %w", err)
 	}
-	if err := s.waitForBuildTask(ctx, name); err != nil {
-		result, logsErr := s.runner.Run(ctx, "docker", []string{"service", "logs", "--raw", name}, command.RunOptions{})
-		if logsErr == nil && len(strings.TrimSpace(string(result.Output))) > 0 {
-			return fmt.Errorf("isolated build failed: %s", strings.TrimSpace(string(result.Output)))
-		}
-		return err
+
+	// Reuse the command runner's streamed output while the Swarm task runs.
+	// Waiting for logs only after completion makes long cold builds look stuck.
+	logsCtx, stopLogs := context.WithCancel(ctx)
+	type logResult struct {
+		output []byte
+		err    error
 	}
-	if _, err := s.runner.Run(ctx, "docker", []string{"service", "logs", "--raw", name}, command.RunOptions{
-		StreamOutput: true,
-		Stdout:       os.Stdout,
-		Stderr:       os.Stderr,
-	}); err != nil {
-		return fmt.Errorf("read isolated build logs: %w", err)
+	logsDone := make(chan logResult, 1)
+	go func() {
+		result, err := s.runner.Run(logsCtx, "docker", []string{"service", "logs", "--raw", "--follow", name}, command.RunOptions{
+			StreamOutput: true,
+			Stdout:       os.Stdout,
+			Stderr:       os.Stderr,
+		})
+		logsDone <- logResult{output: result.Output, err: err}
+	}()
+
+	buildErr := s.waitForBuildTask(ctx, name)
+	stopLogs()
+	logs := <-logsDone
+	if buildErr != nil {
+		if output := strings.TrimSpace(string(logs.output)); output != "" {
+			return fmt.Errorf("isolated build failed: %s", output)
+		}
+		return buildErr
 	}
 	return nil
 }
@@ -134,12 +147,19 @@ func isolatedBuildArgs(image, relativeDockerfile string, resources manifest.Buil
 func (s *Service) waitForBuildTask(ctx context.Context, name string) error {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
+	lastState := ""
+	nextProgress := time.Now()
 	for {
 		result, err := s.runner.Run(ctx, "docker", []string{"service", "ps", "--no-trunc", "--format", "{{.CurrentState}}", name}, command.RunOptions{})
 		if err != nil {
 			return fmt.Errorf("inspect isolated build: %w", err)
 		}
 		state := strings.TrimSpace(string(result.Output))
+		if state != lastState || time.Now().After(nextProgress) {
+			s.logger.InfoContext(ctx, "isolated build in progress", "service", name, "state", state)
+			lastState = state
+			nextProgress = time.Now().Add(15 * time.Second)
+		}
 		if strings.HasPrefix(state, "Complete") {
 			return nil
 		}
