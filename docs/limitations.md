@@ -3,7 +3,6 @@
 - The internal registry is a local, plain-HTTP registry and requires Docker insecure-registry configuration.
 - Blue/green deployments (the default for exposed apps) currently reject manifests with named volumes, because
   concurrently running releases must not receive independent stack-scoped volume names.
-- There is no release-list command.
 - Registry garbage collection runs offline when `noops cleanup --apply` removes registry images. The registry is
   temporarily unavailable while that collection runs.
 - TLS certificate renewal currently mounts the Docker daemon socket into certbot so its renewal hook can force an nginx

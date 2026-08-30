@@ -44,6 +44,12 @@ func ListHistory(cfg config.Config, appName, environment string) ([]Metadata, er
 		}
 		metadata = append(metadata, item)
 	}
+	sort.Slice(metadata, func(i, j int) bool {
+		if metadata[i].CreateAt.Equal(metadata[j].CreateAt) {
+			return metadata[i].Tag > metadata[j].Tag
+		}
+		return metadata[i].CreateAt.After(metadata[j].CreateAt)
+	})
 
 	return metadata, nil
 }

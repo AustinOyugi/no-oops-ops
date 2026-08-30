@@ -57,14 +57,14 @@ func (s *Service) buildSecretBindings(ctx context.Context, manifestPath string, 
 	return bindings, nil
 }
 
-// buildImageWithSwarmSecrets runs Docker CLI in a one-shot Swarm task. That
-// task is the only process able to read the source Swarm secrets; it streams
-// each one directly to BuildKit using --secret without writing it to the Git
-// checkout or the final image.
-func (s *Service) buildImageWithSwarmSecrets(ctx context.Context, image, dockerfile, contextDir string, resources manifest.BuildResources, secrets []BuildSecretBinding) error {
+// buildImageIsolated runs every Docker build in a one-shot Swarm task. When a
+// build uses secrets, that task is the only process able to read them; it
+// streams each one directly to BuildKit using --secret without writing it to
+// the Git checkout or the final image.
+func (s *Service) buildImageIsolated(ctx context.Context, image, dockerfile, contextDir string, resources manifest.BuildResources, secrets []BuildSecretBinding) error {
 	relativeDockerfile, err := filepath.Rel(contextDir, dockerfile)
 	if err != nil || relativeDockerfile == ".." || strings.HasPrefix(relativeDockerfile, ".."+string(filepath.Separator)) {
-		return fmt.Errorf("build Dockerfile %q must be within build context %q when using build secrets", dockerfile, contextDir)
+		return fmt.Errorf("build Dockerfile %q must be within isolated build context %q", dockerfile, contextDir)
 	}
 
 	random := make([]byte, 6)
@@ -88,7 +88,7 @@ func (s *Service) buildImageWithSwarmSecrets(ctx context.Context, image, dockerf
 	args = append(args, "--entrypoint", "/bin/sh", buildRunnerImage, "-ec", "DOCKER_BUILDKIT=1 docker build \"$@\"", "sh")
 	args = append(args, isolatedBuildArgs(image, filepath.ToSlash(relativeDockerfile), resources, secrets)...)
 
-	s.logger.InfoContext(ctx, "running isolated build with mounted secrets", "image", image, "secrets", len(secrets))
+	s.logger.InfoContext(ctx, "running isolated build", "image", image, "secrets", len(secrets))
 	if _, err := s.runner.Run(ctx, "docker", args, command.RunOptions{}); err != nil {
 		return fmt.Errorf("start isolated build: %w", err)
 	}
@@ -126,11 +126,14 @@ func (s *Service) buildImageWithSwarmSecrets(ctx context.Context, image, dockerf
 // particular, the first argument is a Docker build option, not the literal
 // word "build", because the shell command has already selected that subcommand.
 func isolatedBuildArgs(image, relativeDockerfile string, resources manifest.BuildResources, secrets []BuildSecretBinding) []string {
+	args := []string{"-t", image, "-f", "/work/" + relativeDockerfile}
 	// BuildKit deliberately excludes secret contents from cache keys. A build
 	// that consumes an environment secret must therefore bypass cache so a
 	// rotated value is reflected in generated client assets (for example,
 	// Next.js NEXT_PUBLIC_* values).
-	args := []string{"--no-cache", "-t", image, "-f", "/work/" + relativeDockerfile}
+	if len(secrets) > 0 {
+		args = append([]string{"--no-cache"}, args...)
+	}
 	if resources.Memory != "" {
 		args = append(args, "--memory", resources.Memory)
 	}

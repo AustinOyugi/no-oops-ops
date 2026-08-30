@@ -61,10 +61,10 @@ services, and rejects plainly embedded credential-like environment values. Move 
 
 ## Git build contexts
 
-When `x-noops.build.source.git` is present, No Oops fetches the configured environment's repository/ref in a temporary
-Swarm Git-fetch task. Private-source tokens are mounted only into that task as a Swarm secret. The Compose
-`build.context` and `build.dockerfile` paths are resolved from that checkout; no application toolchain or Git
-installation is required on the host.
+When `x-noops.build.source.git` is present, No Oops fetches the configured environment's repository/ref into a temporary
+workspace. Private-source tokens are mounted only into a one-shot Swarm Git-fetch task as a Swarm secret. The Compose
+`build.context` and `build.dockerfile` paths are resolved from that checkout; every resulting Docker build runs in a
+one-shot Swarm build task, and no application toolchain or Git installation is required on the host.
 
 ```yaml
 build:
@@ -98,7 +98,7 @@ runtimes onto the host. Builds are serialized per workspace to avoid competing f
 
 The defaults are: update `order: start-first`, `parallelism: 1`, `delay: 10s`, `failure_action: rollback`; restart
 `condition: on-failure`, `delay: 10s`, `max_attempts: 5`, `window: 70s`; rollback `order: start-first`,
-`parallelism: 1`, `delay: 0s`, `failure_action: pause`; and `convergence_timeout: 4m`.
+`parallelism: 1`, `delay: 0s`, `failure_action: pause`; and `convergence_timeout: 2m`.
 
 `rollout.monitor` defaults to `healthcheck.start_period + retries × interval + timeout + 10s`. Override it only when the
 application needs a longer or shorter Swarm monitoring window. `max_failure_ratio` for both update and rollback must be
@@ -117,8 +117,8 @@ port is published directly. `noops remove` removes the route before stopping the
 Blue/green promotion is enabled by default for stateless ingress-managed apps. Named volumes are rejected in blue/green
 mode; set `x-noops.ingress.blue_green: false` to use an in-place Swarm update for stateful services. Set
 `x-noops.ingress.tls: true` to serve HTTPS. The domain's DNS A/AAAA record must resolve to the Swarm manager and allow
-inbound ports 80 and 443. With the default platform ingress, the first deployment makes the HTTP-01 challenge path available, obtains a
-Let's Encrypt certificate, and then enables the HTTPS virtual host with HTTP-to-HTTPS redirects. Subsequent certificate
+inbound ports 80 and 443. With the default platform ingress, the first deployment makes the HTTP-01 challenge path
+available, obtains a Let's Encrypt certificate, and then enables the HTTPS virtual host with HTTP-to-HTTPS redirects. Subsequent certificate
 renewals reload nginx automatically. The current renewal service mounts the Docker daemon socket to force that reload;
 this grants it root-equivalent Docker-host access and is suitable only for the trusted single-node platform. A given
 domain/path-prefix pair can be owned by only one deployed app, and all routes sharing a domain must agree on its TLS

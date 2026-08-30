@@ -1,7 +1,7 @@
 # No Oops Ops
 
 No Oops Ops is a self-hosted CLI for repeatable Docker Swarm deployments. It fetches application source from Git,
-builds images in isolated containers, creates immutable releases in an internal registry, deploys them with Docker
+builds every image in a one-shot isolated Swarm task, creates immutable releases in an internal registry, deploys them with Docker
 Stack, records deployment history, and manages environment-scoped Swarm secrets.
 
 It is intended for small Docker-based services that need a dependable deployment workflow without operating a full
@@ -16,16 +16,16 @@ See [Getting started](docs/getting-started.md).
 make install
 noops init /srv/noops/example
 cd /srv/noops/example
-# Add the `lango` app alias and its manifest path to apps.yml.
+# Add the `redis` app alias and its manifest path to apps.yml.
 noops install
-noops secret set prod github-readonly # only for private Git sources
-noops release prod lango --service lango
-noops deploy prod lango --service lango
+noops secret set prod REDIS_PASSWORD
+noops release prod redis --service redis
+noops deploy prod redis --service redis
 ```
 
 `init` creates an empty, version-matched `apps.yml` catalog. Add each app's stable alias and Compose-shaped manifest
 path before releasing it; see [Configuration and generated state](docs/reference/configuration.md) for the catalog
-format and the [`lango` example](examples/paas/apps/service/lango.app.yml) for a manifest.
+format and the [`redis` example](examples/paas/apps/redis/app.yml) for a manifest.
 
 If the app uses secrets, create them before deployment:
 
@@ -48,17 +48,19 @@ noops secret set prod AUTH_SERVER_API_CLIENT_SECRET
 ## Typical workflow
 
 ```text
-install → secret set (when needed) → release → deploy → rollback or remove
+install → secret set (when needed) → release → release list → deploy → rollback or remove
 ```
 
 `apps.yml` maps stable app names to ordinary Compose-shaped `app.yml` files. Add `x-noops` only for No Oops behavior;
 standard Compose and Swarm fields remain the application's source of truth. Lifecycle commands require
 `--service <name>` or `--all`; `--all` uses a stable dependency order and stops at the first failure.
 
-`release` creates and pushes an immutable timestamped image. For `x-noops.build.source.git`, it starts a short-lived
-Swarm Git-fetch task, mounts an environment-scoped source secret only into that task, then builds the checked-out source
-with Docker. Build toolchains such as Maven, Java, Node, or Go belong in the Dockerfile—not on the deployment host.
-`deploy` uses the latest recorded release by default, waits for the configured health and rollout result, and records
+`release` creates and pushes an immutable timestamped image. `release list` shows the recorded releases for a service,
+newest first. Every build runs in a short-lived Swarm task; for `x-noops.build.source.git`, No Oops first fetches the
+source in a temporary workspace. Private-source fetches use a short-lived Swarm Git-fetch task and mount an
+environment-scoped source secret only into that task. Build toolchains such as Maven, Java, Node, or Go belong in the
+Dockerfile—not on the deployment host. `deploy` uses the latest
+recorded release by default (and creates one when none exists), waits for the configured health and rollout result, and records
 the final Swarm outcome. `install` waits for the managed registry and nginx services to become ready; `status` reports
 their task readiness and marks partially running services as degraded.
 
@@ -67,9 +69,12 @@ their task readiness and marks partially running services as degraded.
 ```bash
 make build
 make test
+make release-snapshot
 ```
 
 `make build` writes the local executable to `.bin/noops`; `make install` installs it to `~/.local/bin/noops`.
+`make release-snapshot` verifies the release archive locally. `make release VERSION=0.0.1` creates and pushes the
+corresponding `v0.0.1` tag; GitHub then publishes the tagged release.
 
 ## Current capabilities
 

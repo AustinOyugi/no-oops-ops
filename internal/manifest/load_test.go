@@ -154,7 +154,7 @@ func TestLoadComposeShapedExamples(t *testing.T) {
 		{"../../examples/paas/apps/postgres/postgres.app.yml", "postgres"},
 		{"../../examples/paas/apps/postgres/postgres.app.yml", "pgbouncer"},
 		{"../../examples/paas/apps/keycloak/keycloak.app.yml", "keycloak"},
-		{"../../examples/paas/apps/service/lango.app.yml", "lango"},
+		{"../../examples/paas/apps/redis/app.yml", "redis"},
 	} {
 		if _, err := LoadService(example.path, example.service); err != nil {
 			t.Errorf("LoadService(%q, %q): %v", example.path, example.service, err)

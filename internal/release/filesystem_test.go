@@ -79,6 +79,26 @@ func TestSourceTag(t *testing.T) {
 	}
 }
 
+func TestListHistoryReturnsNewestReleaseFirst(t *testing.T) {
+	cfg := config.Config{StateDir: t.TempDir()}
+	for _, metadata := range []Metadata{
+		{App: "api", Environment: "prod", Tag: "20260830-010000", CreateAt: time.Date(2026, time.August, 30, 1, 0, 0, 0, time.UTC)},
+		{App: "api", Environment: "prod", Tag: "20260830-020000", CreateAt: time.Date(2026, time.August, 30, 2, 0, 0, 0, time.UTC)},
+	} {
+		if _, err := saveMetadataHistory(cfg, metadata.App, metadata); err != nil {
+			t.Fatalf("saveMetadataHistory() error = %v", err)
+		}
+	}
+
+	history, err := ListHistory(cfg, "api", "prod")
+	if err != nil {
+		t.Fatalf("ListHistory() error = %v", err)
+	}
+	if got, want := history[0].Tag, "20260830-020000"; got != want {
+		t.Errorf("first release tag = %q, want %q", got, want)
+	}
+}
+
 func boolPtr(value bool) *bool {
 	return &value
 }

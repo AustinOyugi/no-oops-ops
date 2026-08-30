@@ -7,9 +7,13 @@ import (
 
 	"github.com/AustinOyugi/no-oops-ops/internal/catalog"
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
+	"github.com/AustinOyugi/no-oops-ops/internal/release"
 )
 
 func (a *App) runRelease(ctx context.Context, args []string) error {
+	if len(args) > 0 && args[0] == "list" {
+		return a.runReleaseList(ctx, args[1:])
+	}
 	environment, manifestPath, services, err := parseServiceArgs(args, "release", a.resolveApp)
 	if err != nil {
 		return err
@@ -20,6 +24,38 @@ func (a *App) runRelease(ctx context.Context, args []string) error {
 		}
 	}
 	return nil
+}
+
+func (a *App) runReleaseList(ctx context.Context, args []string) error {
+	environment, manifestPath, services, err := parseServiceArgs(args, "release list", a.resolveApp)
+	if err != nil {
+		return err
+	}
+	for _, service := range services {
+		m, err := manifest.Load(manifest.WithService(manifestPath, service))
+		if err != nil {
+			return err
+		}
+		history, err := release.ListHistory(a.config, m.Name, environment)
+		if err != nil {
+			return err
+		}
+		if len(history) == 0 {
+			a.logger.InfoContext(ctx, "release history", "environment", environment, "service", m.Name, "releases", 0)
+			continue
+		}
+		for _, item := range history {
+			a.logger.InfoContext(ctx, "release", "environment", item.Environment, "service", item.App, "tag", item.Tag, "image", item.RegistryImage, "created_at", item.CreateAt, "git_commit", gitCommit(item))
+		}
+	}
+	return nil
+}
+
+func gitCommit(metadata release.Metadata) string {
+	if metadata.Git == nil {
+		return ""
+	}
+	return metadata.Git.Commit
 }
 
 func (a *App) runReleaseService(ctx context.Context, environment, manifestPath string) error {

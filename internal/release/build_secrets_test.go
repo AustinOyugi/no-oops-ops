@@ -20,3 +20,15 @@ func TestIsolatedBuildArgsHasOneBuildContext(t *testing.T) {
 		t.Fatalf("isolatedBuildArgs() = %q, want %q", got, want)
 	}
 }
+
+func TestIsolatedBuildArgsKeepsCacheWithoutSecrets(t *testing.T) {
+	got := isolatedBuildArgs("registry.example/app:tag", "Dockerfile", manifest.BuildResources{}, nil)
+	want := []string{
+		"-t", "registry.example/app:tag",
+		"-f", "/work/Dockerfile",
+		"/work",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("isolatedBuildArgs() = %q, want %q", got, want)
+	}
+}
