@@ -347,9 +347,21 @@ func (s *Service) issueMissingCertificates(ctx context.Context, routes []Route) 
 func (s *Service) reload(ctx context.Context) error {
 	serviceName := s.config.NginxName + "_nginx"
 	s.logger.InfoContext(ctx, "reconciling nginx ingress", "service", serviceName)
-	result, err := s.runner.Run(ctx, "docker", []string{"service", "update", "--force", serviceName}, command.RunOptions{LogCommand: true})
+	result, err := s.runner.Run(ctx, "docker", []string{
+		"ps", "-q", "--filter", "label=com.docker.swarm.service.name=" + serviceName,
+	}, command.RunOptions{})
 	if err != nil {
-		return fmt.Errorf("reload nginx service %q: %w: %s", serviceName, err, strings.TrimSpace(string(result.Output)))
+		return fmt.Errorf("find nginx containers for service %q: %w: %s", serviceName, err, strings.TrimSpace(string(result.Output)))
+	}
+	containers := strings.Fields(string(result.Output))
+	if len(containers) == 0 {
+		return fmt.Errorf("nginx service %q has no running containers", serviceName)
+	}
+	for _, container := range containers {
+		result, err = s.runner.Run(ctx, "docker", []string{"exec", container, "nginx", "-s", "reload"}, command.RunOptions{LogCommand: true})
+		if err != nil {
+			return fmt.Errorf("reload nginx container %q for service %q: %w: %s", container, serviceName, err, strings.TrimSpace(string(result.Output)))
+		}
 	}
 	return nil
 }

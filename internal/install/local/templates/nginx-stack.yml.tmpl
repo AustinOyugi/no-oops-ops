@@ -36,8 +36,10 @@ services:
     command:
       - >-
         apk add --no-cache docker-cli && while :; do certbot renew --webroot
-        --webroot-path /var/www/certbot --deploy-hook 'docker service update
-        --force {{ .NginxService }}'; sleep 12h; done
+        --webroot-path /var/www/certbot --deploy-hook 'nginx_containers="$(docker ps -q
+        --filter label=com.docker.swarm.service.name={{ .NginxService }})"; test -n
+        "$nginx_containers" && for nginx_container in $nginx_containers;
+        do docker exec "$nginx_container" nginx -s reload; done'; sleep 12h; done
     volumes:
       - "{{ .ACMEWebroot }}:/var/www/certbot:rw"
       - "{{ .CertificateDir }}:/etc/letsencrypt:rw"

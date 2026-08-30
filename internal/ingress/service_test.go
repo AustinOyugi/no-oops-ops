@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -88,6 +89,41 @@ func TestReconcileSkipsReloadForUnexposedAppWithoutRoute(t *testing.T) {
 	if len(runner.calls) != 0 {
 		t.Fatalf("unexpected nginx command: %v", runner.calls)
 	}
+}
+
+func TestReloadGracefullyReloadsRunningNginxContainers(t *testing.T) {
+	runner := &reloadRecordingRunner{output: "nginx-one\nnginx-two\n"}
+	service := &Service{
+		logger: slog.Default(),
+		config: config.Config{NginxName: "noops-nginx"},
+		runner: runner,
+	}
+
+	if err := service.reload(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	want := [][]string{
+		{"docker", "ps", "-q", "--filter", "label=com.docker.swarm.service.name=noops-nginx_nginx"},
+		{"docker", "exec", "nginx-one", "nginx", "-s", "reload"},
+		{"docker", "exec", "nginx-two", "nginx", "-s", "reload"},
+	}
+	if !reflect.DeepEqual(runner.calls, want) {
+		t.Fatalf("reload commands = %v, want %v", runner.calls, want)
+	}
+}
+
+type reloadRecordingRunner struct {
+	calls  [][]string
+	output string
+}
+
+func (r *reloadRecordingRunner) Run(_ context.Context, name string, args []string, _ command.RunOptions) (command.Result, error) {
+	r.calls = append(r.calls, append([]string{name}, args...))
+	if len(args) > 0 && args[0] == "ps" {
+		return command.Result{Output: []byte(r.output)}, nil
+	}
+	return command.Result{}, nil
 }
 
 func TestValidateCloudflareRoutesRequiresImportedCertificate(t *testing.T) {

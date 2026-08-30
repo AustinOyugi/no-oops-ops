@@ -5,8 +5,8 @@
   concurrently running releases must not receive independent stack-scoped volume names.
 - Registry garbage collection runs offline when `noops cleanup --apply` removes registry images. The registry is
   temporarily unavailable while that collection runs.
-- TLS certificate renewal currently mounts the Docker daemon socket into certbot so its renewal hook can force an nginx
-  service reload. Access to that socket is effectively root-equivalent on the Docker host; this is accepted only for the
+- TLS certificate renewal currently mounts the Docker daemon socket into certbot so its renewal hook can gracefully reload
+  nginx. Access to that socket is effectively root-equivalent on the Docker host; this is accepted only for the
   trusted, single-node local platform and should be replaced by a host-side reload controller.
 - No Oops Ops manages a local Docker Swarm deployment platform; it is not a multi-host control plane.
 - Docker Swarm determines health and automatic update rollback. No Oops Ops reports the final rollout outcome and task

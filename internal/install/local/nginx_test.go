@@ -31,8 +31,10 @@ func TestRenderNginxStack(t *testing.T) {
 		`entrypoint: ["/bin/sh", "-c"]`,
 		"command:",
 		"- >-",
-		"--webroot-path /var/www/certbot --deploy-hook 'docker service update",
-		"--force noops-nginx_nginx'; sleep 12h; done",
+		"--webroot-path /var/www/certbot --deploy-hook 'nginx_containers=\"$(docker ps -q",
+		"--filter label=com.docker.swarm.service.name=noops-nginx_nginx",
+		"\"$nginx_containers\" && for nginx_container in $nginx_containers",
+		"do docker exec \"$nginx_container\" nginx -s reload; done'; sleep 12h; done",
 		"/var/run/docker.sock:/var/run/docker.sock",
 	} {
 		if !strings.Contains(output, want) {
