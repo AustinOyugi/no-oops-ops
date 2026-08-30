@@ -4,8 +4,7 @@ No Oops Ops is a self-hosted CLI for repeatable Docker Swarm deployments. It fet
 builds every image in a one-shot isolated Swarm task, creates immutable releases in an internal registry, deploys them with Docker
 Stack, records deployment history, and manages environment-scoped Swarm secrets.
 
-It is intended for small Docker-based services that need a dependable deployment workflow without operating a full
-platform.
+It is intended for services that need a dependable deployment workflow without operating a full platform.
 
 ## Quick start
 
