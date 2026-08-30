@@ -24,5 +24,3 @@ apps:
     manifest: ./apps/neo4j/app.yml
   chatwoot:
     manifest: ./apps/chatwoot/app.yml
-  lango:
-    manifest: ./apps/service/lango.app.yml

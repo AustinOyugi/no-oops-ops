@@ -1,0 +1,115 @@
+services:
+  chatwoot:
+    image: chatwoot-rails
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    environment:
+      NODE_ENV: production
+      RAILS_ENV: production
+      INSTALLATION_ENV: docker
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        export POSTGRES_USERNAME="$$(cat /run/secrets/POSTGRES_USERNAME)"
+        export POSTGRES_PASSWORD="$$(cat /run/secrets/POSTGRES_PASSWORD)"
+        export REDIS_PASSWORD="$$(cat /run/secrets/REDIS_PASSWORD)"
+        export SECRET_KEY_BASE="$$(cat /run/secrets/SECRET_KEY_BASE)"
+        exec ./docker/entrypoints/rails.sh "$$@"
+      - --
+    command:
+      - bundle
+      - exec
+      - rails
+      - s
+      - -p
+      - "3000"
+      - -b
+      - 0.0.0.0
+    volumes:
+      - chatwoot_storage:/app/storage
+    x-noops:
+      build:
+        timeout: 30m
+        source:
+          git:
+            url: https://github.com/CraniumTechies/chatwoot.git
+            environments:
+              prod:
+                ref: feat/vybes
+                secret: cranium
+      service:
+        internal_port: 3000
+      ingress:
+        enabled: true
+        domain: chat.vybes.africa
+        path_prefix: /
+        tls_certificate: cranium-cloudflare
+        proxy:
+          websocket: true
+        blue_green: false
+      env:
+        file: env.yml
+        secrets:
+          resolution: file
+          resolvable:
+            - POSTGRES_USERNAME
+            - POSTGRES_PASSWORD
+            - REDIS_PASSWORD
+            - SECRET_KEY_BASE
+  chatwoot-sidekiq:
+    image: chatwoot-sidekiq
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    environment:
+      NODE_ENV: production
+      RAILS_ENV: production
+      INSTALLATION_ENV: docker
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        export POSTGRES_USERNAME="$$(cat /run/secrets/POSTGRES_USERNAME)"
+        export POSTGRES_PASSWORD="$$(cat /run/secrets/POSTGRES_PASSWORD)"
+        export REDIS_PASSWORD="$$(cat /run/secrets/REDIS_PASSWORD)"
+        export SECRET_KEY_BASE="$$(cat /run/secrets/SECRET_KEY_BASE)"
+        exec "$$@"
+      - --
+    command:
+      - bundle
+      - exec
+      - sidekiq
+      - -C
+      - config/sidekiq.yml
+    volumes:
+      - chatwoot_storage:/app/storage
+    x-noops:
+      build:
+        timeout: 30m
+        source:
+          git:
+            url: https://github.com/CraniumTechies/chatwoot.git
+            environments:
+              prod:
+                ref: feat/vybes
+                secret: cranium
+      ingress:
+        blue_green: false
+      depends_on:
+        - chatwoot
+      env:
+        file: env.yml
+        secrets:
+          resolution: file
+          resolvable:
+            - POSTGRES_USERNAME
+            - POSTGRES_PASSWORD
+            - REDIS_PASSWORD
+            - SECRET_KEY_BASE
+
+volumes:
+  chatwoot_storage:
+    external: true
+    name: noops-chatwoot-storage

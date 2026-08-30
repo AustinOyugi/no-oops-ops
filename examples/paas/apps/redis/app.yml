@@ -1,0 +1,30 @@
+services:
+  redis:
+    image: "redis:7.4-alpine"
+    command:
+      - sh
+      - -c
+      - 'exec redis-server --appendonly yes --bind 0.0.0.0 --protected-mode no --requirepass "$$REDIS_PASSWORD"'
+    healthcheck:
+      test: [ "CMD-SHELL", "redis-cli", "ping" ]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+      - "redis_data:/data"
+    x-noops:
+      rollout:
+        convergence_timeout: 4m
+      ingress:
+        blue_green: false
+      env:
+        file: env.yml
+        secrets:
+          resolution: env
+          resolvable:
+            - REDIS_PASSWORD
+volumes:
+  redis_data:
