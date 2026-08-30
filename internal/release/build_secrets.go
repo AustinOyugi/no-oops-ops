@@ -113,7 +113,11 @@ func (s *Service) buildImageWithSwarmSecrets(ctx context.Context, image, dockerf
 // particular, the first argument is a Docker build option, not the literal
 // word "build", because the shell command has already selected that subcommand.
 func isolatedBuildArgs(image, relativeDockerfile string, resources manifest.BuildResources, secrets []BuildSecretBinding) []string {
-	args := []string{"-t", image, "-f", "/work/" + relativeDockerfile}
+	// BuildKit deliberately excludes secret contents from cache keys. A build
+	// that consumes an environment secret must therefore bypass cache so a
+	// rotated value is reflected in generated client assets (for example,
+	// Next.js NEXT_PUBLIC_* values).
+	args := []string{"--no-cache", "-t", image, "-f", "/work/" + relativeDockerfile}
 	if resources.Memory != "" {
 		args = append(args, "--memory", resources.Memory)
 	}
