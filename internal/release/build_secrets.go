@@ -147,19 +147,12 @@ func isolatedBuildArgs(image, relativeDockerfile string, resources manifest.Buil
 func (s *Service) waitForBuildTask(ctx context.Context, name string) error {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
-	lastState := ""
-	nextProgress := time.Now()
 	for {
 		result, err := s.runner.Run(ctx, "docker", []string{"service", "ps", "--no-trunc", "--format", "{{.CurrentState}}", name}, command.RunOptions{})
 		if err != nil {
 			return fmt.Errorf("inspect isolated build: %w", err)
 		}
 		state := strings.TrimSpace(string(result.Output))
-		if state != lastState || time.Now().After(nextProgress) {
-			s.logger.InfoContext(ctx, "isolated build in progress", "service", name, "state", state)
-			lastState = state
-			nextProgress = time.Now().Add(15 * time.Second)
-		}
 		if strings.HasPrefix(state, "Complete") {
 			return nil
 		}
