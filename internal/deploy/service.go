@@ -259,7 +259,7 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		return Result{}, s.cleanupFailedCandidate(ctx, blueGreen, deploymentStack, fmt.Errorf("reconcile ingress route: %w", err))
 	}
 
-	deploymentPath, err := s.deployments.Save(s.config, Deployment{
+	deployment := Deployment{
 		App:            m.Name,
 		CreatedAt:      time.Now().UTC(),
 		Environment:    environment,
@@ -269,29 +269,20 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		StackName:      deploymentStack,
 		ServiceName:    deploymentSwarmService,
 		SecretBindings: secretBindings,
-	})
+	}
+	deploymentPath, err := s.deployments.Save(s.config, deployment)
 	if err != nil {
 		return Result{}, err
 	}
-
 	err = s.releases.SetLatest(s.config, m.Name, release.ActiveRelease{Tag: releaseTag, IsAvailable: true}, environment)
 	if err != nil {
 		return Result{}, err
 	}
 
-	// The candidate is now the recorded active deployment and ingress already
-	// targets it. Only after persisting that fact may the previous stack be
-	// removed; otherwise a failed cleanup could leave the new active stack
-	// untracked and cause later deployments to accumulate candidates.
-	if blueGreen {
-		previousStack := activeDeployment.StackName
-		if previousStack == "" {
-			previousStack = stackName(environment, m.Name)
-		}
-		if err := s.removeStack(ctx, previousStack); err != nil {
-			s.logger.WarnContext(ctx, "could not remove previous blue-green stack after promotion", "stack", previousStack, "error", err)
-		}
-	}
+	// The new service is recorded and ingress already targets it. Reconcile all
+	// older stacks belonging to this app/environment, including candidates left
+	// behind by earlier No Oops versions.
+	s.removeStaleAppStacks(ctx, environment, m.Name, deploymentStack)
 
 	return Result{
 		DeploymentPath: deploymentPath,
