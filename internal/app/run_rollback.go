@@ -7,7 +7,7 @@ import (
 )
 
 func (a *App) runRollback(ctx context.Context, args []string) error {
-	environment, manifestPath, services, err := parseServiceArgs(args, "rollback", a.resolveApp)
+	environment, manifestPath, services, err := parseServiceArgs(args, "rollback", a.resolveApp, false)
 	if err != nil {
 		return err
 	}

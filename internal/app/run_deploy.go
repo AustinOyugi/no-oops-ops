@@ -166,7 +166,7 @@ func parseDeployArgs(args []string, resolveApp func(string) (string, error)) (en
 		args = args[1:]
 	}
 	if len(args) < 2 {
-		return "", "", nil, false, errors.New("deploy requires an environment, app name, and --service <name> or --all")
+		return "", "", nil, false, errors.New("deploy requires an environment and app name")
 	}
 	environment = args[0]
 	manifestPath, err = resolveApp(args[1])
@@ -180,7 +180,17 @@ func parseDeployArgs(args []string, resolveApp func(string) (string, error)) (en
 	if len(args) == 4 && args[2] == "--service" {
 		return environment, manifestPath, []string{args[3]}, quick, nil
 	}
-	return "", "", nil, false, errors.New("deploy requires exactly --service <name> or --all")
+	if len(args) == 2 {
+		names, e := manifest.Services(manifestPath)
+		if e != nil {
+			return "", "", nil, false, e
+		}
+		if len(names) == 1 {
+			return environment, manifestPath, names, quick, nil
+		}
+		return "", "", nil, false, errors.New("deploy requires --service <name> or --all when the manifest contains multiple services")
+	}
+	return "", "", nil, false, errors.New("deploy accepts only --service <name> or --all")
 }
 
 func (a *App) runDeployPreflight(ctx context.Context) error {

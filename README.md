@@ -18,8 +18,8 @@ cd /srv/noops/example
 # Add the `redis` app alias and its manifest path to apps.yml.
 noops install
 noops secret set prod REDIS_PASSWORD
-noops release prod redis --service redis
-noops deploy prod redis --service redis
+noops release prod redis
+noops deploy prod redis
 ```
 
 `init` creates an empty, version-matched `apps.yml` catalog. Add each app's stable alias and Compose-shaped manifest

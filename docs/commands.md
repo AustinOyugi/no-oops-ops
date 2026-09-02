@@ -9,9 +9,9 @@ noops [--workspace <workspace>] install
 noops [--workspace <workspace>] uninstall [--purge]
 noops [--workspace <workspace>] doctor [--deploy-ready]
 noops [--workspace <workspace>] status
-noops [--workspace <workspace>] release <environment> <app> (--service <name> | --all)
-noops [--workspace <workspace>] release list <environment> <app> (--service <name> | --all)
-noops [--workspace <workspace>] deploy [--quick] <environment> <app> (--service <name> | --all)
+noops [--workspace <workspace>] release <environment> <app> [--service <name> | --all]
+noops [--workspace <workspace>] release list <environment> <app> [--service <name> | --all]
+noops [--workspace <workspace>] deploy [--quick] <environment> <app> [--service <name> | --all]
 noops [--workspace <workspace>] rollback <environment> <app> (--service <name> | --all)
 noops [--workspace <workspace>] remove <environment> <app> (--service <name> | --all)
 noops [--workspace <workspace>] secret set <environment> <key>
@@ -45,9 +45,9 @@ directories.
 
 | Command                                                    | Behavior                                                                                                                                                                                                                                                                                                       |
 |------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `release <env> <app> (--service <name> \| --all)`          | Builds selected services or snapshots image-only services, pushes immutable images, and records release metadata. Git-backed builds fetch into a temporary workspace and run the Dockerfile's build stages; no language runtime is installed on the host.                                                      |
-| `release list <env> <app> (--service <name> \| --all)`     | Lists recorded releases for selected services, newest first.                                                                                                      |
-| `deploy [--quick] <env> <app> (--service <name> \| --all)` | Deploys selected services using their latest recorded releases. If none exists, it creates one first. `--quick` uses the health-check start period as its monitor window. The normal rollout convergence timeout defaults to two minutes unless the manifest overrides it. |
+| `release <env> <app> [--service <name> \| --all]`          | Builds selected services or snapshots image-only services, pushes immutable images, and records release metadata. When the manifest has exactly one service, omit service selection; multi-service manifests require `--service` or `--all`. Git-backed builds fetch into a temporary workspace and run the Dockerfile's build stages; no language runtime is installed on the host. |
+| `release list <env> <app> [--service <name> \| --all]`     | Lists recorded releases for selected services, newest first. When the manifest has exactly one service, omit service selection.                                                                                                      |
+| `deploy [--quick] <env> <app> [--service <name> \| --all]` | Deploys selected services using their latest recorded releases. If none exists, it creates one first. When the manifest has exactly one service, omit service selection; multi-service manifests require `--service` or `--all`. `--quick` uses the health-check start period as its monitor window. The normal rollout convergence timeout defaults to two minutes unless the manifest overrides it. |
 | `rollback <env> <app> (--service <name> \| --all)`         | Redeploys each selected service's previous successful deployment, including pinned secret versions.                                                                                                                                                                                                            |
 | `remove <env> <app> (--service <name> \| --all)`           | Removes selected app stacks and generated state. Named volumes and environment secrets are preserved.                                                                                                                                                                                                          |
 | `cleanup [--apply] [--orphaned] [--keep <count>]`          | Plans retention cleanup across releases, deployments, and registry images. `--orphaned` selects app environments with no actually running recorded service, overriding normal retention. Dry-run is the default; `--apply` deletes selected manifests and metadata, then runs offline registry GC when needed. |

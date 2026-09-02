@@ -14,7 +14,7 @@ func (a *App) runRelease(ctx context.Context, args []string) error {
 	if len(args) > 0 && args[0] == "list" {
 		return a.runReleaseList(ctx, args[1:])
 	}
-	environment, manifestPath, services, err := parseServiceArgs(args, "release", a.resolveApp)
+	environment, manifestPath, services, err := parseServiceArgs(args, "release", a.resolveApp, true)
 	if err != nil {
 		return err
 	}
@@ -27,7 +27,7 @@ func (a *App) runRelease(ctx context.Context, args []string) error {
 }
 
 func (a *App) runReleaseList(ctx context.Context, args []string) error {
-	environment, manifestPath, services, err := parseServiceArgs(args, "release list", a.resolveApp)
+	environment, manifestPath, services, err := parseServiceArgs(args, "release list", a.resolveApp, true)
 	if err != nil {
 		return err
 	}
@@ -99,9 +99,9 @@ func (a *App) resolveApp(name string) (string, error) {
 	return catalog.Resolve(a.config.Workspace, name)
 }
 
-func parseServiceArgs(args []string, command string, resolveApp func(string) (string, error)) (string, string, []string, error) {
-	if len(args) < 3 {
-		return "", "", nil, fmt.Errorf("%s requires an environment, app name, and --service <name> or --all", command)
+func parseServiceArgs(args []string, command string, resolveApp func(string) (string, error), allowImplicitSingleService bool) (string, string, []string, error) {
+	if len(args) < 2 {
+		return "", "", nil, fmt.Errorf("%s requires an environment and app name", command)
 	}
 	environment, appName := args[0], args[1]
 	path, err := resolveApp(appName)
@@ -124,12 +124,25 @@ func parseServiceArgs(args []string, command string, resolveApp func(string) (st
 			return "", "", nil, fmt.Errorf("unknown %s option %q", command, args[i])
 		}
 	}
-	if all == (selected != "") {
+	if all && selected != "" {
 		return "", "", nil, errors.New("provide exactly one of --service or --all")
+	}
+	if selected == "" && allowImplicitSingleService {
+		names, err := manifest.Services(path)
+		if err != nil {
+			return "", "", nil, err
+		}
+		if len(names) == 1 {
+			return environment, path, names, nil
+		}
+		return "", "", nil, fmt.Errorf("%s requires --service <name> or --all when the manifest contains multiple services", command)
 	}
 	if all {
 		names, err := manifest.DeploymentOrder(path)
 		return environment, path, names, err
+	}
+	if selected == "" {
+		return "", "", nil, errors.New("provide exactly one of --service or --all")
 	}
 	if _, err := manifest.LoadService(path, selected); err != nil {
 		return "", "", nil, err

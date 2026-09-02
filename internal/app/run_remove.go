@@ -7,7 +7,7 @@ import (
 )
 
 func (a *App) runRemove(ctx context.Context, args []string) error {
-	environment, manifestPath, services, err := parseServiceArgs(args, "remove", a.resolveApp)
+	environment, manifestPath, services, err := parseServiceArgs(args, "remove", a.resolveApp, false)
 	if err != nil {
 		return err
 	}

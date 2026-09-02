@@ -96,6 +96,35 @@ func TestParseDeployArgsQuick(t *testing.T) {
 	}
 }
 
+func TestParseDeployArgsSelectsTheOnlyServiceImplicitly(t *testing.T) {
+	manifestPath := filepath.Join(t.TempDir(), "app.yml")
+	if err := os.WriteFile(manifestPath, []byte("services:\n  api:\n    image: api\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	resolve := func(string) (string, error) { return manifestPath, nil }
+
+	environment, path, services, quick, err := parseDeployArgs([]string{"dev", "api"}, resolve)
+	if err != nil {
+		t.Fatalf("parseDeployArgs returned error: %v", err)
+	}
+	if environment != "dev" || path != manifestPath || len(services) != 1 || services[0] != "api" || quick {
+		t.Errorf("parseDeployArgs = (%q, %q, %v, %t), want implicit api deployment", environment, path, services, quick)
+	}
+}
+
+func TestParseDeployArgsRequiresSelectionForMultipleServices(t *testing.T) {
+	manifestPath := filepath.Join(t.TempDir(), "app.yml")
+	if err := os.WriteFile(manifestPath, []byte("services:\n  api:\n    image: api\n  worker:\n    image: worker\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	resolve := func(string) (string, error) { return manifestPath, nil }
+
+	_, _, _, _, err := parseDeployArgs([]string{"dev", "api"}, resolve)
+	if err == nil || !strings.Contains(err.Error(), "multiple services") {
+		t.Fatalf("parseDeployArgs error = %v, want multiple-services selection error", err)
+	}
+}
+
 func TestRequiresACME(t *testing.T) {
 	plainTLS := manifest.Manifest{Expose: manifest.Expose{TLS: true}}
 	if !requiresACME(plainTLS, false) {

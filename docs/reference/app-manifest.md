@@ -30,7 +30,7 @@ services:
 ```
 
 Lifecycle operations target an app alias from the workspace `apps.yml` and a service explicitly:
-`noops release <env> api --service api`, `noops deploy <env> api --service api`, or `--all`. `--all` uses a stable
+`noops release <env> api`, `noops deploy <env> api`, or an explicit `--service api` / `--all`. A service selector can be omitted when the manifest has exactly one service. `--all` uses a stable
 dependency order from `x-noops.depends_on` and stops at the first failure. Compose `depends_on` is preserved, but is not
 a Swarm readiness guarantee; applications must retry dependencies at runtime. The earlier top-level `name`, `image`, and
 `service` format is not supported.

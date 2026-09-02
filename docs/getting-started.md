@@ -62,8 +62,8 @@ Create an app manifest next to an environment file when the service needs enviro
 services with neither can omit the environment file. The examples in `examples/` show both shapes.
 
 ```bash
-noops release prod api --service api
-noops deploy prod api --service api
+noops release prod api
+noops deploy prod api
 ```
 
 `api` is an alias declared in the workspace `apps.yml`. Use
