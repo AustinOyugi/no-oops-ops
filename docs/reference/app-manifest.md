@@ -50,6 +50,7 @@ services, and rejects plainly embedded credential-like environment values. Move 
 | `services.<name>.x-noops.build.source.git`      | No              | —         | Environment-scoped Git repository used as the isolated build context.                                                                                            |
 | `services.<name>.x-noops.build.resources`       | No              | —         | CPU and memory limits applied to Docker build steps.                                                                                                             |
 | `services.<name>.x-noops.build.timeout`         | No              | —         | Maximum duration of a build.                                                                                                                                     |
+| `services.<name>.x-noops.build.no_cache`        | No              | `false`   | Passes `--no-cache` to Docker. Use for cache-warming builds whose mounted-cache side effects must run every release.                                           |
 | `services.<name>.x-noops.env.file`              | No              | —         | Environment YAML file, relative to the manifest. Omit `x-noops.env` entirely when the service has no environment values or secret bindings.                      |
 | `services.<name>.x-noops.env.build.file`        | No              | —         | Relative dotenv file to generate in the temporary build context from ordinary environment values.                                                               |
 | `services.<name>.x-noops.env.secrets`           | No              | —         | Allow-listed versioned secret references and delivery mode.                                                                                                      |
@@ -83,6 +84,9 @@ x-noops:
       cpus: "1.5"
       memory: 2Gi
     timeout: 20m
+    # Forces Dockerfile RUN steps to execute even when a prior layer is cached.
+    # Useful when the step populates a BuildKit cache mount for another build.
+    no_cache: true
 ```
 
 No Oops resolves and records the resulting commit SHA with the release. When `x-noops.env.build.file` is configured,

@@ -108,7 +108,7 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 		if err != nil {
 			return Result{}, err
 		}
-		if err := s.buildImage(buildCtx, registryImage, dockerfile, contextDir, m.Build.Resources, buildSecrets); err != nil {
+		if err := s.buildImage(buildCtx, registryImage, dockerfile, contextDir, m.Build.Resources, m.Build.NoCache, buildSecrets); err != nil {
 			return Result{}, err
 		}
 		m.Source.Context = contextDir
@@ -190,7 +190,7 @@ func (s *Service) buildPulledImage(ctx context.Context, targetImage, sourceImage
 		return fmt.Errorf("write temporary Dockerfile: %w", err)
 	}
 
-	if err := s.buildImage(ctx, targetImage, dockerfile, contextDir, manifest.BuildResources{}, nil); err != nil {
+	if err := s.buildImage(ctx, targetImage, dockerfile, contextDir, manifest.BuildResources{}, false, nil); err != nil {
 		return fmt.Errorf("build release image from %q: %w", sourceImage, err)
 	}
 

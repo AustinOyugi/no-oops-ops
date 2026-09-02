@@ -8,7 +8,7 @@ import (
 )
 
 func TestIsolatedBuildArgsHasOneBuildContext(t *testing.T) {
-	got := isolatedBuildArgs("registry.example/app:tag", "Dockerfile", manifest.BuildResources{}, []BuildSecretBinding{{ID: "SENTRY_AUTH_TOKEN"}})
+	got := isolatedBuildArgs("registry.example/app:tag", "Dockerfile", manifest.BuildResources{}, false, []BuildSecretBinding{{ID: "SENTRY_AUTH_TOKEN"}})
 	want := []string{
 		"--no-cache",
 		"-t", "registry.example/app:tag",
@@ -22,8 +22,21 @@ func TestIsolatedBuildArgsHasOneBuildContext(t *testing.T) {
 }
 
 func TestIsolatedBuildArgsKeepsCacheWithoutSecrets(t *testing.T) {
-	got := isolatedBuildArgs("registry.example/app:tag", "Dockerfile", manifest.BuildResources{}, nil)
+	got := isolatedBuildArgs("registry.example/app:tag", "Dockerfile", manifest.BuildResources{}, false, nil)
 	want := []string{
+		"-t", "registry.example/app:tag",
+		"-f", "/work/Dockerfile",
+		"/work",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("isolatedBuildArgs() = %q, want %q", got, want)
+	}
+}
+
+func TestIsolatedBuildArgsBypassesCacheWhenRequested(t *testing.T) {
+	got := isolatedBuildArgs("registry.example/app:tag", "Dockerfile", manifest.BuildResources{}, true, nil)
+	want := []string{
+		"--no-cache",
 		"-t", "registry.example/app:tag",
 		"-f", "/work/Dockerfile",
 		"/work",

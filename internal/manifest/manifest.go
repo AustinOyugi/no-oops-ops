@@ -83,6 +83,7 @@ type NoOpsBuild struct {
 	Source    BuildSource    `yaml:"source"`
 	Resources BuildResources `yaml:"resources"`
 	Timeout   string         `yaml:"timeout"`
+	NoCache   bool           `yaml:"no_cache"`
 }
 
 type BuildSource struct {
