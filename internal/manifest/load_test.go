@@ -112,7 +112,7 @@ func TestLoadBuildGitSource(t *testing.T) {
               prod: {ref: refs/tags/v1.2.3, secret: github-readonly}
         resources: {cpus: "1.5", memory: 2Gi}
         timeout: 20m
-        no_cache: true
+        no-cache: true
 `)
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatal(err)
