@@ -64,6 +64,9 @@ services with neither can omit the environment file. The examples in `examples/`
 ```bash
 noops release prod api
 noops deploy prod api
+
+# Or release and deploy the same immutable image in one command.
+noops release --deploy prod api
 ```
 
 `api` is an alias declared in the workspace `apps.yml`. Use

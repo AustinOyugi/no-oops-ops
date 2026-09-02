@@ -14,12 +14,26 @@ func (a *App) runRelease(ctx context.Context, args []string) error {
 	if len(args) > 0 && args[0] == "list" {
 		return a.runReleaseList(ctx, args[1:])
 	}
-	environment, manifestPath, services, err := parseServiceArgs(args, "release", a.resolveApp, true)
+	environment, manifestPath, services, deployAfterRelease, err := parseReleaseArgs(args, a.resolveApp)
 	if err != nil {
 		return err
 	}
+	releaseTags := make(map[string]string, len(services))
 	for _, service := range services {
-		if err := a.runReleaseService(ctx, environment, manifest.WithService(manifestPath, service)); err != nil {
+		result, err := a.runReleaseService(ctx, environment, manifest.WithService(manifestPath, service))
+		if err != nil {
+			return err
+		}
+		releaseTags[service] = result.Tag
+	}
+	if !deployAfterRelease {
+		return nil
+	}
+	if err := a.runDeployPreflight(ctx); err != nil {
+		return err
+	}
+	for _, service := range services {
+		if err := a.runDeployService(ctx, environment, manifest.WithService(manifestPath, service), releaseTags[service], false); err != nil {
 			return err
 		}
 	}
@@ -58,7 +72,7 @@ func gitCommit(metadata release.Metadata) string {
 	return metadata.Git.Commit
 }
 
-func (a *App) runReleaseService(ctx context.Context, environment, manifestPath string) error {
+func (a *App) runReleaseService(ctx context.Context, environment, manifestPath string) (release.Result, error) {
 
 	result, err := a.releaser.Run(ctx, environment, manifestPath)
 	if err != nil {
@@ -69,7 +83,7 @@ func (a *App) runReleaseService(ctx context.Context, environment, manifestPath s
 			"manifest_path", manifestPath,
 			"reason", err.Error(),
 		)
-		return err
+		return release.Result{}, err
 	}
 
 	manifest := result.Manifest
@@ -92,7 +106,20 @@ func (a *App) runReleaseService(ctx context.Context, environment, manifestPath s
 		"build_executed", result.Built,
 	)
 
-	return nil
+	return result, nil
+}
+
+func parseReleaseArgs(args []string, resolveApp func(string) (string, error)) (environment, manifestPath string, services []string, deployAfterRelease bool, err error) {
+	serviceArgs := make([]string, 0, len(args))
+	for _, arg := range args {
+		if arg == "--deploy" {
+			deployAfterRelease = true
+			continue
+		}
+		serviceArgs = append(serviceArgs, arg)
+	}
+	environment, manifestPath, services, err = parseServiceArgs(serviceArgs, "release", resolveApp, true)
+	return environment, manifestPath, services, deployAfterRelease, err
 }
 
 func (a *App) resolveApp(name string) (string, error) {

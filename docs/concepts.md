@@ -13,7 +13,7 @@ Compose service with `build` is built from its declared context and Dockerfile i
 image-only service is snapshotted into the internal registry. A digest image reference is also accepted as an upstream
 source.
 
-Release metadata is retained per app and environment. A release does not change a running service.
+Release metadata is retained per app and environment. A release does not change a running service unless it is invoked with `--deploy`, which deploys the exact releases that command created.
 
 ### Git-backed container builds
 

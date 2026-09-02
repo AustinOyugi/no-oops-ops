@@ -20,6 +20,8 @@ noops install
 noops secret set prod REDIS_PASSWORD
 noops release prod redis
 noops deploy prod redis
+# Or create a fresh release and deploy that exact image in one command.
+noops release --deploy prod redis
 ```
 
 `init` creates an empty, version-matched `apps.yml` catalog. Add each app's stable alias and Compose-shaped manifest
