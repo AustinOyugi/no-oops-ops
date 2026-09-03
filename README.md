@@ -1,7 +1,8 @@
 # No Oops Ops
 
 No Oops Ops is a self-hosted CLI for repeatable Docker Swarm deployments. It fetches application source from Git,
-builds every image in a one-shot isolated Swarm task, creates immutable releases in an internal registry, deploys them with Docker
+builds every image in a one-shot isolated Swarm task, creates immutable releases in an internal registry, deploys them
+with Docker
 Stack, records deployment history, and manages environment-scoped Swarm secrets.
 
 It is intended for services that need a dependable deployment workflow without operating a full platform.
@@ -61,7 +62,8 @@ newest first. Every build runs in a short-lived Swarm task; for `x-noops.build.s
 source in a temporary workspace. Private-source fetches use a short-lived Swarm Git-fetch task and mount an
 environment-scoped source secret only into that task. Build toolchains such as Maven, Java, Node, or Go belong in the
 Dockerfile—not on the deployment host. `deploy` uses the latest
-recorded release by default (and creates one when none exists), waits for the configured health and rollout result, and records
+recorded release by default (and creates one when none exists), waits for the configured health and rollout result, and
+records
 the final Swarm outcome. `install` waits for the managed registry and nginx services to become ready; `status` reports
 their task readiness and marks partially running services as degraded.
 

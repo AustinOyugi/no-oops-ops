@@ -30,7 +30,8 @@ services:
 ```
 
 Lifecycle operations target an app alias from the workspace `apps.yml` and a service explicitly:
-`noops release <env> api`, `noops deploy <env> api`, or an explicit `--service api` / `--all`. A service selector can be omitted when the manifest has exactly one service. `--all` uses a stable
+`noops release <env> api`, `noops deploy <env> api`, or an explicit `--service api` / `--all`. A service selector can be
+omitted when the manifest has exactly one service. `--all` uses a stable
 dependency order from `x-noops.depends_on` and stops at the first failure. Compose `depends_on` is preserved, but is not
 a Swarm readiness guarantee; applications must retry dependencies at runtime. The earlier top-level `name`, `image`, and
 `service` format is not supported.
@@ -50,9 +51,9 @@ services, and rejects plainly embedded credential-like environment values. Move 
 | `services.<name>.x-noops.build.source.git`      | No              | —         | Environment-scoped Git repository used as the isolated build context.                                                                                            |
 | `services.<name>.x-noops.build.resources`       | No              | —         | CPU and memory limits applied to Docker build steps.                                                                                                             |
 | `services.<name>.x-noops.build.timeout`         | No              | —         | Maximum duration of a build.                                                                                                                                     |
-| `services.<name>.x-noops.build.no-cache`        | No              | `false`   | Passes `--no-cache` to Docker. Use for cache-warming builds whose mounted-cache side effects must run every release.                                           |
+| `services.<name>.x-noops.build.no-cache`        | No              | `false`   | Passes `--no-cache` to Docker. Use for cache-warming builds whose mounted-cache side effects must run every release.                                             |
 | `services.<name>.x-noops.env.file`              | No              | —         | Environment YAML file, relative to the manifest. Omit `x-noops.env` entirely when the service has no environment values or secret bindings.                      |
-| `services.<name>.x-noops.env.build.file`        | No              | —         | Relative dotenv file to generate in the temporary build context from ordinary environment values.                                                               |
+| `services.<name>.x-noops.env.build.file`        | No              | —         | Relative dotenv file to generate in the temporary build context from ordinary environment values.                                                                |
 | `services.<name>.x-noops.env.secrets`           | No              | —         | Allow-listed versioned secret references and delivery mode.                                                                                                      |
 | `services.<name>.x-noops.ingress.*`             | No              | disabled  | Managed nginx route, TLS, and blue/green settings.                                                                                                               |
 | `services.<name>.x-noops.rollout.*`             | No              | See below | No Oops convergence monitoring settings. It does not replace existing `deploy.update_config`, `rollback_config`, or restart policy.                              |
@@ -91,8 +92,10 @@ x-noops:
 
 No Oops resolves and records the resulting commit SHA with the release. When `x-noops.env.build.file` is configured,
 ordinary values from `x-noops.env.file` are materialized into that ephemeral dotenv file before Docker builds;
-`from_secret` values remain runtime-only by default. An explicit `env.build.secrets` allow-list can make a private secret
-available only as a standard BuildKit secret mount; see [environment files](env-file.md). A Git credential is optional for public
+`from_secret` values remain runtime-only by default. An explicit `env.build.secrets` allow-list can make a private
+secret
+available only as a standard BuildKit secret mount; see [environment files](env-file.md). A Git credential is optional
+for public
 repositories; when configured, create it for the same environment with `noops secret set` and supply only the provider
 access-token value. The `secret` value is the secret key, not the token itself.
 `x-noops.source.build.command` is unsupported: build commands belong in Dockerfile stages so they cannot leak language
@@ -122,8 +125,10 @@ Blue/green promotion is enabled by default for stateless ingress-managed apps. N
 mode; set `x-noops.ingress.blue_green: false` to use an in-place Swarm update for stateful services. Set
 `x-noops.ingress.tls: true` to serve HTTPS. The domain's DNS A/AAAA record must resolve to the Swarm manager and allow
 inbound ports 80 and 443. With the default platform ingress, the first deployment makes the HTTP-01 challenge path
-available, obtains a Let's Encrypt certificate, and then enables the HTTPS virtual host with HTTP-to-HTTPS redirects. Subsequent certificate
-renewals reload nginx automatically and gracefully. The current renewal service mounts the Docker daemon socket to signal that reload;
+available, obtains a Let's Encrypt certificate, and then enables the HTTPS virtual host with HTTP-to-HTTPS redirects.
+Subsequent certificate
+renewals reload nginx automatically and gracefully. The current renewal service mounts the Docker daemon socket to
+signal that reload;
 this grants it root-equivalent Docker-host access and is suitable only for the trusted single-node platform. A given
 domain/path-prefix pair can be owned by only one deployed app, and all routes sharing a domain must agree on its TLS
 setting. Compose `depends_on` is preserved but should not be used as a readiness guarantee.
