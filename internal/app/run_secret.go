@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/AustinOyugi/no-oops-ops/internal/secret"
 	"golang.org/x/term"
 )
 
@@ -65,6 +66,60 @@ func (a *App) runSecret(ctx context.Context, args []string) error {
 	default:
 		return errors.New("unknown secret subcommand")
 	}
+}
+
+// SetSecret stores a new version of an environment secret.
+func (a *App) SetSecret(ctx context.Context, environment, key string, value io.Reader) (secret.Metadata, error) {
+	return a.secrets.Set(ctx, environment, key, value)
+}
+
+// SetSecretFromStdin reads a secret value from standard input or a hidden prompt.
+func (a *App) SetSecretFromStdin(ctx context.Context, environment, key string) error {
+	value, err := secretValueInput(os.Stdin, os.Stderr)
+	if err != nil {
+		return err
+	}
+	result, err := a.SetSecret(ctx, environment, key, value)
+	if err != nil {
+		return err
+	}
+	a.logger.InfoContext(ctx, "secret created", "environment", result.Environment, "key", result.Key, "version", result.Version, "swarm_name", result.SwarmName)
+	return nil
+}
+
+// DeleteSecret deletes all versions of an environment secret.
+func (a *App) DeleteSecret(ctx context.Context, environment, key string) ([]secret.Metadata, error) {
+	return a.secrets.Delete(ctx, environment, key)
+}
+
+// DeleteSecretAndLog deletes all secret versions and reports each deletion.
+func (a *App) DeleteSecretAndLog(ctx context.Context, environment, key string) error {
+	items, err := a.DeleteSecret(ctx, environment, key)
+	if err != nil {
+		return err
+	}
+	for _, item := range items {
+		a.logger.InfoContext(ctx, "secret deleted", "environment", item.Environment, "key", item.Key, "version", item.Version, "swarm_name", item.SwarmName)
+	}
+	return nil
+}
+
+// ListSecrets lists metadata for environment secrets.
+func (a *App) ListSecrets(ctx context.Context, environment string) ([]secret.Metadata, error) {
+	return a.secrets.List(ctx, environment)
+}
+
+// ListSecretsAndLog reports environment secret metadata.
+func (a *App) ListSecretsAndLog(ctx context.Context, environment string) error {
+	items, err := a.ListSecrets(ctx, environment)
+	if err != nil {
+		return err
+	}
+	for _, item := range items {
+		a.logger.InfoContext(ctx, "secret", "environment", item.Environment, "key", item.Key, "version", item.Version, "swarm_name", item.SwarmName, "created_at", item.CreatedAt)
+	}
+	a.logger.InfoContext(ctx, "secret list completed", "environment", environment, "secrets", len(items))
+	return nil
 }
 
 func secretValueInput(stdin *os.File, stderr io.Writer) (io.Reader, error) {

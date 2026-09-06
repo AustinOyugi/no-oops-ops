@@ -6,6 +6,11 @@ import (
 )
 
 func (a *App) runStatus(ctx context.Context) error {
+	return a.Status(ctx)
+}
+
+// Status reports local platform health.
+func (a *App) Status(ctx context.Context) error {
 	a.logger.InfoContext(ctx, "starting noops status", "app_name", a.config.AppName)
 
 	result, err := a.status.Run(ctx)

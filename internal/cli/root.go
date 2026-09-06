@@ -3,46 +3,13 @@ package cli
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/app"
+	"github.com/AustinOyugi/no-oops-ops/internal/cleanup"
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/workspace"
 	"github.com/spf13/cobra"
 )
-
-type runtime struct{ workspace string }
-
-func (r runtime) application() (*app.App, error) {
-	root := r.workspace
-	if root == "" {
-		var err error
-		root, err = os.Getwd()
-		if err != nil {
-			return nil, fmt.Errorf("get working directory: %w", err)
-		}
-	}
-	cfg, err := config.Load(root)
-	if err != nil {
-		return nil, err
-	}
-	return app.New(cfg)
-}
-
-type targetFlags struct {
-	service string
-	all     bool
-}
-
-func addTargetFlags(cmd *cobra.Command, flags *targetFlags) {
-	cmd.Flags().StringVar(&flags.service, "service", "", "Service name")
-	cmd.Flags().BoolVar(&flags.all, "all", false, "Select all services")
-	cmd.MarkFlagsMutuallyExclusive("service", "all")
-}
-
-func target(args []string, flags targetFlags) app.Target {
-	return app.Target{Environment: args[0], App: args[1], Service: flags.service, All: flags.all}
-}
 
 // NewRootCommand constructs the No Oops command tree.
 func NewRootCommand(ctx context.Context) *cobra.Command {
@@ -79,18 +46,13 @@ func newInitCommand() *cobra.Command {
 }
 
 func newLifecycleCommands(ctx context.Context, rt *runtime) []*cobra.Command {
-	withApp := func(run func(*app.App) error) error {
+	withApp := appRunner(func(run func(*app.App) error) error {
 		application, err := rt.application()
 		if err != nil {
 			return err
 		}
 		return run(application)
-	}
-	legacy := func(use string, args cobra.PositionalArgs, command func() []string) *cobra.Command {
-		return &cobra.Command{Use: use, Args: args, RunE: func(cmd *cobra.Command, _ []string) error {
-			return withApp(func(application *app.App) error { return application.Run(ctx, command()) })
-		}}
-	}
+	})
 
 	var releaseFlags targetFlags
 	var deployAfterRelease bool
@@ -127,36 +89,29 @@ func newLifecycleCommands(ctx context.Context, rt *runtime) []*cobra.Command {
 	}}
 	addTargetFlags(removeCmd, &removeFlags)
 
-	installCmd := legacy("install", cobra.NoArgs, func() []string { return []string{"install"} })
+	installCmd := &cobra.Command{Use: "install", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		return withApp(func(application *app.App) error { return application.Install(ctx) })
+	}}
 	var purge bool
-	uninstallCmd := legacy("uninstall", cobra.NoArgs, func() []string {
-		if purge {
-			return []string{"uninstall", "--purge"}
-		}
-		return []string{"uninstall"}
-	})
+	uninstallCmd := &cobra.Command{Use: "uninstall", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		return withApp(func(application *app.App) error { return application.Uninstall(ctx, purge) })
+	}}
 	uninstallCmd.Flags().BoolVar(&purge, "purge", false, "Remove persistent registry data")
 	var deployReady bool
-	doctorCmd := legacy("doctor", cobra.NoArgs, func() []string {
-		if deployReady {
-			return []string{"doctor", "--deploy-ready"}
-		}
-		return []string{"doctor"}
-	})
+	doctorCmd := &cobra.Command{Use: "doctor", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		return withApp(func(application *app.App) error { return application.Doctor(ctx, deployReady) })
+	}}
 	doctorCmd.Flags().BoolVar(&deployReady, "deploy-ready", false, "Check deployment prerequisites only")
-	statusCmd := legacy("status", cobra.NoArgs, func() []string { return []string{"status"} })
+	statusCmd := &cobra.Command{Use: "status", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		return withApp(func(application *app.App) error { return application.Status(ctx) })
+	}}
 	var apply, orphaned bool
 	var keep int
-	cleanupCmd := legacy("cleanup", cobra.NoArgs, func() []string {
-		out := []string{"cleanup"}
-		if apply {
-			out = append(out, "--apply")
-		}
-		if orphaned {
-			out = append(out, "--orphaned")
-		}
-		return append(out, "--keep", fmt.Sprint(keep))
-	})
+	cleanupCmd := &cobra.Command{Use: "cleanup", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		return withApp(func(application *app.App) error {
+			return application.Cleanup(ctx, cleanup.Options{Apply: apply, Orphaned: orphaned, Keep: keep})
+		})
+	}}
 	cleanupCmd.Flags().BoolVar(&apply, "apply", false, "Apply cleanup")
 	cleanupCmd.Flags().BoolVar(&orphaned, "orphaned", false, "Include orphaned app environments")
 	cleanupCmd.Flags().IntVar(&keep, "keep", 2, "Number of records to retain")
@@ -168,16 +123,27 @@ func newLifecycleCommands(ctx context.Context, rt *runtime) []*cobra.Command {
 	}{{"set", "set <environment> <key>", 2}, {"delete", "delete <environment> <key>", 2}, {"list", "list <environment>", 1}} {
 		s := spec
 		secretCmd.AddCommand(&cobra.Command{Use: s.use, Args: cobra.ExactArgs(s.count), RunE: func(cmd *cobra.Command, args []string) error {
-			return withApp(func(application *app.App) error {
-				return application.Run(ctx, append([]string{"secret", s.verb}, args...))
-			})
+			return runSecretCommand(ctx, withApp, s.verb, args)
 		}})
 	}
 	certificateCmd := &cobra.Command{Use: "certificate"}
 	certificateCmd.AddCommand(&cobra.Command{Use: "import <name> <certificate.pem> <private-key.pem>", Args: cobra.ExactArgs(3), RunE: func(cmd *cobra.Command, args []string) error {
-		return withApp(func(application *app.App) error {
-			return application.Run(ctx, append([]string{"certificate", "import"}, args...))
-		})
+		return withApp(func(application *app.App) error { return application.ImportCertificate(args[0], args[1], args[2]) })
 	}})
 	return []*cobra.Command{installCmd, uninstallCmd, doctorCmd, statusCmd, releaseCmd, deployCmd, rollbackCmd, removeCmd, secretCmd, certificateCmd, cleanupCmd}
+}
+
+func runSecretCommand(ctx context.Context, withApp appRunner, verb string, args []string) error {
+	return withApp(func(application *app.App) error {
+		switch verb {
+		case "set":
+			return application.SetSecretFromStdin(ctx, args[0], args[1])
+		case "delete":
+			return application.DeleteSecretAndLog(ctx, args[0], args[1])
+		case "list":
+			return application.ListSecretsAndLog(ctx, args[0])
+		default:
+			return fmt.Errorf("unsupported secret command %q", verb)
+		}
+	})
 }

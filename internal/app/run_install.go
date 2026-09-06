@@ -7,6 +7,11 @@ import (
 )
 
 func (a *App) runInstall(ctx context.Context) error {
+	return a.Install(ctx)
+}
+
+// Install prepares the local deployment platform.
+func (a *App) Install(ctx context.Context) error {
 	a.logger.InfoContext(ctx, "starting noops", "app_name", a.config.AppName)
 	result, err := a.installer.Run(ctx)
 

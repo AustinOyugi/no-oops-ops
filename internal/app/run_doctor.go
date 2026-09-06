@@ -7,11 +7,16 @@ import (
 )
 
 func (a *App) runDoctor(ctx context.Context, args []string) error {
-	profile := doctor.ProfileFull
 	if len(args) > 1 || (len(args) == 1 && args[0] != "--deploy-ready") {
 		return errors.New("doctor supports only the --deploy-ready option")
 	}
-	if len(args) == 1 {
+	return a.Doctor(ctx, len(args) == 1)
+}
+
+// Doctor checks the local deployment platform.
+func (a *App) Doctor(ctx context.Context, deployReady bool) error {
+	profile := doctor.ProfileFull
+	if deployReady {
 		profile = doctor.ProfileDeployReadiness
 	}
 

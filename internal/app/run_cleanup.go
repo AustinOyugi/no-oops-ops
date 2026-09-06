@@ -32,6 +32,11 @@ func (a *App) runCleanup(ctx context.Context, args []string) error {
 			return errors.New("cleanup accepts only --apply, --orphaned, and --keep <count>")
 		}
 	}
+	return a.Cleanup(ctx, options)
+}
+
+// Cleanup removes expired deployment artifacts according to options.
+func (a *App) Cleanup(ctx context.Context, options cleanup.Options) error {
 	plan, err := a.cleaner.Run(ctx, options)
 	if err != nil {
 		return err

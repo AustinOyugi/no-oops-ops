@@ -12,7 +12,11 @@ func (a *App) runUninstall(ctx context.Context, args []string) error {
 		return errors.New("uninstall supports only the --purge option")
 	}
 
-	purge := len(args) == 1
+	return a.Uninstall(ctx, len(args) == 1)
+}
+
+// Uninstall removes the local deployment platform.
+func (a *App) Uninstall(ctx context.Context, purge bool) error {
 	a.logger.InfoContext(ctx, "starting uninstall", "purge", purge)
 	if err := a.uninstaller.Run(ctx, uninstall.Options{Purge: purge}); err != nil {
 		return err
