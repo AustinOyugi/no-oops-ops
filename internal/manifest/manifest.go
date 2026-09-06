@@ -17,6 +17,7 @@ type Manifest struct {
 	Env         Env         `yaml:"env"`
 	Build       NoOpsBuild  `yaml:"build"`
 	DependsOn   []string    `yaml:"depends_on"`
+	Deploy      *bool       `yaml:"deploy"`
 	Volumes     []string    `yaml:"volumes"`
 	// Compose is the selected, Compose-shaped document. It is deliberately a
 	// yaml.Node rather than a Go struct: Compose adds fields over time and No
@@ -74,6 +75,13 @@ type ComposeNoOps struct {
 	DependsOn []string `yaml:"depends_on"`
 	Source    Source   `yaml:"source"`
 	Service   Service  `yaml:"service"`
+	Deploy    *bool    `yaml:"deploy"`
+}
+
+// ShouldDeploy reports whether lifecycle deployment commands should manage the
+// service. Services are deployable unless x-noops.deploy is explicitly false.
+func (m Manifest) ShouldDeploy() bool {
+	return m.Deploy == nil || *m.Deploy
 }
 
 // NoOpsBuild describes how No Oops obtains an isolated build context. Compose

@@ -52,12 +52,13 @@ services, and rejects plainly embedded credential-like environment values. Move 
 | `services.<name>.x-noops.build.resources`       | No              | —         | CPU and memory limits applied to Docker build steps.                                                                                                             |
 | `services.<name>.x-noops.build.timeout`         | No              | —         | Maximum duration of a build.                                                                                                                                     |
 | `services.<name>.x-noops.build.no-cache`        | No              | `false`   | Passes `--no-cache` to Docker. Use for cache-warming builds whose mounted-cache side effects must run every release.                                             |
+| `services.<name>.x-noops.deploy`                | No              | `true`    | Set to `false` for a release-only service. `release --all` still builds it, while deploy, rollback, and remove skip it.                                          |
 | `services.<name>.x-noops.env.file`              | No              | —         | Environment YAML file, relative to the manifest. Omit `x-noops.env` entirely when the service has no environment values or secret bindings.                      |
 | `services.<name>.x-noops.env.build.file`        | No              | —         | Relative dotenv file to generate in the temporary build context from ordinary environment values.                                                                |
 | `services.<name>.x-noops.env.secrets`           | No              | —         | Allow-listed versioned secret references and delivery mode.                                                                                                      |
 | `services.<name>.x-noops.ingress.*`             | No              | disabled  | Managed nginx route, TLS, and blue/green settings.                                                                                                               |
 | `services.<name>.x-noops.rollout.*`             | No              | See below | No Oops convergence monitoring settings. It does not replace existing `deploy.update_config`, `rollback_config`, or restart policy.                              |
-| `services.<name>.x-noops.depends_on`            | No              | `[]`      | Deployment ordering for `--all`; not a runtime readiness guarantee.                                                                                              |
+| `services.<name>.x-noops.depends_on`            | No              | `[]`      | Release and deployment ordering for `--all`; not a runtime readiness guarantee.                                                                                  |
 
 `healthcheck.test` must be an array accepted by Docker. Duration values use Go duration syntax, such as `30s` or `2m`.
 

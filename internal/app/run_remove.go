@@ -8,7 +8,7 @@ import (
 
 // Remove removes selected deployed services and their generated state.
 func (a *App) Remove(ctx context.Context, target Target) error {
-	environment, manifestPath, services, err := a.resolveTarget(target, false)
+	environment, manifestPath, services, err := a.resolveTarget(target, false, true)
 	if err != nil {
 		return err
 	}

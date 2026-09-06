@@ -8,7 +8,7 @@ import (
 
 // Rollback redeploys the previous successful deployment of selected services.
 func (a *App) Rollback(ctx context.Context, target Target) error {
-	environment, manifestPath, services, err := a.resolveTarget(target, false)
+	environment, manifestPath, services, err := a.resolveTarget(target, false, true)
 	if err != nil {
 		return err
 	}

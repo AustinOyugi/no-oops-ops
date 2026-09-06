@@ -10,7 +10,7 @@ import (
 
 // Release builds selected services and optionally deploys those exact releases.
 func (a *App) Release(ctx context.Context, target Target, deployAfterRelease bool) error {
-	environment, manifestPath, services, err := a.resolveTarget(target, true)
+	environment, manifestPath, services, err := a.resolveTarget(target, true, false)
 	if err != nil {
 		return err
 	}
@@ -25,10 +25,25 @@ func (a *App) Release(ctx context.Context, target Target, deployAfterRelease boo
 	if !deployAfterRelease {
 		return nil
 	}
+	deployable := make([]string, 0, len(services))
+	for _, service := range services {
+		m, err := manifest.LoadService(manifestPath, service)
+		if err != nil {
+			return err
+		}
+		if m.ShouldDeploy() {
+			deployable = append(deployable, service)
+		} else {
+			a.logger.InfoContext(ctx, "skipping release-only service deployment", "environment", environment, "service", service)
+		}
+	}
+	if len(deployable) == 0 {
+		return nil
+	}
 	if err := a.runDeployPreflight(ctx); err != nil {
 		return err
 	}
-	for _, service := range services {
+	for _, service := range deployable {
 		if err := a.runDeployService(ctx, environment, manifest.WithService(manifestPath, service), releaseTags[service], false); err != nil {
 			return err
 		}
@@ -38,7 +53,7 @@ func (a *App) Release(ctx context.Context, target Target, deployAfterRelease boo
 
 // ListReleases lists releases for selected services.
 func (a *App) ListReleases(ctx context.Context, target Target) error {
-	environment, manifestPath, services, err := a.resolveTarget(target, true)
+	environment, manifestPath, services, err := a.resolveTarget(target, true, false)
 	if err != nil {
 		return err
 	}

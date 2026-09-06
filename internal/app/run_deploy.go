@@ -14,7 +14,7 @@ import (
 
 // Deploy deploys selected services, creating a release when necessary.
 func (a *App) Deploy(ctx context.Context, target Target, quick bool) error {
-	environment, manifestPath, services, err := a.resolveTarget(target, true)
+	environment, manifestPath, services, err := a.resolveTarget(target, true, true)
 	if err != nil {
 		return err
 	}

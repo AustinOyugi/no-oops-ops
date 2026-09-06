@@ -31,10 +31,11 @@ func Services(path string) ([]string, error) {
 	return names, nil
 }
 
-// DeploymentOrder returns a stable topological order using x-noops.depends_on.
+// ReleaseOrder returns every service in stable topological order using
+// x-noops.depends_on.
 // Compose depends_on is intentionally not treated as readiness: Swarm does not
 // provide that guarantee.
-func DeploymentOrder(path string) ([]string, error) {
+func ReleaseOrder(path string) ([]string, error) {
 	names, err := Services(path)
 	if err != nil {
 		return nil, err
@@ -83,6 +84,26 @@ func DeploymentOrder(path string) ([]string, error) {
 		}
 	}
 	return ordered, nil
+}
+
+// DeploymentOrder returns deployable services in release order. Services with
+// x-noops.deploy: false remain releasable but are excluded.
+func DeploymentOrder(path string) ([]string, error) {
+	ordered, err := ReleaseOrder(path)
+	if err != nil {
+		return nil, err
+	}
+	deployable := make([]string, 0, len(ordered))
+	for _, name := range ordered {
+		m, err := LoadService(path, name)
+		if err != nil {
+			return nil, err
+		}
+		if m.ShouldDeploy() {
+			deployable = append(deployable, name)
+		}
+	}
+	return deployable, nil
 }
 
 func Load(path string) (Manifest, error) {
@@ -259,7 +280,7 @@ func composeManifest(compose ComposeFile) (Manifest, error) {
 			ingress = service.NoOps.Expose
 		}
 		normalizeIngress(&ingress)
-		return Manifest{Name: name, Source: source, Image: image, Service: serviceConfig, Healthcheck: service.Healthcheck, Rollout: service.NoOps.Rollout, Expose: ingress, Env: service.NoOps.Env, Build: service.NoOps.Build, DependsOn: service.NoOps.DependsOn, Volumes: service.Volumes}, nil
+		return Manifest{Name: name, Source: source, Image: image, Service: serviceConfig, Healthcheck: service.Healthcheck, Rollout: service.NoOps.Rollout, Expose: ingress, Env: service.NoOps.Env, Build: service.NoOps.Build, DependsOn: service.NoOps.DependsOn, Deploy: service.NoOps.Deploy, Volumes: service.Volumes}, nil
 	}
 	panic("unreachable")
 }

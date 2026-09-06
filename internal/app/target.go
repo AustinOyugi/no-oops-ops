@@ -16,7 +16,7 @@ type Target struct {
 	Service     string
 }
 
-func (a *App) resolveTarget(target Target, allowImplicitSingleService bool) (string, string, []string, error) {
+func (a *App) resolveTarget(target Target, allowImplicitSingleService, deployableOnly bool) (string, string, []string, error) {
 	if target.Environment == "" || target.App == "" {
 		return "", "", nil, errors.New("an environment and app name are required")
 	}
@@ -28,12 +28,21 @@ func (a *App) resolveTarget(target Target, allowImplicitSingleService bool) (str
 		return "", "", nil, err
 	}
 	if target.All {
-		names, err := manifest.DeploymentOrder(path)
+		var names []string
+		if deployableOnly {
+			names, err = manifest.DeploymentOrder(path)
+		} else {
+			names, err = manifest.ReleaseOrder(path)
+		}
 		return target.Environment, path, names, err
 	}
 	if target.Service != "" {
-		if _, err := manifest.LoadService(path, target.Service); err != nil {
+		m, err := manifest.LoadService(path, target.Service)
+		if err != nil {
 			return "", "", nil, err
+		}
+		if deployableOnly && !m.ShouldDeploy() {
+			return "", "", nil, fmt.Errorf("service %q has x-noops.deploy disabled", target.Service)
 		}
 		return target.Environment, path, []string{target.Service}, nil
 	}
@@ -43,6 +52,15 @@ func (a *App) resolveTarget(target Target, allowImplicitSingleService bool) (str
 			return "", "", nil, err
 		}
 		if len(names) == 1 {
+			if deployableOnly {
+				m, err := manifest.LoadService(path, names[0])
+				if err != nil {
+					return "", "", nil, err
+				}
+				if !m.ShouldDeploy() {
+					return "", "", nil, fmt.Errorf("service %q has x-noops.deploy disabled", names[0])
+				}
+			}
 			return target.Environment, path, names, nil
 		}
 	}

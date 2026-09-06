@@ -36,7 +36,7 @@ func TestResolveTarget(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, services, err := application.resolveTarget(tt.target, tt.implicit)
+			_, _, services, err := application.resolveTarget(tt.target, tt.implicit, false)
 			if tt.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 					t.Fatalf("resolveTarget error = %v, want %q", err, tt.wantErr)

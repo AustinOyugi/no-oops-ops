@@ -79,6 +79,28 @@ func TestLoadServiceSelectsOneServiceFromMultiServiceManifest(t *testing.T) {
 	}
 }
 
+func TestDeploymentOrderExcludesReleaseOnlyServices(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "app.yml")
+	data := []byte("services:\n  library:\n    image: repo/library:1\n    x-noops: {deploy: false}\n  api:\n    image: repo/api:1\n    x-noops: {depends_on: [library]}\n")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	releaseOrder, err := ReleaseOrder(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.Join(releaseOrder, ","), "library,api"; got != want {
+		t.Fatalf("ReleaseOrder = %q, want %q", got, want)
+	}
+	deploymentOrder, err := DeploymentOrder(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.Join(deploymentOrder, ","), "api"; got != want {
+		t.Fatalf("DeploymentOrder = %q, want %q", got, want)
+	}
+}
+
 func TestLoadSupportsCompactIngressMetadataAndWorkerWithoutHealthcheck(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "app.yml")
 	data := []byte("services:\n  api:\n    image: repo/api:1\n    x-noops:\n      service: {internal_port: 8080}\n      ingress: {domains: [api.example.test]}\n  worker:\n    image: repo/worker:1\n")
