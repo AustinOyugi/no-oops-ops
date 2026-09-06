@@ -7,6 +7,12 @@ Stack, records deployment history, and manages environment-scoped Swarm secrets.
 
 It is intended for services that need a dependable deployment workflow without operating a full platform.
 
+No Oops Ops is a minimal-intervention layer over Docker Compose and Docker Swarm. Existing Compose YAML remains the
+source of truth: No Oops preserves fields it does not own and adds release, secret, ingress, and rollout behavior
+through `x-noops` metadata. This keeps migration focused on adding deployment metadata instead of rewriting a working
+Compose configuration into a separate application format. See the [Compose-preserving deployment
+model](docs/compose-preserving-migration.md).
+
 ## Quick start
 
 Prerequisites: Go 1.25+, Docker running locally, and Docker configured to allow the local HTTP registry.

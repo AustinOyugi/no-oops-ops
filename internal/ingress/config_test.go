@@ -43,13 +43,13 @@ func TestRenderConfigGroupsRoutesByDomainAndPrefersLongerPrefixes(t *testing.T) 
 
 func TestRenderConfigKeepsExactHostnameSeparateFromWildcard(t *testing.T) {
 	rendered, err := RenderConfig([]Route{
-		{Environment: "prod", App: "wildcard", Domain: "*.vybes.africa", PathPrefix: "/", Service: "prod-wildcard_app", Port: 3000, TLS: true, TLSCertificate: "origin"},
-		{Environment: "prod", App: "api", Domain: "api.vybes.africa", PathPrefix: "/", Service: "prod-api_app", Port: 8080, TLS: true, TLSCertificate: "origin"},
+		{Environment: "prod", App: "wildcard", Domain: "*.example.com", PathPrefix: "/", Service: "prod-wildcard_app", Port: 3000, TLS: true, TLSCertificate: "origin"},
+		{Environment: "prod", App: "api", Domain: "api.example.com", PathPrefix: "/", Service: "prod-api_app", Port: 8080, TLS: true, TLSCertificate: "origin"},
 	})
 	if err != nil {
 		t.Fatalf("RenderConfig() error = %v", err)
 	}
-	for _, serverName := range []string{"server_name *.vybes.africa;", "server_name api.vybes.africa;"} {
+	for _, serverName := range []string{"server_name *.example.com;", "server_name api.example.com;"} {
 		if !strings.Contains(string(rendered), serverName) {
 			t.Fatalf("rendered config missing %q", serverName)
 		}
@@ -60,8 +60,8 @@ func TestRenderConfigMapsPrimaryAndWildcardAliasForTLS(t *testing.T) {
 	rendered, err := RenderConfig([]Route{{
 		Environment:    "prod",
 		App:            "web",
-		Domain:         "vybes.africa",
-		Domains:        []string{"*.vybes.africa"},
+		Domain:         "example.com",
+		Domains:        []string{"*.example.com"},
 		PathPrefix:     "/",
 		Service:        "prod-web_app",
 		Port:           3000,
@@ -71,25 +71,25 @@ func TestRenderConfigMapsPrimaryAndWildcardAliasForTLS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RenderConfig() error = %v", err)
 	}
-	if got, want := strings.Count(string(rendered), "server_name vybes.africa *.vybes.africa;"), 2; got != want {
+	if got, want := strings.Count(string(rendered), "server_name example.com *.example.com;"), 2; got != want {
 		t.Fatalf("primary and wildcard hostname occur %d times, want %d; config:\n%s", got, want, rendered)
 	}
 }
 
 func TestRenderFilesSeparatesDomainsAndInternalServices(t *testing.T) {
 	files, err := RenderFiles([]Route{
-		{Environment: "dev", App: "lango", Domain: "lango.example.test", PathPrefix: "/", Service: "dev-lango_dev-lango", Port: 8080},
-		{Environment: "prod", App: "lango", Domain: "lango.example.test", PathPrefix: "/api", Service: "prod-lango_prod-lango", Port: 8080},
+		{Environment: "dev", App: "sample", Domain: "sample.example.test", PathPrefix: "/", Service: "dev-sample_dev-sample", Port: 8080},
+		{Environment: "prod", App: "sample", Domain: "sample.example.test", PathPrefix: "/api", Service: "prod-sample_prod-sample", Port: 8080},
 		{Environment: "dev", App: "accounts", Domain: "accounts.example.test", PathPrefix: "/", Service: "dev-accounts_dev-accounts", Port: 8081},
 	})
 	if err != nil {
 		t.Fatalf("render files: %v", err)
 	}
 	for _, path := range []string{
-		"external/lango-example-test.conf",
+		"external/sample-example-test.conf",
 		"external/accounts-example-test.conf",
-		"internal/dev-lango.conf",
-		"internal/prod-lango.conf",
+		"internal/dev-sample.conf",
+		"internal/prod-sample.conf",
 		"internal/dev-accounts.conf",
 	} {
 		if _, ok := files[path]; !ok {
@@ -128,13 +128,13 @@ func TestRenderConfigRendersImportedCertificateAndProxySettings(t *testing.T) {
 	rendered, err := RenderConfig([]Route{{
 		Environment:       "prod",
 		App:               "chat",
-		Domain:            "chat.vybes.africa",
-		Domains:           []string{"support.vybes.africa"},
+		Domain:            "chat.example.com",
+		Domains:           []string{"support.example.com"},
 		PathPrefix:        "/",
 		Service:           "prod-chat_prod-chat",
 		Port:              3000,
 		TLS:               true,
-		TLSCertificate:    "vybes-cloudflare-origin",
+		TLSCertificate:    "cloudflare-origin",
 		Websocket:         true,
 		ClientMaxBodySize: "100m",
 	}})
@@ -146,9 +146,9 @@ func TestRenderConfigRendersImportedCertificateAndProxySettings(t *testing.T) {
 		t.Errorf("server_tokens directives = %d, want one for each of %d virtual hosts:\n%s", got, want, output)
 	}
 	for _, want := range []string{
-		"server_name chat.vybes.africa support.vybes.africa;",
-		"ssl_certificate /etc/noops/certificates/vybes-cloudflare-origin/fullchain.pem;",
-		"ssl_certificate_key /etc/noops/certificates/vybes-cloudflare-origin/privkey.pem;",
+		"server_name chat.example.com support.example.com;",
+		"ssl_certificate /etc/noops/certificates/cloudflare-origin/fullchain.pem;",
+		"ssl_certificate_key /etc/noops/certificates/cloudflare-origin/privkey.pem;",
 		"client_max_body_size 100m;",
 		"proxy_set_header X-Forwarded-Host $host;",
 		"proxy_set_header X-Requested-Host $scheme://$host$request_uri;",

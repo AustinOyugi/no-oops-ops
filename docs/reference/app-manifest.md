@@ -150,7 +150,7 @@ the X25519 and P-256 ECDH curves.
 Services on the shared network can call exposed applications through the nginx alias `ingress.noops.internal`, without
 depending on a release-specific Swarm service name. The internal URL is
 `http://ingress.noops.internal/<environment>/<app>/...`; nginx strips the internal prefix before proxying the request.
-For example, the development `lango` app is reachable internally as `http://ingress.noops.internal/dev/lango/health` and
+For example, the development `api` app is reachable internally as `http://ingress.noops.internal/dev/api/health` and
 receives `/health`.
 
 Nginx keeps generated external routes in one file per domain and internal routes in one file per environment/app. This

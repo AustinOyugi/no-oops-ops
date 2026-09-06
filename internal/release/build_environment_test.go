@@ -15,7 +15,7 @@ func TestMaterializeBuildEnvironmentWritesAndRestoresFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cleanup, err := materializeBuildEnvironment(dir, &manifest.EnvBuild{File: ".env.production"}, map[string]string{"NAME": "Vybes Africa", "URL": "https://example.com"})
+	cleanup, err := materializeBuildEnvironment(dir, &manifest.EnvBuild{File: ".env.production"}, map[string]string{"NAME": "Example Inc", "URL": "https://example.com"})
 	if err != nil {
 		t.Fatalf("materializeBuildEnvironment() error = %v", err)
 	}
@@ -23,7 +23,7 @@ func TestMaterializeBuildEnvironmentWritesAndRestoresFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := string(data), "NAME=\"Vybes Africa\"\nURL=\"https://example.com\"\n"; got != want {
+	if got, want := string(data), "NAME=\"Example Inc\"\nURL=\"https://example.com\"\n"; got != want {
 		t.Fatalf("generated dotenv = %q, want %q", got, want)
 	}
 	ignore, err := os.ReadFile(ignorePath)

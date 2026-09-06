@@ -34,18 +34,18 @@ services:
         timeout: 30m
         source:
           git:
-            url: https://github.com/CraniumTechies/chatwoot.git
+            url: https://github.com/example-org/chatwoot.git
             environments:
               prod:
-                ref: feat/vybes
-                secret: cranium
+                ref: main
+                secret: github-readonly
       service:
         internal_port: 3000
       ingress:
         enabled: true
-        domain: chat.vybes.africa
+        domain: chat.example.com
         path_prefix: /
-        tls_certificate: cranium-cloudflare
+        tls_certificate: cloudflare-origin
         proxy:
           websocket: true
         blue_green: false
@@ -90,11 +90,11 @@ services:
         timeout: 30m
         source:
           git:
-            url: https://github.com/CraniumTechies/chatwoot.git
+            url: https://github.com/example-org/chatwoot.git
             environments:
               prod:
-                ref: feat/vybes
-                secret: cranium
+                ref: main
+                secret: github-readonly
       ingress:
         blue_green: false
       depends_on:

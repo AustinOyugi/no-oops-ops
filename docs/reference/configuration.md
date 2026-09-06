@@ -25,25 +25,25 @@ version: v0.1.0
 settings:
   platform:
     network:
-      name: cranium-platform
+      name: noops-platform
     registry:
-      name: cranium-registry
+      name: noops-registry
       port: 5000
     ingress:
-      name: cranium-ingress
+      name: noops-ingress
       http_port: 80
       https_port: 443
       # Trust Cloudflare's client-IP header only from Cloudflare networks.
       cloudflare: true
     networks:
-      default: "cranium-{environment}"
+      default: "noops-{environment}"
       environments:
-        prod: cranium-prod
-        staging: cranium-staging
+        prod: noops-prod
+        staging: noops-staging
 
 apps:
-  nyota:
-    manifest: ./apps/nyota/app.yml
+  api:
+    manifest: ./apps/api/app.yml
 ```
 
 `platform.network.name` is used only by No Oops platform services. Application

@@ -6,9 +6,9 @@ Make No Oops Ops a minimal-intervention deployment layer for Docker Compose
 and Docker Swarm configurations. Existing Compose YAML is the source of truth;
 No Oops Ops must preserve it and change only the parts it owns.
 
-This model is intended to make migrations from existing platforms, including
-the Cranium infrastructure, mostly a matter of adding No Oops metadata rather
-than rewriting working Compose files into a separate application format.
+This model is intended to make migrations from existing platforms mostly a
+matter of adding No Oops metadata rather than rewriting working Compose files
+into a separate application format.
 
 ## Manifest model
 
@@ -97,7 +97,7 @@ applications remain responsible for runtime readiness and retries.
 
 ## Migration outcome
 
-With this model, Cranium services can retain their existing Compose structure.
+With this model, existing services can retain their Compose structure.
 Migration consists of selecting a secure registry, adding `x-noops` metadata
 for release/secret/ingress behavior, rotating exposed credentials and keys,
 and deploying services incrementally. Stateful systems such as Neo4j, Redis,

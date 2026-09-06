@@ -18,19 +18,19 @@ func TestLoadUsesPlatformSettingsFromAppsCatalog(t *testing.T) {
 settings:
   platform:
     network:
-      name: cranium-platform
+      name: noops-platform
     registry:
-      name: cranium-registry
+      name: noops-registry
       port: 5100
     ingress:
-      name: cranium-ingress
+      name: noops-ingress
       http_port: 8080
       https_port: 8443
       cloudflare: true
     networks:
-      default: "cranium-{environment}"
+      default: "noops-{environment}"
       environments:
-        prod: cranium-production
+        prod: noops-production
 apps: {}
 `
 	if err := os.WriteFile(filepath.Join(root, "apps.yml"), []byte(content), 0o600); err != nil {
@@ -40,7 +40,7 @@ apps: {}
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := cfg.NetworkName, "cranium-platform"; got != want {
+	if got, want := cfg.NetworkName, "noops-platform"; got != want {
 		t.Errorf("platform network = %q, want %q", got, want)
 	}
 	if got, want := cfg.RegistryPort, "5100"; got != want {
@@ -49,10 +49,10 @@ apps: {}
 	if !cfg.NginxCloudflare {
 		t.Error("expected Cloudflare ingress support to be enabled")
 	}
-	if got, want := cfg.EnvironmentNetwork("prod"), "cranium-production"; got != want {
+	if got, want := cfg.EnvironmentNetwork("prod"), "noops-production"; got != want {
 		t.Errorf("prod network = %q, want %q", got, want)
 	}
-	if got, want := cfg.EnvironmentNetwork("dev"), "cranium-dev"; got != want {
+	if got, want := cfg.EnvironmentNetwork("dev"), "noops-dev"; got != want {
 		t.Errorf("dev network = %q, want %q", got, want)
 	}
 }

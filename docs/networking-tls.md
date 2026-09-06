@@ -51,8 +51,8 @@ Let's Encrypt certificate. The managed certbot service renews it and reloads Ngi
 
 ## Wildcard hostnames
 
-Ingress accepts a leftmost wildcard such as `*.vybes.africa`. nginx always selects an exact hostname first, so a route
-for `api.vybes.africa` overrides the wildcard route for that host. Wildcard HTTPS routes require an imported
+Ingress accepts a leftmost wildcard such as `*.example.com`. nginx always selects an exact hostname first, so a route
+for `api.example.com` overrides the wildcard route for that host. Wildcard HTTPS routes require an imported
 `tls_certificate`; No Oops does not use ACME HTTP-01 for wildcards.
 
 To serve the apex and every first-level subdomain from one app, use the apex as `domain` and the wildcard as an alias:
@@ -60,9 +60,9 @@ To serve the apex and every first-level subdomain from one app, use the apex as 
 ```yaml
 ingress:
   enabled: true
-  domain: vybes.africa
-  domains: ["*.vybes.africa"]
-  tls_certificate: cranium-cloudflare
+  domain: example.com
+  domains: ["*.example.com"]
+  tls_certificate: cloudflare-origin
 ```
 
 ## Cloudflare Origin TLS
@@ -89,7 +89,7 @@ Create a Cloudflare Origin certificate for the app hostname (or a suitable wildc
 its certificate and private key to the server securely, then import them:
 
 ```bash
-noops certificate import cranium-cloudflare origin-cert.pem origin-key.pem
+noops certificate import cloudflare-origin origin-cert.pem origin-key.pem
 ```
 
 Reference its import name from every HTTPS app:
@@ -99,7 +99,7 @@ x-noops:
   ingress:
     enabled: true
     domain: app.example.com
-    tls_certificate: cranium-cloudflare
+    tls_certificate: cloudflare-origin
 ```
 
 Do not set `tls: true` alongside `tls_certificate`. The third legacy Nginx directive,

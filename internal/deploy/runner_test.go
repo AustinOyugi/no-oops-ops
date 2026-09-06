@@ -12,9 +12,9 @@ func TestAllDesiredTasksRunningRequiresAllDesiredTasks(t *testing.T) {
 }
 
 func TestParseServiceUpdateStatus(t *testing.T) {
-	state, message, image := parseServiceUpdateStatus("rollback_completed|rollback completed|registry/lango:v1\n")
-	if state != "rollback_completed" || message != "rollback completed" || image != "registry/lango:v1" {
-		t.Errorf("parseServiceUpdateStatus() = (%q, %q, %q), want (%q, %q, %q)", state, message, image, "rollback_completed", "rollback completed", "registry/lango:v1")
+	state, message, image := parseServiceUpdateStatus("rollback_completed|rollback completed|registry/sample:v1\n")
+	if state != "rollback_completed" || message != "rollback completed" || image != "registry/sample:v1" {
+		t.Errorf("parseServiceUpdateStatus() = (%q, %q, %q), want (%q, %q, %q)", state, message, image, "rollback_completed", "rollback completed", "registry/sample:v1")
 	}
 }
 

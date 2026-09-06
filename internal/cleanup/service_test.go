@@ -14,7 +14,7 @@ import (
 
 func TestPlanRetainsRollbackSafeHistory(t *testing.T) {
 	state := t.TempDir()
-	dir := filepath.Join(state, "apps", "lango", "dev")
+	dir := filepath.Join(state, "apps", "sample", "dev")
 	if err := os.MkdirAll(filepath.Join(dir, "releases"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -23,8 +23,8 @@ func TestPlanRetainsRollbackSafeHistory(t *testing.T) {
 	}
 	for i, tag := range []string{"old", "previous", "active"} {
 		created := time.Date(2026, 8, 1+i, 0, 0, 0, 0, time.UTC)
-		writeJSON(t, filepath.Join(dir, "releases", tag+".json"), release.Metadata{App: "lango", Environment: "dev", Tag: tag, RegistryImage: "127.0.0.1:5000/lango:" + tag, CreateAt: created})
-		writeJSON(t, filepath.Join(dir, "deployments", tag+".json"), deploy.Deployment{App: "lango", Environment: "dev", ReleaseTag: tag, ReleaseImage: "127.0.0.1:5000/lango:" + tag, Outcome: deploy.SwarmOutcomeCompleted, CreatedAt: created})
+		writeJSON(t, filepath.Join(dir, "releases", tag+".json"), release.Metadata{App: "sample", Environment: "dev", Tag: tag, RegistryImage: "127.0.0.1:5000/sample:" + tag, CreateAt: created})
+		writeJSON(t, filepath.Join(dir, "deployments", tag+".json"), deploy.Deployment{App: "sample", Environment: "dev", ReleaseTag: tag, ReleaseImage: "127.0.0.1:5000/sample:" + tag, Outcome: deploy.SwarmOutcomeCompleted, CreatedAt: created})
 	}
 	svc := NewService(nil, config.Config{StateDir: state})
 	plan, err := svc.plan(map[string]string{}, 0, false)
@@ -34,23 +34,23 @@ func TestPlanRetainsRollbackSafeHistory(t *testing.T) {
 	if len(plan.ReleasePaths) != 1 || len(plan.DeploymentPaths) != 1 || len(plan.Images) != 1 {
 		t.Fatalf("plan = %#v, want one old release, deployment, and image", plan)
 	}
-	if plan.Images[0] != "127.0.0.1:5000/lango:old" {
+	if plan.Images[0] != "127.0.0.1:5000/sample:old" {
 		t.Errorf("image = %q", plan.Images[0])
 	}
 }
 
 func TestPlanSelectsEntireOrphanedEnvironment(t *testing.T) {
 	state := t.TempDir()
-	dir := filepath.Join(state, "apps", "lango", "dev")
+	dir := filepath.Join(state, "apps", "sample", "dev")
 	if err := os.MkdirAll(filepath.Join(dir, "releases"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(filepath.Join(dir, "deployments"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	image := "127.0.0.1:5000/lango:active"
-	writeJSON(t, filepath.Join(dir, "releases", "active.json"), release.Metadata{App: "lango", Environment: "dev", Tag: "active", RegistryImage: image, CreateAt: time.Now()})
-	writeJSON(t, filepath.Join(dir, "deployments", "active.json"), deploy.Deployment{App: "lango", Environment: "dev", ReleaseImage: image, ServiceName: "dev-lango_app", Outcome: deploy.SwarmOutcomeCompleted, CreatedAt: time.Now()})
+	image := "127.0.0.1:5000/sample:active"
+	writeJSON(t, filepath.Join(dir, "releases", "active.json"), release.Metadata{App: "sample", Environment: "dev", Tag: "active", RegistryImage: image, CreateAt: time.Now()})
+	writeJSON(t, filepath.Join(dir, "deployments", "active.json"), deploy.Deployment{App: "sample", Environment: "dev", ReleaseImage: image, ServiceName: "dev-sample_app", Outcome: deploy.SwarmOutcomeCompleted, CreatedAt: time.Now()})
 	plan, err := NewService(nil, config.Config{StateDir: state}).plan(map[string]string{}, 2, true)
 	if err != nil {
 		t.Fatal(err)

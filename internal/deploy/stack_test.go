@@ -72,19 +72,19 @@ secrets: {existing-secret: {external: true}}
 }
 
 func TestReleaseStackNameUsesReleaseSpecificSwarmSafeSuffix(t *testing.T) {
-	if got, want := releaseStackName("prod", "lango", "2026-08-24T10:30:00Z"), "prod-lango-r2026-08-24t103000z"; got != want {
+	if got, want := releaseStackName("prod", "sample", "2026-08-24T10:30:00Z"), "prod-sample-r2026-08-24t103000z"; got != want {
 		t.Errorf("releaseStackName() = %q, want %q", got, want)
 	}
 }
 
 func TestCandidateStackNameIsUniquePerDeployment(t *testing.T) {
 	tag := "20260824-133728"
-	first := candidateStackName("dev", "lango", tag, time.Date(2026, 8, 24, 13, 37, 28, 1, time.UTC))
-	second := candidateStackName("dev", "lango", tag, time.Date(2026, 8, 24, 13, 37, 28, 2, time.UTC))
+	first := candidateStackName("dev", "sample", tag, time.Date(2026, 8, 24, 13, 37, 28, 1, time.UTC))
+	second := candidateStackName("dev", "sample", tag, time.Date(2026, 8, 24, 13, 37, 28, 2, time.UTC))
 	if first == second {
 		t.Fatalf("candidate stack names must differ for repeated deployments: %q", first)
 	}
-	if !strings.HasPrefix(first, "dev-lango-r20260824-133728-") {
+	if !strings.HasPrefix(first, "dev-sample-r20260824-133728-") {
 		t.Errorf("candidate stack name = %q, want release-specific prefix", first)
 	}
 }
@@ -93,7 +93,7 @@ func TestCandidateStackNameFitsDockerSwarmServiceLimit(t *testing.T) {
 	createdAt := time.Date(2026, 8, 27, 19, 38, 37, 1, time.UTC)
 	stack := candidateStackName(
 		"prod",
-		"vybe-builder-service",
+		"sample-builder-service",
 		"20260827-025448",
 		createdAt,
 	)
@@ -101,7 +101,7 @@ func TestCandidateStackNameFitsDockerSwarmServiceLimit(t *testing.T) {
 	if len(service) > maxSwarmServiceNameLength {
 		t.Fatalf("Swarm service name %q has length %d, want at most %d", service, len(service), maxSwarmServiceNameLength)
 	}
-	fullName := releaseStackName("prod", "vybe-builder-service", "20260827-025448-"+fmt.Sprintf("%d", createdAt.UnixNano()))
+	fullName := releaseStackName("prod", "sample-builder-service", "20260827-025448-"+fmt.Sprintf("%d", createdAt.UnixNano()))
 	digest := sha256.Sum256([]byte(fullName))
 	if !strings.HasSuffix(stack, "-"+fmt.Sprintf("%x", digest[:5])) {
 		t.Fatalf("candidate stack %q should retain a digest suffix after truncation", stack)
@@ -110,8 +110,8 @@ func TestCandidateStackNameFitsDockerSwarmServiceLimit(t *testing.T) {
 
 func TestRenderStackTemplateMountsExternalSecrets(t *testing.T) {
 	rendered, err := renderStackTemplate(stackTemplateData{
-		ServiceName: "prod-lango",
-		Image:       "registry/lango:v1",
+		ServiceName: "prod-sample",
+		Image:       "registry/sample:v1",
 		Network:     "noops-net",
 		Secrets: []SecretBinding{{
 			EnvKey:     "DATABASE_URL",
@@ -138,7 +138,7 @@ func TestRenderStackTemplateMountsExternalSecrets(t *testing.T) {
 
 func TestRenderStackTemplateWrapperMode(t *testing.T) {
 	rendered, err := renderStackTemplate(stackTemplateData{
-		ServiceName:     "dev-lango",
+		ServiceName:     "dev-sample",
 		Image:           "127.0.0.1:5000/noops-runtime:latest",
 		Network:         "noops-net",
 		UseWrapper:      true,
@@ -172,8 +172,8 @@ func TestRenderStackTemplateWrapperMode(t *testing.T) {
 
 func TestRenderStackTemplateFileModeSecretTargetIsEnvKey(t *testing.T) {
 	rendered, err := renderStackTemplate(stackTemplateData{
-		ServiceName: "prod-lango",
-		Image:       "registry/lango:v1",
+		ServiceName: "prod-sample",
+		Image:       "registry/sample:v1",
 		Network:     "noops-net",
 		UseWrapper:  false,
 		Secrets: []SecretBinding{{
@@ -233,8 +233,8 @@ func TestRenderStackTemplateRendersNamedVolumesAndBindMounts(t *testing.T) {
 
 func TestRenderStackTemplateRendersSwarmUpdateAndRollbackPolicies(t *testing.T) {
 	rendered, err := renderStackTemplate(stackTemplateData{
-		ServiceName:             "prod-lango",
-		Image:                   "registry/lango:v1",
+		ServiceName:             "prod-sample",
+		Image:                   "registry/sample:v1",
 		Network:                 "noops-net",
 		Parallelism:             1,
 		RolloutDelay:            "10s",

@@ -24,25 +24,25 @@ func (r *recordingRunner) Run(_ context.Context, name string, args []string, _ c
 
 func TestUpdateRouteAddsExposedApp(t *testing.T) {
 	m := manifest.Manifest{
-		Name:    "lango",
+		Name:    "sample",
 		Service: manifest.Service{InternalPort: 8080},
-		Expose:  manifest.Expose{Enabled: true, Domain: "lango.example.test", PathPrefix: "/"},
+		Expose:  manifest.Expose{Enabled: true, Domain: "sample.example.test", PathPrefix: "/"},
 	}
-	routes, changed, err := updateRoute(nil, "dev", m, "dev-lango_dev-lango")
+	routes, changed, err := updateRoute(nil, "dev", m, "dev-sample_dev-sample")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !changed || len(routes) != 1 {
 		t.Fatalf("changed=%v routes=%v", changed, routes)
 	}
-	if got, want := routes[0].Service, "dev-lango_dev-lango"; got != want {
+	if got, want := routes[0].Service, "dev-sample_dev-sample"; got != want {
 		t.Errorf("service = %q, want %q", got, want)
 	}
 }
 
 func TestUpdateRouteCarriesTLSSetting(t *testing.T) {
-	m := manifest.Manifest{Name: "lango", Service: manifest.Service{InternalPort: 8080}, Expose: manifest.Expose{Enabled: true, TLS: true, Domain: "lango.example.test", PathPrefix: "/"}}
-	routes, _, err := updateRoute(nil, "dev", m, "dev-lango_dev-lango")
+	m := manifest.Manifest{Name: "sample", Service: manifest.Service{InternalPort: 8080}, Expose: manifest.Expose{Enabled: true, TLS: true, Domain: "sample.example.test", PathPrefix: "/"}}
+	routes, _, err := updateRoute(nil, "dev", m, "dev-sample_dev-sample")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestUpdateRouteRejectsDuplicateDomainAndPath(t *testing.T) {
 }
 
 func TestUpdateRouteRemovesDisabledExposure(t *testing.T) {
-	routes, changed, err := updateRoute([]Route{{Environment: "dev", App: "lango"}}, "dev", manifest.Manifest{Name: "lango"}, "")
+	routes, changed, err := updateRoute([]Route{{Environment: "dev", App: "sample"}}, "dev", manifest.Manifest{Name: "sample"}, "")
 	if err != nil {
 		t.Fatal(err)
 	}

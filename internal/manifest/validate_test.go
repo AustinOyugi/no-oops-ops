@@ -147,7 +147,7 @@ func TestValidateAllowsWildcardIngressDomain(t *testing.T) {
 		Service:     Service{InternalPort: 8080},
 		Healthcheck: Healthcheck{Test: []string{"CMD", "true"}},
 		Source:      Source{Context: ".", Dockerfile: "Dockerfile"},
-		Expose:      Expose{Enabled: true, Domain: "*.vybes.africa", PathPrefix: "/"},
+		Expose:      Expose{Enabled: true, Domain: "*.example.com", PathPrefix: "/"},
 	}
 	if err := m.Validate(); err != nil {
 		t.Fatalf("wildcard ingress domain rejected: %v", err)

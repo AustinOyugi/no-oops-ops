@@ -46,8 +46,8 @@ No Oops does not use a global state directory. Run `init` once for each
 deployment workspace; it creates the Git-ignored `.noops/` runtime store.
 
 ```bash
-noops init /srv/cranium/noops
-cd /srv/cranium/noops
+noops init /srv/noops/workspace
+cd /srv/noops/workspace
 # Edit apps.yml with the workspace platform settings and app aliases.
 noops install
 noops doctor
@@ -70,7 +70,7 @@ noops release --deploy prod api
 ```
 
 `api` is an alias declared in the workspace `apps.yml`. Use
-`--workspace /srv/cranium/noops` from another directory.
+`--workspace /srv/noops/workspace` from another directory.
 
 An `app.yml` may contain several Compose services. Use `--all` to process them in stable `x-noops.depends_on` order;
 processing stops at the first failure.
