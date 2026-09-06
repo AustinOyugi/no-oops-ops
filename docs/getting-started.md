@@ -19,7 +19,9 @@ Docker Desktop:
 
 ```json
 {
-  "insecure-registries": ["127.0.0.1:5000"]
+  "insecure-registries": [
+    "127.0.0.1:5000"
+  ]
 }
 ```
 
