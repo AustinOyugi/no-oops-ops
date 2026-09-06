@@ -19,6 +19,20 @@ func (a *App) runRollback(ctx context.Context, args []string) error {
 	return nil
 }
 
+// Rollback redeploys the previous successful deployment of selected services.
+func (a *App) Rollback(ctx context.Context, target Target) error {
+	environment, manifestPath, services, err := a.resolveTarget(target, false)
+	if err != nil {
+		return err
+	}
+	for _, service := range services {
+		if err := a.runRollbackService(ctx, environment, manifest.WithService(manifestPath, service)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (a *App) runRollbackService(ctx context.Context, environment, manifestPath string) error {
 	result, err := a.deployer.Rollback(ctx, environment, manifestPath)
 

@@ -29,6 +29,23 @@ func (a *App) runDeploy(ctx context.Context, args []string) error {
 	return nil
 }
 
+// Deploy deploys selected services, creating a release when necessary.
+func (a *App) Deploy(ctx context.Context, target Target, quick bool) error {
+	environment, manifestPath, services, err := a.resolveTarget(target, true)
+	if err != nil {
+		return err
+	}
+	if err := a.runDeployPreflight(ctx); err != nil {
+		return err
+	}
+	for _, service := range services {
+		if err := a.runDeployService(ctx, environment, manifest.WithService(manifestPath, service), "", quick); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (a *App) runDeployService(ctx context.Context, environment, manifestPath, optionalReleaseVersion string, quick bool) error {
 	loadedManifest, err := manifest.Load(manifestPath)
 	if err != nil {

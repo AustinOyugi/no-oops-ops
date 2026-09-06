@@ -40,6 +40,56 @@ func (a *App) runRelease(ctx context.Context, args []string) error {
 	return nil
 }
 
+// Release builds selected services and optionally deploys those exact releases.
+func (a *App) Release(ctx context.Context, target Target, deployAfterRelease bool) error {
+	environment, manifestPath, services, err := a.resolveTarget(target, true)
+	if err != nil {
+		return err
+	}
+	releaseTags := make(map[string]string, len(services))
+	for _, service := range services {
+		result, err := a.runReleaseService(ctx, environment, manifest.WithService(manifestPath, service))
+		if err != nil {
+			return err
+		}
+		releaseTags[service] = result.Tag
+	}
+	if !deployAfterRelease {
+		return nil
+	}
+	if err := a.runDeployPreflight(ctx); err != nil {
+		return err
+	}
+	for _, service := range services {
+		if err := a.runDeployService(ctx, environment, manifest.WithService(manifestPath, service), releaseTags[service], false); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ListReleases lists releases for selected services.
+func (a *App) ListReleases(ctx context.Context, target Target) error {
+	environment, manifestPath, services, err := a.resolveTarget(target, true)
+	if err != nil {
+		return err
+	}
+	for _, service := range services {
+		m, err := manifest.Load(manifest.WithService(manifestPath, service))
+		if err != nil {
+			return err
+		}
+		history, err := release.ListHistory(a.config, m.Name, environment)
+		if err != nil {
+			return err
+		}
+		for _, item := range history {
+			a.logger.InfoContext(ctx, "release", "environment", item.Environment, "service", item.App, "tag", item.Tag, "image", item.RegistryImage, "created_at", item.CreateAt, "git_commit", gitCommit(item))
+		}
+	}
+	return nil
+}
+
 func (a *App) runReleaseList(ctx context.Context, args []string) error {
 	environment, manifestPath, services, err := parseServiceArgs(args, "release list", a.resolveApp, true)
 	if err != nil {

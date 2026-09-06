@@ -19,6 +19,20 @@ func (a *App) runRemove(ctx context.Context, args []string) error {
 	return nil
 }
 
+// Remove removes selected deployed services and their generated state.
+func (a *App) Remove(ctx context.Context, target Target) error {
+	environment, manifestPath, services, err := a.resolveTarget(target, false)
+	if err != nil {
+		return err
+	}
+	for _, service := range services {
+		if err := a.runRemoveService(ctx, environment, manifest.WithService(manifestPath, service)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (a *App) runRemoveService(ctx context.Context, environment, manifestPath string) error {
 	result, err := a.deployer.Remove(ctx, environment, manifestPath)
 	if err != nil {
