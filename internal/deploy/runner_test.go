@@ -1,6 +1,9 @@
 package deploy
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestAllDesiredTasksRunningRequiresAllDesiredTasks(t *testing.T) {
 	if allDesiredTasksRunning(1, 3) {
@@ -27,5 +30,32 @@ func TestParseTaskDiagnostics(t *testing.T) {
 	got := diagnostics[0]
 	if got.ID != "abc123" || got.Node != "node-1" || got.DesiredState != "Running" || got.CurrentState != "Rejected 4 seconds ago" || got.Error != "No such image" {
 		t.Errorf("diagnostic = %#v", got)
+	}
+}
+
+func TestRolloutMonitorAllowsFullMonitorAfterConvergence(t *testing.T) {
+	started := time.Date(2026, time.September, 6, 13, 50, 40, 0, time.UTC)
+	state := newRolloutMonitorState(started, 90*time.Second, 90*time.Second)
+
+	if timedOut, monitoring, completed, _ := state.observe(started.Add(60*time.Second), true); timedOut || !monitoring || completed {
+		t.Fatalf("first convergence observation = timedOut:%t monitoring:%t completed:%t, want false:true:false", timedOut, monitoring, completed)
+	}
+	if timedOut, monitoring, completed, _ := state.observe(started.Add(90*time.Second), true); timedOut || !monitoring || completed {
+		t.Fatalf("at the old convergence deadline = timedOut:%t monitoring:%t completed:%t, want false:true:false", timedOut, monitoring, completed)
+	}
+	if timedOut, monitoring, completed, _ := state.observe(started.Add(149*time.Second), true); timedOut || !monitoring || completed {
+		t.Fatalf("before the full monitor window = timedOut:%t monitoring:%t completed:%t, want false:true:false", timedOut, monitoring, completed)
+	}
+	if timedOut, monitoring, completed, _ := state.observe(started.Add(150*time.Second), true); timedOut || !monitoring || !completed {
+		t.Fatalf("after the full monitor window = timedOut:%t monitoring:%t completed:%t, want false:true:true", timedOut, monitoring, completed)
+	}
+}
+
+func TestRolloutMonitorTimesOutBeforeConvergence(t *testing.T) {
+	started := time.Date(2026, time.September, 6, 13, 50, 40, 0, time.UTC)
+	state := newRolloutMonitorState(started, 90*time.Second, 30*time.Second)
+
+	if timedOut, _, _, _ := state.observe(started.Add(91*time.Second), false); !timedOut {
+		t.Fatal("expected convergence timeout before any successful convergence")
 	}
 }

@@ -31,6 +31,50 @@ const (
 
 const swarmObservationInterval = 2 * time.Second
 
+// rolloutMonitorState separates the time allowed to first converge from the
+// time a converged service must remain stable. Once convergence has been
+// reached, the convergence deadline must no longer cancel the monitor window.
+type rolloutMonitorState struct {
+	convergenceDeadline time.Time
+	monitor             time.Duration
+	converged           bool
+	stableSince         time.Time
+}
+
+func newRolloutMonitorState(now time.Time, convergenceTimeout, monitor time.Duration) rolloutMonitorState {
+	return rolloutMonitorState{
+		convergenceDeadline: now.Add(convergenceTimeout),
+		monitor:             monitor,
+	}
+}
+
+// observe records one rollout observation. It returns whether convergence has
+// timed out, whether the service is currently being monitored, whether the
+// monitor window completed, and whether this observation first converged.
+func (r *rolloutMonitorState) observe(now time.Time, converged bool) (timedOut, monitoring, completed, justConverged bool) {
+	if !r.converged {
+		if now.After(r.convergenceDeadline) {
+			return true, false, false, false
+		}
+		if !converged {
+			return false, false, false, false
+		}
+		r.converged = true
+		r.stableSince = now
+		justConverged = true
+	} else if !converged {
+		r.stableSince = time.Time{}
+		return false, false, false, false
+	} else if r.stableSince.IsZero() {
+		r.stableSince = now
+	}
+
+	if now.Sub(r.stableSince) >= r.monitor {
+		return false, true, true, justConverged
+	}
+	return false, true, false, justConverged
+}
+
 // swarmProgress is intentionally limited to fields that reflect rollout
 // progress. The image is checked for correctness, but including its digest in
 // every log entry makes normal deploy output needlessly noisy.
@@ -136,8 +180,7 @@ func (s *Service) waitForSwarmConvergence(
 	timeout time.Duration,
 	initialMonitor time.Duration,
 ) (SwarmOutcome, int, error) {
-	deadline := time.Now().Add(timeout)
-	var stableSince time.Time
+	monitorState := newRolloutMonitorState(time.Now(), timeout, initialMonitor)
 	var lastProgress swarmProgress
 	hasLastProgress := false
 
@@ -160,12 +203,6 @@ func (s *Service) waitForSwarmConvergence(
 		}
 
 		switch state {
-		case "completed":
-			if strings.HasPrefix(image, expectedImage) {
-				progressIndicator.Stop()
-				s.logger.InfoContext(ctx, "Swarm convergence complete", "service", serviceName, "running_tasks", desiredTasks, "desired_tasks", desiredTasks)
-				return SwarmOutcomeCompleted, desiredTasks, nil
-			}
 		case "rollback_completed":
 			progressIndicator.Stop()
 			s.logger.WarnContext(ctx, "Swarm rollout rolled back", "service", serviceName, "reason", message)
@@ -184,23 +221,20 @@ func (s *Service) waitForSwarmConvergence(
 		if err != nil {
 			return "", 0, err
 		}
-		progressIndicator.Update(state, runningTasks, desiredTasks, state == "" && allDesiredTasksRunning(runningTasks, desiredTasks))
+		converged := (state == "completed" && strings.HasPrefix(image, expectedImage)) ||
+			(state == "" && allDesiredTasksRunning(runningTasks, desiredTasks))
+		timedOut, monitoring, completed, justConverged := monitorState.observe(time.Now(), converged)
+		progressIndicator.Update(state, runningTasks, desiredTasks, monitoring)
 
-		if state == "" && allDesiredTasksRunning(runningTasks, desiredTasks) {
-			if stableSince.IsZero() {
-				stableSince = time.Now()
-				if !progressIndicator.active {
-					s.logger.InfoContext(ctx, "Swarm desired task count reached; observing monitor window", "service", serviceName, "running_tasks", runningTasks, "desired_tasks", desiredTasks, "monitor", initialMonitor.String())
-				}
-			}
-			if time.Since(stableSince) >= initialMonitor {
-				progressIndicator.Stop()
-				s.logger.InfoContext(ctx, "Swarm convergence complete", "service", serviceName, "running_tasks", runningTasks, "desired_tasks", desiredTasks)
-				return SwarmOutcomeCompleted, runningTasks, nil
-			}
-		} else {
-			stableSince = time.Time{}
-
+		if justConverged && !progressIndicator.active {
+			s.logger.InfoContext(ctx, "Swarm desired task count reached; observing monitor window", "service", serviceName, "running_tasks", runningTasks, "desired_tasks", desiredTasks, "monitor", initialMonitor.String())
+		}
+		if completed {
+			progressIndicator.Stop()
+			s.logger.InfoContext(ctx, "Swarm convergence complete", "service", serviceName, "running_tasks", runningTasks, "desired_tasks", desiredTasks)
+			return SwarmOutcomeCompleted, runningTasks, nil
+		}
+		if !converged {
 			progress := swarmProgress{updateState: state, runningTasks: runningTasks}
 			if !progressIndicator.active && (!hasLastProgress || progress != lastProgress) {
 				s.logger.InfoContext(ctx, "Swarm rollout progress", "service", serviceName, "update_state", state, "running_tasks", runningTasks, "desired_tasks", desiredTasks)
@@ -209,7 +243,7 @@ func (s *Service) waitForSwarmConvergence(
 			hasLastProgress = true
 		}
 
-		if time.Now().After(deadline) {
+		if timedOut {
 			progressIndicator.Stop()
 			s.logger.WarnContext(ctx, "Swarm convergence timed out", "service", serviceName, "running_tasks", runningTasks, "desired_tasks", desiredTasks, "timeout", timeout.String())
 			return SwarmOutcomeTimedOut, runningTasks, s.convergenceError(ctx, serviceName, SwarmOutcomeTimedOut, fmt.Sprintf("service did not converge within %s", timeout))

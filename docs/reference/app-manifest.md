@@ -112,6 +112,10 @@ The defaults are: update `order: start-first`, `parallelism: 1`, `delay: 10s`, `
 application needs a longer or shorter Swarm monitoring window. `max_failure_ratio` for both update and rollback must be
 between 0 and 1.
 
+Rollout uses consecutive time windows: `rollout.convergence_timeout` is the time allowed for the desired tasks to
+converge, then `rollout.monitor` is the full time they must remain stable. The monitor window starts only after
+convergence and does not consume the convergence timeout.
+
 For development feedback loops, `noops deploy --quick <environment> <app>` temporarily uses `healthcheck.start_period`
 as the monitor window while retaining the manifest's `rollout.convergence_timeout`. It does not change the manifest; a
 later normal deploy uses the configured monitor again.
