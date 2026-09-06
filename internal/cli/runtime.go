@@ -25,5 +25,3 @@ func (r runtime) application() (*app.App, error) {
 	}
 	return app.New(cfg)
 }
-
-type appRunner func(func(*app.App) error) error

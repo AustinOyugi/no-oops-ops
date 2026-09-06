@@ -2,38 +2,9 @@ package app
 
 import (
 	"context"
-	"errors"
-	"strconv"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/cleanup"
 )
-
-func (a *App) runCleanup(ctx context.Context, args []string) error {
-	options := cleanup.Options{Keep: 2}
-	for len(args) > 0 {
-		switch args[0] {
-		case "--apply":
-			options.Apply = true
-			args = args[1:]
-		case "--orphaned":
-			options.Orphaned = true
-			args = args[1:]
-		case "--keep":
-			if len(args) < 2 {
-				return errors.New("cleanup --keep requires a value")
-			}
-			keep, err := strconv.Atoi(args[1])
-			if err != nil || keep < 0 {
-				return errors.New("cleanup --keep must be a non-negative integer")
-			}
-			options.Keep = keep
-			args = args[2:]
-		default:
-			return errors.New("cleanup accepts only --apply, --orphaned, and --keep <count>")
-		}
-	}
-	return a.Cleanup(ctx, options)
-}
 
 // Cleanup removes expired deployment artifacts according to options.
 func (a *App) Cleanup(ctx context.Context, options cleanup.Options) error {

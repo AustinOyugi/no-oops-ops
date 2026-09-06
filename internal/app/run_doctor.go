@@ -6,13 +6,6 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/doctor"
 )
 
-func (a *App) runDoctor(ctx context.Context, args []string) error {
-	if len(args) > 1 || (len(args) == 1 && args[0] != "--deploy-ready") {
-		return errors.New("doctor supports only the --deploy-ready option")
-	}
-	return a.Doctor(ctx, len(args) == 1)
-}
-
 // Doctor checks the local deployment platform.
 func (a *App) Doctor(ctx context.Context, deployReady bool) error {
 	profile := doctor.ProfileFull

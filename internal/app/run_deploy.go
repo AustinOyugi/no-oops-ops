@@ -12,23 +12,6 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 )
 
-func (a *App) runDeploy(ctx context.Context, args []string) error {
-	environment, manifestPath, services, quick, err := parseDeployArgs(args, a.resolveApp)
-	if err != nil {
-		return err
-	}
-
-	if err := a.runDeployPreflight(ctx); err != nil {
-		return err
-	}
-	for _, service := range services {
-		if err := a.runDeployService(ctx, environment, manifest.WithService(manifestPath, service), "", quick); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // Deploy deploys selected services, creating a release when necessary.
 func (a *App) Deploy(ctx context.Context, target Target, quick bool) error {
 	environment, manifestPath, services, err := a.resolveTarget(target, true)
@@ -175,39 +158,6 @@ func validateIngressTLS(m manifest.Manifest, cloudflare bool) error {
 		return errors.New("Cloudflare ingress requires x-noops.ingress.tls_certificate for an HTTPS route; import a Cloudflare Origin certificate with `noops certificate import`")
 	}
 	return nil
-}
-
-func parseDeployArgs(args []string, resolveApp func(string) (string, error)) (environment, manifestPath string, services []string, quick bool, err error) {
-	if len(args) > 0 && args[0] == "--quick" {
-		quick = true
-		args = args[1:]
-	}
-	if len(args) < 2 {
-		return "", "", nil, false, errors.New("deploy requires an environment and app name")
-	}
-	environment = args[0]
-	manifestPath, err = resolveApp(args[1])
-	if err != nil {
-		return "", "", nil, false, err
-	}
-	if len(args) == 3 && args[2] == "--all" {
-		names, e := manifest.DeploymentOrder(manifestPath)
-		return environment, manifestPath, names, quick, e
-	}
-	if len(args) == 4 && args[2] == "--service" {
-		return environment, manifestPath, []string{args[3]}, quick, nil
-	}
-	if len(args) == 2 {
-		names, e := manifest.Services(manifestPath)
-		if e != nil {
-			return "", "", nil, false, e
-		}
-		if len(names) == 1 {
-			return environment, manifestPath, names, quick, nil
-		}
-		return "", "", nil, false, errors.New("deploy requires --service <name> or --all when the manifest contains multiple services")
-	}
-	return "", "", nil, false, errors.New("deploy accepts only --service <name> or --all")
 }
 
 func (a *App) runDeployPreflight(ctx context.Context) error {

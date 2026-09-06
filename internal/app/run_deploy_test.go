@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -23,21 +22,6 @@ func (failingDoctor) RunProfile(context.Context, doctor.Profile) (doctor.Result,
 	result := doctor.Result{}
 	result.Add("registry_service", doctor.StatusFail, "registry service is unavailable", "Run noops install to deploy the registry")
 	return result, nil
-}
-
-func TestRunRoutesVersionCommand(t *testing.T) {
-	var logs bytes.Buffer
-	application := &App{
-		logger: slog.New(slog.NewTextHandler(&logs, nil)),
-		config: config.Config{InstallVersion: "test-version"},
-	}
-
-	if err := application.Run(context.Background(), []string{"version"}); err != nil {
-		t.Fatalf("Run(version) returned error: %v", err)
-	}
-	if got := logs.String(); !strings.Contains(got, "version=test-version") {
-		t.Errorf("Run(version) logs = %q, want version", got)
-	}
 }
 
 type recordingDeployer struct {
@@ -73,7 +57,7 @@ func TestRunDeployStopsBeforeDeployingWhenPreflightFails(t *testing.T) {
 		config:   config.Config{Workspace: workspace},
 	}
 
-	err := application.runDeploy(context.Background(), []string{"prod", "api", "--service", "api"})
+	err := application.Deploy(context.Background(), Target{Environment: "prod", App: "api", Service: "api"}, false)
 	if err == nil {
 		t.Fatal("runDeploy returned nil error")
 	}
@@ -82,46 +66,6 @@ func TestRunDeployStopsBeforeDeployingWhenPreflightFails(t *testing.T) {
 	}
 	if deployer.runCalls != 0 {
 		t.Errorf("deployer calls = %d, want 0", deployer.runCalls)
-	}
-}
-
-func TestParseDeployArgsQuick(t *testing.T) {
-	resolve := func(name string) (string, error) { return name + ".yml", nil }
-	environment, path, services, quick, err := parseDeployArgs([]string{"--quick", "dev", "api", "--service", "api"}, resolve)
-	if err != nil {
-		t.Fatalf("parseDeployArgs returned error: %v", err)
-	}
-	if environment != "dev" || path != "api.yml" || len(services) != 1 || services[0] != "api" || !quick {
-		t.Errorf("parseDeployArgs = (%q, %q, %v, %t), want quick dev deployment", environment, path, services, quick)
-	}
-}
-
-func TestParseDeployArgsSelectsTheOnlyServiceImplicitly(t *testing.T) {
-	manifestPath := filepath.Join(t.TempDir(), "app.yml")
-	if err := os.WriteFile(manifestPath, []byte("services:\n  api:\n    image: api\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	resolve := func(string) (string, error) { return manifestPath, nil }
-
-	environment, path, services, quick, err := parseDeployArgs([]string{"dev", "api"}, resolve)
-	if err != nil {
-		t.Fatalf("parseDeployArgs returned error: %v", err)
-	}
-	if environment != "dev" || path != manifestPath || len(services) != 1 || services[0] != "api" || quick {
-		t.Errorf("parseDeployArgs = (%q, %q, %v, %t), want implicit api deployment", environment, path, services, quick)
-	}
-}
-
-func TestParseDeployArgsRequiresSelectionForMultipleServices(t *testing.T) {
-	manifestPath := filepath.Join(t.TempDir(), "app.yml")
-	if err := os.WriteFile(manifestPath, []byte("services:\n  api:\n    image: api\n  worker:\n    image: worker\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	resolve := func(string) (string, error) { return manifestPath, nil }
-
-	_, _, _, _, err := parseDeployArgs([]string{"dev", "api"}, resolve)
-	if err == nil || !strings.Contains(err.Error(), "multiple services") {
-		t.Fatalf("parseDeployArgs error = %v, want multiple-services selection error", err)
 	}
 }
 

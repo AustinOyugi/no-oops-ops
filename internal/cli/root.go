@@ -46,13 +46,13 @@ func newInitCommand() *cobra.Command {
 }
 
 func newLifecycleCommands(ctx context.Context, rt *runtime) []*cobra.Command {
-	withApp := appRunner(func(run func(*app.App) error) error {
+	withApp := func(run func(*app.App) error) error {
 		application, err := rt.application()
 		if err != nil {
 			return err
 		}
 		return run(application)
-	})
+	}
 
 	var releaseFlags targetFlags
 	var deployAfterRelease bool
@@ -123,7 +123,7 @@ func newLifecycleCommands(ctx context.Context, rt *runtime) []*cobra.Command {
 	}{{"set", "set <environment> <key>", 2}, {"delete", "delete <environment> <key>", 2}, {"list", "list <environment>", 1}} {
 		s := spec
 		secretCmd.AddCommand(&cobra.Command{Use: s.use, Args: cobra.ExactArgs(s.count), RunE: func(cmd *cobra.Command, args []string) error {
-			return runSecretCommand(ctx, withApp, s.verb, args)
+			return runSecretCommand(ctx, rt, s.verb, args)
 		}})
 	}
 	certificateCmd := &cobra.Command{Use: "certificate"}
@@ -133,17 +133,19 @@ func newLifecycleCommands(ctx context.Context, rt *runtime) []*cobra.Command {
 	return []*cobra.Command{installCmd, uninstallCmd, doctorCmd, statusCmd, releaseCmd, deployCmd, rollbackCmd, removeCmd, secretCmd, certificateCmd, cleanupCmd}
 }
 
-func runSecretCommand(ctx context.Context, withApp appRunner, verb string, args []string) error {
-	return withApp(func(application *app.App) error {
-		switch verb {
-		case "set":
-			return application.SetSecretFromStdin(ctx, args[0], args[1])
-		case "delete":
-			return application.DeleteSecretAndLog(ctx, args[0], args[1])
-		case "list":
-			return application.ListSecretsAndLog(ctx, args[0])
-		default:
-			return fmt.Errorf("unsupported secret command %q", verb)
-		}
-	})
+func runSecretCommand(ctx context.Context, rt *runtime, verb string, args []string) error {
+	application, err := rt.application()
+	if err != nil {
+		return err
+	}
+	switch verb {
+	case "set":
+		return application.SetSecret(ctx, args[0], args[1])
+	case "delete":
+		return application.DeleteSecret(ctx, args[0], args[1])
+	case "list":
+		return application.ListSecrets(ctx, args[0])
+	default:
+		return fmt.Errorf("unsupported secret command %q", verb)
+	}
 }

@@ -2,18 +2,9 @@ package app
 
 import (
 	"context"
-	"errors"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/uninstall"
 )
-
-func (a *App) runUninstall(ctx context.Context, args []string) error {
-	if len(args) > 1 || (len(args) == 1 && args[0] != "--purge") {
-		return errors.New("uninstall supports only the --purge option")
-	}
-
-	return a.Uninstall(ctx, len(args) == 1)
-}
 
 // Uninstall removes the local deployment platform.
 func (a *App) Uninstall(ctx context.Context, purge bool) error {

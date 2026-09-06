@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"errors"
 	"github.com/AustinOyugi/no-oops-ops/internal/cleanup"
 	"github.com/AustinOyugi/no-oops-ops/internal/release"
 	"io"
@@ -80,61 +79,4 @@ func New(cfg config.Config) (*App, error) {
 		secrets:     secret.NewService(logger, cfg),
 		cleaner:     cleanup.NewService(logger, cfg),
 	}, nil
-}
-
-func (a *App) Run(ctx context.Context, args []string) error {
-	if len(args) == 0 || args[0] == "version" {
-		a.logger.InfoContext(ctx, "No Oops Ops", "version", a.config.InstallVersion)
-		return nil
-	}
-
-	if args[0] == "doctor" {
-		return a.runDoctor(ctx, args[1:])
-	}
-
-	if args[0] == "status" {
-		return a.runStatus(ctx)
-	}
-
-	if args[0] == "install" {
-		if len(args) != 1 {
-			return errors.New("install does not accept arguments; run noops install from the workspace or use --workspace <directory>")
-		}
-		return a.runInstall(ctx)
-	}
-
-	if args[0] == "uninstall" {
-		return a.runUninstall(ctx, args[1:])
-	}
-
-	if args[0] == "deploy" {
-		return a.runDeploy(ctx, args[1:])
-	}
-
-	if args[0] == "rollback" {
-		return a.runRollback(ctx, args[1:])
-	}
-
-	if args[0] == "remove" {
-		return a.runRemove(ctx, args[1:])
-	}
-
-	if args[0] == "release" {
-		return a.runRelease(ctx, args[1:])
-	}
-
-	if args[0] == "secret" {
-		return a.runSecret(ctx, args[1:])
-	}
-
-	if args[0] == "certificate" {
-		return a.runCertificate(args[1:])
-	}
-
-	if args[0] == "cleanup" {
-		return a.runCleanup(ctx, args[1:])
-	}
-
-	a.logger.ErrorContext(ctx, "unknown command", "command", args[0])
-	return errors.New("unknown command")
 }
