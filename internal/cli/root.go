@@ -14,13 +14,12 @@ import (
 // NewRootCommand constructs the No Oops command tree.
 func NewRootCommand(ctx context.Context) *cobra.Command {
 	rt := runtime{}
-	var showVersion bool
 	root := &cobra.Command{Use: "noops", Short: "No Oops Ops deployment CLI", SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return printVersion(cmd)
 		},
 	}
-	root.Flags().BoolVarP(&showVersion, "version", "v", false, "Print version information")
+	root.Flags().BoolP("version", "v", false, "Print version information")
 	root.PersistentFlags().StringVar(&rt.workspace, "workspace", "", "Workspace directory")
 	commands := []*cobra.Command{newVersionCommand(), newInitCommand()}
 	commands = append(commands, newLifecycleCommands(ctx, &rt)...)
@@ -58,65 +57,73 @@ func newLifecycleCommands(ctx context.Context, rt *runtime) []*cobra.Command {
 		}
 		return run(application)
 	}
+	
+	newAppCommand := func(use string, args cobra.PositionalArgs, run func(*app.App, []string) error) *cobra.Command {
+		return &cobra.Command{
+			Use:  use,
+			Args: args,
+			RunE: func(_ *cobra.Command, commandArgs []string) error {
+				return withApp(func(application *app.App) error {
+					return run(application, commandArgs)
+				})
+			},
+		}
+	}
 
 	var releaseFlags targetFlags
 	var deployAfterRelease bool
-	releaseCmd := &cobra.Command{Use: "release <environment> <app>", Args: cobra.ExactArgs(2), RunE: func(cmd *cobra.Command, args []string) error {
-		return withApp(func(application *app.App) error {
-			return application.Release(ctx, target(args, releaseFlags), deployAfterRelease)
-		})
-	}}
+	releaseCmd := newAppCommand("release <environment> <app>", cobra.ExactArgs(2), func(application *app.App, args []string) error {
+		return application.Release(ctx, target(args, releaseFlags), deployAfterRelease)
+	})
 	addTargetFlags(releaseCmd, &releaseFlags)
 	releaseCmd.Flags().BoolVar(&deployAfterRelease, "deploy", false, "Deploy the exact release after it is created")
 	var listFlags targetFlags
-	listCmd := &cobra.Command{Use: "list <environment> <app>", Args: cobra.ExactArgs(2), RunE: func(cmd *cobra.Command, args []string) error {
-		return withApp(func(application *app.App) error { return application.ListReleases(ctx, target(args, listFlags)) })
-	}}
+	listCmd := newAppCommand("list <environment> <app>", cobra.ExactArgs(2), func(application *app.App, args []string) error {
+		return application.ListReleases(ctx, target(args, listFlags))
+	})
 	addTargetFlags(listCmd, &listFlags)
 	releaseCmd.AddCommand(listCmd)
 
 	var deployFlags targetFlags
 	var quick bool
-	deployCmd := &cobra.Command{Use: "deploy <environment> <app>", Args: cobra.ExactArgs(2), RunE: func(cmd *cobra.Command, args []string) error {
-		return withApp(func(application *app.App) error { return application.Deploy(ctx, target(args, deployFlags), quick) })
-	}}
+	deployCmd := newAppCommand("deploy <environment> <app>", cobra.ExactArgs(2), func(application *app.App, args []string) error {
+		return application.Deploy(ctx, target(args, deployFlags), quick)
+	})
 	addTargetFlags(deployCmd, &deployFlags)
 	deployCmd.Flags().BoolVar(&quick, "quick", false, "Use the health-check start period as the rollout monitor")
 
 	var rollbackFlags targetFlags
-	rollbackCmd := &cobra.Command{Use: "rollback <environment> <app>", Args: cobra.ExactArgs(2), RunE: func(cmd *cobra.Command, args []string) error {
-		return withApp(func(application *app.App) error { return application.Rollback(ctx, target(args, rollbackFlags)) })
-	}}
+	rollbackCmd := newAppCommand("rollback <environment> <app>", cobra.ExactArgs(2), func(application *app.App, args []string) error {
+		return application.Rollback(ctx, target(args, rollbackFlags))
+	})
 	addTargetFlags(rollbackCmd, &rollbackFlags)
 	var removeFlags targetFlags
-	removeCmd := &cobra.Command{Use: "remove <environment> <app>", Args: cobra.ExactArgs(2), RunE: func(cmd *cobra.Command, args []string) error {
-		return withApp(func(application *app.App) error { return application.Remove(ctx, target(args, removeFlags)) })
-	}}
+	removeCmd := newAppCommand("remove <environment> <app>", cobra.ExactArgs(2), func(application *app.App, args []string) error {
+		return application.Remove(ctx, target(args, removeFlags))
+	})
 	addTargetFlags(removeCmd, &removeFlags)
 
-	installCmd := &cobra.Command{Use: "install", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
-		return withApp(func(application *app.App) error { return application.Install(ctx) })
-	}}
+	installCmd := newAppCommand("install", cobra.NoArgs, func(application *app.App, _ []string) error {
+		return application.Install(ctx)
+	})
 	var purge bool
-	uninstallCmd := &cobra.Command{Use: "uninstall", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
-		return withApp(func(application *app.App) error { return application.Uninstall(ctx, purge) })
-	}}
+	uninstallCmd := newAppCommand("uninstall", cobra.NoArgs, func(application *app.App, _ []string) error {
+		return application.Uninstall(ctx, purge)
+	})
 	uninstallCmd.Flags().BoolVar(&purge, "purge", false, "Remove persistent registry data")
 	var deployReady bool
-	doctorCmd := &cobra.Command{Use: "doctor", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
-		return withApp(func(application *app.App) error { return application.Doctor(ctx, deployReady) })
-	}}
+	doctorCmd := newAppCommand("doctor", cobra.NoArgs, func(application *app.App, _ []string) error {
+		return application.Doctor(ctx, deployReady)
+	})
 	doctorCmd.Flags().BoolVar(&deployReady, "deploy-ready", false, "Check deployment prerequisites only")
-	statusCmd := &cobra.Command{Use: "status", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
-		return withApp(func(application *app.App) error { return application.Status(ctx) })
-	}}
+	statusCmd := newAppCommand("status", cobra.NoArgs, func(application *app.App, _ []string) error {
+		return application.Status(ctx)
+	})
 	var apply, orphaned bool
 	var keep int
-	cleanupCmd := &cobra.Command{Use: "cleanup", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
-		return withApp(func(application *app.App) error {
-			return application.Cleanup(ctx, cleanup.Options{Apply: apply, Orphaned: orphaned, Keep: keep})
-		})
-	}}
+	cleanupCmd := newAppCommand("cleanup", cobra.NoArgs, func(application *app.App, _ []string) error {
+		return application.Cleanup(ctx, cleanup.Options{Apply: apply, Orphaned: orphaned, Keep: keep})
+	})
 	cleanupCmd.Flags().BoolVar(&apply, "apply", false, "Apply cleanup")
 	cleanupCmd.Flags().BoolVar(&orphaned, "orphaned", false, "Include orphaned app environments")
 	cleanupCmd.Flags().IntVar(&keep, "keep", 2, "Number of records to retain")
@@ -132,9 +139,9 @@ func newLifecycleCommands(ctx context.Context, rt *runtime) []*cobra.Command {
 		}})
 	}
 	certificateCmd := &cobra.Command{Use: "certificate"}
-	certificateCmd.AddCommand(&cobra.Command{Use: "import <name> <certificate.pem> <private-key.pem>", Args: cobra.ExactArgs(3), RunE: func(cmd *cobra.Command, args []string) error {
-		return withApp(func(application *app.App) error { return application.ImportCertificate(args[0], args[1], args[2]) })
-	}})
+	certificateCmd.AddCommand(newAppCommand("import <name> <certificate.pem> <private-key.pem>", cobra.ExactArgs(3), func(application *app.App, args []string) error {
+		return application.ImportCertificate(args[0], args[1], args[2])
+	}))
 	return []*cobra.Command{installCmd, uninstallCmd, doctorCmd, statusCmd, releaseCmd, deployCmd, rollbackCmd, removeCmd, secretCmd, certificateCmd, cleanupCmd}
 }
 
