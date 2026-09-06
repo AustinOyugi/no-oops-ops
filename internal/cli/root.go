@@ -14,12 +14,13 @@ import (
 // NewRootCommand constructs the No Oops command tree.
 func NewRootCommand(ctx context.Context) *cobra.Command {
 	rt := runtime{}
+	var showVersion bool
 	root := &cobra.Command{Use: "noops", Short: "No Oops Ops deployment CLI", SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, err := fmt.Fprintf(cmd.OutOrStdout(), "noops %s\n", config.Version)
-			return err
+			return printVersion(cmd)
 		},
 	}
+	root.Flags().BoolVarP(&showVersion, "version", "v", false, "Print version information")
 	root.PersistentFlags().StringVar(&rt.workspace, "workspace", "", "Workspace directory")
 	commands := []*cobra.Command{newVersionCommand(), newInitCommand()}
 	commands = append(commands, newLifecycleCommands(ctx, &rt)...)
@@ -29,9 +30,13 @@ func NewRootCommand(ctx context.Context) *cobra.Command {
 
 func newVersionCommand() *cobra.Command {
 	return &cobra.Command{Use: "version", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
-		_, err := fmt.Fprintf(cmd.OutOrStdout(), "noops %s\n", config.Version)
-		return err
+		return printVersion(cmd)
 	}}
+}
+
+func printVersion(cmd *cobra.Command) error {
+	_, err := fmt.Fprintf(cmd.OutOrStdout(), "noops %s\n", config.Version)
+	return err
 }
 
 func newInitCommand() *cobra.Command {

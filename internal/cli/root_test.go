@@ -6,6 +6,24 @@ import (
 	"testing"
 )
 
+func TestVersionForms(t *testing.T) {
+	for _, args := range [][]string{{}, {"version"}, {"--version"}, {"-v"}} {
+		t.Run(strings.Join(args, "_"), func(t *testing.T) {
+			root := NewRootCommand(context.Background())
+			var output strings.Builder
+			root.SetOut(&output)
+			root.SetErr(&output)
+			root.SetArgs(args)
+			if err := root.Execute(); err != nil {
+				t.Fatalf("noops %v returned error: %v", args, err)
+			}
+			if !strings.HasPrefix(output.String(), "noops ") {
+				t.Errorf("output = %q, want version", output.String())
+			}
+		})
+	}
+}
+
 func TestRootCommandRendersReleaseHelp(t *testing.T) {
 	root := NewRootCommand(context.Background())
 	var output strings.Builder
