@@ -154,6 +154,10 @@ func parseServiceArgs(args []string, command string, resolveApp func(string) (st
 	if all && selected != "" {
 		return "", "", nil, errors.New("provide exactly one of --service or --all")
 	}
+	if all {
+		names, err := manifest.DeploymentOrder(path)
+		return environment, path, names, err
+	}
 	if selected == "" && allowImplicitSingleService {
 		names, err := manifest.Services(path)
 		if err != nil {
@@ -163,10 +167,6 @@ func parseServiceArgs(args []string, command string, resolveApp func(string) (st
 			return environment, path, names, nil
 		}
 		return "", "", nil, fmt.Errorf("%s requires --service <name> or --all when the manifest contains multiple services", command)
-	}
-	if all {
-		names, err := manifest.DeploymentOrder(path)
-		return environment, path, names, err
 	}
 	if selected == "" {
 		return "", "", nil, errors.New("provide exactly one of --service or --all")
