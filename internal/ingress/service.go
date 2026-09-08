@@ -19,6 +19,8 @@ import (
 const (
 	dirMode  = 0o700
 	fileMode = 0o600
+
+	internalHost = "ingress.noops.internal"
 )
 
 type Route struct {
@@ -68,7 +70,8 @@ func (s *Service) EnsureNetwork(ctx context.Context, network string) error {
 		return nil
 	}
 	service := s.config.NginxName + "_nginx"
-	if _, err := s.runner.Run(ctx, "docker", []string{"service", "update", "--network-add", network, service}, command.RunOptions{LogCommand: true}); err != nil {
+	attachment := "name=" + network + ",alias=" + internalHost
+	if _, err := s.runner.Run(ctx, "docker", []string{"service", "update", "--network-add", attachment, service}, command.RunOptions{LogCommand: true}); err != nil {
 		return fmt.Errorf("attach ingress service %q to network %q: %w", service, network, err)
 	}
 	networks[network] = true

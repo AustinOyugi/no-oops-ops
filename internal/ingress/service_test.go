@@ -91,6 +91,31 @@ func TestReconcileSkipsReloadForUnexposedAppWithoutRoute(t *testing.T) {
 	}
 }
 
+func TestEnsureNetworkAddsInternalIngressAlias(t *testing.T) {
+	temp := t.TempDir()
+	runner := &recordingRunner{}
+	service := &Service{
+		logger: slog.Default(),
+		config: config.Config{
+			StateDir:  filepath.Join(temp, "state"),
+			NginxName: "noops-nginx",
+		},
+		runner: runner,
+	}
+
+	if err := service.EnsureNetwork(context.Background(), "noops-prod"); err != nil {
+		t.Fatal(err)
+	}
+
+	want := [][]string{{
+		"docker", "service", "update", "--network-add",
+		"name=noops-prod,alias=ingress.noops.internal", "noops-nginx_nginx",
+	}}
+	if !reflect.DeepEqual(runner.calls, want) {
+		t.Fatalf("commands = %v, want %v", runner.calls, want)
+	}
+}
+
 func TestReloadGracefullyReloadsRunningNginxContainers(t *testing.T) {
 	runner := &reloadRecordingRunner{output: "nginx-one\nnginx-two\n"}
 	service := &Service{
