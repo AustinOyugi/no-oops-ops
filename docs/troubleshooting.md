@@ -29,8 +29,8 @@ noops secret set prod github-readonly
 ```
 
 For GitHub, use a fine-grained token restricted to the repository with Contents read access. Confirm the manifest's
-`credential` key matches `github-readonly`. The source token is a versioned Swarm secret and is available only to the
-temporary Git-fetch task.
+`x-noops.build.source.git.environments.<environment>.secret` key matches `github-readonly`. The source token is a
+versioned Swarm secret and is available only to the temporary Git-fetch task.
 
 ## Deploy fails before a stack is applied
 

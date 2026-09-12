@@ -1,8 +1,10 @@
 # Workspace storage
 
 No Oops is workspace-based. Initialize a workspace with `noops init <directory>`.
-The CLI may write only below that workspace's `.noops/` directory. Use the
-workspace as the current directory or provide it with `--workspace`.
+After initialization, the CLI writes runtime state only below that workspace's
+`.noops/` directory. `init` may also create the workspace's initial `apps.yml`
+catalog when it is absent. Use the workspace as the current directory or
+provide it with `--workspace`.
 
 ```text
 workspace/

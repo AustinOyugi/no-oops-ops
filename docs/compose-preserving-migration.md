@@ -84,11 +84,14 @@ One `app.yml` can declare multiple services. Lifecycle commands require an
 explicit target:
 
 ```text
-noops release <env> app.yml --service <name>
-noops deploy <env> app.yml --service <name>
-noops release <env> app.yml --all
-noops deploy <env> app.yml --all
+noops release <env> <app-alias> --service <name>
+noops deploy <env> <app-alias> --service <name>
+noops release <env> <app-alias> --all
+noops deploy <env> <app-alias> --all
 ```
+
+`<app-alias>` is the stable application name in the workspace `apps.yml`; it
+selects the corresponding manifest rather than naming the manifest file.
 
 Each service has independent immutable releases, deployment history, rollback
 state, secrets, and ingress ownership. `--all` uses a stable order and stops

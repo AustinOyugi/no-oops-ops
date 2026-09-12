@@ -1,9 +1,9 @@
 # No Oops Ops
 
-No Oops Ops is a self-hosted CLI for repeatable Docker Swarm deployments. It fetches application source from Git,
-builds every image in a one-shot isolated Swarm task, creates immutable releases in an internal registry, deploys them
-with Docker
-Stack, records deployment history, and manages environment-scoped Swarm secrets.
+No Oops Ops is a self-hosted CLI for repeatable Docker Swarm deployments. It fetches application source from Git when
+configured, builds Compose services in isolated one-shot Swarm tasks, snapshots image-only services into an internal
+registry, and deploys immutable releases with Docker Stack. It also records deployment history and manages
+environment-scoped Swarm secrets.
 
 It is intended for services that need a dependable deployment workflow without operating a full platform.
 
