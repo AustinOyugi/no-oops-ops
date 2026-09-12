@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// NewRootCommand constructs the No Oops command tree.
 func NewRootCommand(ctx context.Context) *cobra.Command {
 	rt := runtime{}
 	root := &cobra.Command{
