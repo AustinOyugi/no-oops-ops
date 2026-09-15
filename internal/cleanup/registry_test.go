@@ -17,3 +17,10 @@ func TestRegistryManifestDeleted(t *testing.T) {
 		t.Fatal("an already-missing manifest must not require garbage collection")
 	}
 }
+
+func TestRegistryResponseBody(t *testing.T) {
+	response := "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"repositories\":[\"sample\"]}"
+	if got, want := registryResponseBody(response), "{\"repositories\":[\"sample\"]}"; got != want {
+		t.Fatalf("registryResponseBody = %q, want %q", got, want)
+	}
+}
