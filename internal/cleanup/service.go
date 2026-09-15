@@ -69,7 +69,11 @@ func (s *Service) Run(ctx context.Context, options Options) (Plan, error) {
 			return plan, fmt.Errorf("remove cleanup metadata %q: %w", path, err)
 		}
 	}
-	if deletedAny {
+	// A previous run can delete registry manifests and then be interrupted
+	// before GC (for example while pruning host image tags). A retry no longer
+	// sees those deleted tags as candidates, so history pruning also requests
+	// the offline GC pass and lets cleanup converge.
+	if deletedAny || len(plan.ReleasePaths) > 0 || len(plan.DeploymentPaths) > 0 {
 		if err := s.garbageCollect(ctx); err != nil {
 			return plan, err
 		}
