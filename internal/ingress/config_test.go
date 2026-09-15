@@ -145,6 +145,9 @@ func TestRenderConfigRendersImportedCertificateAndProxySettings(t *testing.T) {
 	if got, want := strings.Count(output, "server_tokens off;"), strings.Count(output, "server {"); got != want {
 		t.Errorf("server_tokens directives = %d, want one for each of %d virtual hosts:\n%s", got, want, output)
 	}
+	if got, want := strings.Count(output, "client_max_body_size 100m;"), 2; got != want {
+		t.Errorf("client_max_body_size directives = %d, want external and internal routes (%d):\n%s", got, want, output)
+	}
 	for _, want := range []string{
 		"server_name chat.example.com support.example.com;",
 		"ssl_certificate /etc/noops/certificates/cloudflare-origin/fullchain.pem;",

@@ -6,6 +6,13 @@
 `noops-registry` internal registry, and the `noops-nginx` ingress, unless overridden by the workspace catalog. It is
 safe to rerun and waits for the registry and ingress services to become ready.
 
+Application environments use their own overlay networks, configured through
+`settings.platform.networks`. No Oops creates those networks on demand. The
+single managed nginx service is the shared public entry point; it attaches to
+an environment network only for exposed routes in that environment. This keeps
+dev and prod application traffic isolated while allowing both to share nginx's
+public ports.
+
 ## Releases
 
 A release is an immutable image tagged with a UTC timestamp (`YYYYMMDD-HHMMSS`) and pushed to the internal registry. A

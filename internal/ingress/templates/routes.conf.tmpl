@@ -92,6 +92,9 @@ server {
 
 {{ define "internal" }}{{ range .InternalRoutes }}location = {{ .Path }} { return 308 {{ .Path }}/; }
 location {{ .Path }}/ {
+{{ if .ClientMaxBodySize }}
+  client_max_body_size {{ .ClientMaxBodySize }};
+{{ end }}
   resolver 127.0.0.11 valid=10s;
   set $upstream {{ .Service }};
   rewrite ^{{ .Path }}/?(.*)$ /$1 break;

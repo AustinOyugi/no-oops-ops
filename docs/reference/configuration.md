@@ -51,8 +51,15 @@ apps:
 `platform.network.name` is used only by No Oops platform services. Application
 deployments use `platform.networks`: an explicit environment mapping wins, and
 otherwise `{environment}` in `default` is replaced by the selected environment.
-No Oops creates that overlay network on demand. The managed ingress joins an
-environment network only when it serves an exposed app in that environment.
+No Oops creates each environment's overlay network on demand, so applications
+in `dev` and `prod` have independent networks. The managed nginx ingress is a
+single shared public listener, but it joins an environment network only when it
+serves an exposed app in that environment. It does not make application
+networks reachable from one another.
+
+Use distinct domains or path prefixes for routes in different environments. A
+domain and path-prefix pair can have only one owner across the shared listener,
+so the same public request cannot target both a dev and a prod app.
 
 Set `platform.ingress.cloudflare: true` only when public ingress hostnames are
 Cloudflare-proxied. No Oops then generates Nginx `set_real_ip_from` directives

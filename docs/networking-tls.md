@@ -1,7 +1,11 @@
 # Networking and TLS
 
-No Oops runs one shared Nginx ingress service for all exposed applications. Applications stay on private Swarm overlay
-networks; Nginx is the only managed service that publishes HTTP and HTTPS to the host.
+No Oops runs one shared Nginx ingress service for all exposed applications. It is the only managed service that
+publishes HTTP and HTTPS to the host. Applications in each environment stay on independent private Swarm overlay
+networks; nginx joins an environment network only when it must serve an exposed app in that environment.
+
+The public listener is shared, not one listener per environment. Give dev and prod distinct domains or path prefixes:
+the same domain and path-prefix pair can route to only one application across the shared ingress.
 
 ## Platform ingress
 
@@ -30,7 +34,9 @@ x-noops:
 ```
 
 `internal_port` is never published directly. Nginx forwards the route to the private Swarm service. Services can also
-reach an exposed app through `http://ingress.noops.internal/<environment>/<app>/...`.
+reach an exposed app through `http://ingress.noops.internal/<environment>/<app>/...`. That internal address is
+available only to services on the same environment network as the selected route; it does not provide direct network
+access between environments.
 
 ## Let's Encrypt TLS
 
