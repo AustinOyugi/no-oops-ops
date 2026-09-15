@@ -19,3 +19,9 @@ func TestImageKeyRemovesDigestButRetainsTag(t *testing.T) {
 		t.Fatalf("imageKey = %q, want %q", got, want)
 	}
 }
+
+func TestLocalImageInUse(t *testing.T) {
+	if !localImageInUse("conflict: unable to delete image (must be forced) - container abc is using its referenced image def") {
+		t.Fatal("container image conflict should be a non-fatal cache cleanup result")
+	}
+}

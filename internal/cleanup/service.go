@@ -96,11 +96,18 @@ func (s *Service) registryClient() registryClient {
 	return registryClient{runner: s.runner, service: s.cfg.RegistryName + "_registry", port: s.cfg.RegistryPort}
 }
 func (s *Service) removeLocalImage(ctx context.Context, image string) error {
-	result, err := s.runner.Run(ctx, "docker", []string{"image", "rm", image}, command.RunOptions{LogCommand: true})
-	if err == nil || strings.Contains(string(result.Output), "No such image") {
+	result, err := s.runner.Run(ctx, "docker", []string{"image", "rm", image}, command.RunOptions{})
+	if err == nil || strings.Contains(string(result.Output), "No such image") || localImageInUse(string(result.Output)) {
 		return nil
 	}
 	return fmt.Errorf("remove local image %q: %w: %s", image, err, strings.TrimSpace(string(result.Output)))
+}
+
+// A stopped container can retain an image reference even though Swarm no
+// longer runs that version. Never force-remove it: registry cleanup is safe,
+// while host cache eviction is best-effort and must not abort the run.
+func localImageInUse(output string) bool {
+	return strings.Contains(output, "conflict: unable to delete") && strings.Contains(output, "is using its referenced image")
 }
 func (s *Service) garbageCollect(ctx context.Context) error {
 	service := s.cfg.RegistryName + "_registry"
