@@ -47,9 +47,13 @@ func (s *Service) Run(ctx context.Context, options Options) (Plan, error) {
 		return plan, err
 	}
 	client := s.registryClient()
+	protected, err := client.protectedDigests(ctx, plan.ProtectedImages)
+	if err != nil {
+		return plan, err
+	}
 	deletedAny := false
 	for _, image := range plan.Images {
-		deleted, err := client.deleteImage(ctx, image, plan.ProtectedImages)
+		deleted, err := client.deleteImage(ctx, image, protected)
 		if err != nil {
 			return plan, err
 		}

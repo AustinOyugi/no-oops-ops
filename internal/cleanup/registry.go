@@ -92,13 +92,9 @@ func (c *registryClient) protectedDigests(ctx context.Context, images []string) 
 	return protected, nil
 }
 
-func (c *registryClient) deleteImage(ctx context.Context, image string, protectedImages []string) (bool, error) {
+func (c *registryClient) deleteImage(ctx context.Context, image string, protected map[string]struct{}) (bool, error) {
 	digest, err := c.manifestDigest(ctx, image)
 	if err != nil || digest == "" {
-		return false, err
-	}
-	protected, err := c.protectedDigests(ctx, protectedImages)
-	if err != nil {
 		return false, err
 	}
 	if _, ok := protected[digest]; ok {
