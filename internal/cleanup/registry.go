@@ -16,6 +16,12 @@ type registryClient struct {
 	port               string
 }
 
+// Registry tags can point to a Docker manifest, a multi-platform manifest
+// list, or their OCI equivalents. Restricting HEAD to schema-v2 made the
+// registry answer 404 for valid OCI/index tags, which then disappeared from
+// the cleanup inventory.
+const manifestAccept = "application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json"
+
 func (c *registryClient) addRegistryCandidates(ctx context.Context, plan *Plan) error {
 	images, err := c.listImages(ctx)
 	if err != nil {
@@ -116,7 +122,7 @@ func (c *registryClient) manifestDigest(ctx context.Context, image string) (stri
 	if _, digest, found := strings.Cut(fullName, "@"); found {
 		reference = digest
 	}
-	response, err := c.request(ctx, "HEAD", "/v2/"+repo+"/manifests/"+reference, "application/vnd.docker.distribution.manifest.v2+json")
+	response, err := c.request(ctx, "HEAD", "/v2/"+repo+"/manifests/"+reference, manifestAccept)
 	if err != nil {
 		return "", err
 	}
