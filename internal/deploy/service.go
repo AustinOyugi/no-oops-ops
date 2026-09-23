@@ -71,6 +71,7 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 	if err != nil {
 		return Result{}, err
 	}
+	m = m.ForEnvironment(environment)
 	if options.Quick {
 		monitor, err := quickRolloutMonitor(m)
 		if err != nil {

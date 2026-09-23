@@ -40,6 +40,35 @@ No Oops rejects `container_name` because Swarm schedules service tasks, rejects 
 services, and rejects plainly embedded credential-like environment values. Move such values to managed No Oops secrets.
 `x-noops.expose` remains accepted as a compatibility alias for `x-noops.ingress`.
 
+### Environment-specific ingress
+
+Use `x-noops.ingress.environments` when one manifest is deployed to multiple
+environments that need distinct public routes. The deployment environment
+selects one entry; an environment without an entry receives no ingress route.
+
+```yaml
+x-noops:
+  service:
+    internal_port: 8080
+  ingress:
+    environments:
+      canary:
+        domain: canary.partner.example.com
+        path_prefix: /
+        tls_certificate: cloudflare-origin
+        proxy:
+          client_max_body_size: 100m
+      prod:
+        domain: partner.example.com
+        path_prefix: /
+        tls_certificate: cloudflare-origin
+        proxy:
+          client_max_body_size: 100m
+```
+
+The established flat `x-noops.ingress` form remains supported and applies to
+the environment passed to `noops deploy`.
+
 ## Supported fields
 
 | Field                                           | Required        | Default   | Meaning                                                                                                                                                          |
@@ -56,7 +85,7 @@ services, and rejects plainly embedded credential-like environment values. Move 
 | `services.<name>.x-noops.env.file`              | No              | —         | Environment YAML file, relative to the manifest. Omit `x-noops.env` entirely when the service has no environment values or secret bindings.                      |
 | `services.<name>.x-noops.env.build.file`        | No              | —         | Relative dotenv file to generate in the temporary build context from ordinary environment values.                                                                |
 | `services.<name>.x-noops.env.secrets`           | No              | —         | Allow-listed versioned secret references and delivery mode.                                                                                                      |
-| `services.<name>.x-noops.ingress.*`             | No              | disabled  | Managed nginx route, TLS, and blue/green settings.                                                                                                               |
+| `services.<name>.x-noops.ingress.*`             | No              | disabled  | Managed nginx route, TLS, and blue/green settings; `environments.<environment>` selects a route for that deployment environment.                                |
 | `services.<name>.x-noops.rollout.*`             | No              | See below | No Oops convergence monitoring settings. It does not replace existing `deploy.update_config`, `rollback_config`, or restart policy.                              |
 | `services.<name>.x-noops.depends_on`            | No              | `[]`      | Release and deployment ordering for `--all`; not a runtime readiness guarantee.                                                                                  |
 

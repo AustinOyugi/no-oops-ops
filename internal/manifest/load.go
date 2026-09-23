@@ -279,14 +279,20 @@ func composeManifest(compose ComposeFile) (Manifest, error) {
 		if !hasIngress(ingress) {
 			ingress = service.NoOps.Expose
 		}
+		ingressEnvironments := ingress.Environments
+		ingress.Environments = nil
 		normalizeIngress(&ingress)
-		return Manifest{Name: name, Source: source, Image: image, Service: serviceConfig, Healthcheck: service.Healthcheck, Rollout: service.NoOps.Rollout, Expose: ingress, Env: service.NoOps.Env, Build: service.NoOps.Build, DependsOn: service.NoOps.DependsOn, Deploy: service.NoOps.Deploy, Volumes: service.Volumes}, nil
+		for environment, settings := range ingressEnvironments {
+			normalizeIngress(&settings)
+			ingressEnvironments[environment] = settings
+		}
+		return Manifest{Name: name, Source: source, Image: image, Service: serviceConfig, Healthcheck: service.Healthcheck, Rollout: service.NoOps.Rollout, Expose: ingress, IngressEnvironments: ingressEnvironments, Env: service.NoOps.Env, Build: service.NoOps.Build, DependsOn: service.NoOps.DependsOn, Deploy: service.NoOps.Deploy, Volumes: service.Volumes}, nil
 	}
 	panic("unreachable")
 }
 
 func hasIngress(ingress Expose) bool {
-	return ingress.Enabled || ingress.Domain != "" || len(ingress.Domains) > 0 || ingress.BlueGreen != nil || ingress.TLS || ingress.TLSCertificate != "" || ingress.PathPrefix != ""
+	return ingress.Enabled || ingress.Domain != "" || len(ingress.Domains) > 0 || len(ingress.Environments) > 0 || ingress.BlueGreen != nil || ingress.TLS || ingress.TLSCertificate != "" || ingress.PathPrefix != ""
 }
 
 func normalizeIngress(ingress *Expose) {

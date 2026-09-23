@@ -47,6 +47,60 @@ func TestLoadComposeShapedSingleService(t *testing.T) {
 	}
 }
 
+func TestLoadSelectsIngressForDeploymentEnvironment(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "app.yml")
+	data := []byte(`services:
+  partner:
+    image: registry.example.test/partner:1
+    healthcheck: {test: ["CMD", "true"]}
+    x-noops:
+      service: {internal_port: 8080}
+      ingress:
+        environments:
+          canary:
+            domain: canary.partner.example.test
+            tls_certificate: cloudflare-origin
+            proxy: {client_max_body_size: 100m}
+          prod:
+            domain: partner.example.test
+            tls_certificate: cloudflare-origin
+            path_prefix: /
+`)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	canary := m.ForEnvironment("canary")
+	if !canary.Expose.Enabled || canary.Expose.Domain != "canary.partner.example.test" || canary.Expose.PathPrefix != "/" || canary.Expose.Proxy.ClientMaxBodySize != "100m" {
+		t.Fatalf("unexpected canary ingress: %#v", canary.Expose)
+	}
+	prod := m.ForEnvironment("prod")
+	if !prod.Expose.Enabled || prod.Expose.Domain != "partner.example.test" {
+		t.Fatalf("unexpected prod ingress: %#v", prod.Expose)
+	}
+	if got := m.ForEnvironment("dev").Expose; got.Enabled {
+		t.Fatalf("unmapped environment should be unexposed: %#v", got)
+	}
+}
+
+func TestLoadKeepsFlatIngressForAnyDeploymentEnvironment(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "app.yml")
+	data := []byte("services:\n  api:\n    image: repo/api:1\n    healthcheck: {test: [CMD, 'true']}\n    x-noops:\n      service: {internal_port: 8080}\n      ingress: {domain: api.example.test}\n")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := m.ForEnvironment("prod").Expose.Domain; got != "api.example.test" {
+		t.Fatalf("flat ingress domain = %q, want api.example.test", got)
+	}
+}
+
 func TestLoadComposeShapedManifestRejectsMultipleServices(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "app.yml")
 	if err := os.WriteFile(path, []byte("services:\n  one: {image: repo:one}\n  two: {image: repo:two}\n"), 0o600); err != nil {

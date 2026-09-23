@@ -34,6 +34,7 @@ func (a *App) runDeployService(ctx context.Context, environment, manifestPath, o
 	if err != nil {
 		return err
 	}
+	loadedManifest = loadedManifest.ForEnvironment(environment)
 	if err := validateIngressTLS(loadedManifest, a.config.NginxCloudflare); err != nil {
 		return err
 	}

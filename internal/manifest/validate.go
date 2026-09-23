@@ -25,7 +25,7 @@ func (m Manifest) Validate() error {
 		return fmt.Errorf("image.repository is required")
 	}
 
-	if m.Expose.Enabled && m.Service.InternalPort == 0 {
+	if (m.Expose.Enabled || anyIngressEnabled(m.IngressEnvironments)) && m.Service.InternalPort == 0 {
 		return fmt.Errorf("service.internal_port is required when ingress is enabled")
 	}
 
@@ -116,10 +116,51 @@ func (m Manifest) Validate() error {
 	if m.Expose.BlueGreen != nil && *m.Expose.BlueGreen && !m.Expose.Enabled {
 		return fmt.Errorf("expose.blue_green requires expose.enabled")
 	}
+	for environment, ingress := range m.IngressEnvironments {
+		if strings.TrimSpace(environment) == "" {
+			return fmt.Errorf("ingress.environments contains an empty environment")
+		}
+		if err := validateIngressEnvironment(ingress, environment); err != nil {
+			return err
+		}
+	}
 	if err := m.validateComposeCompatibility(); err != nil {
 		return err
 	}
 
+	return nil
+}
+
+func anyIngressEnabled(environments map[string]Expose) bool {
+	for _, ingress := range environments {
+		if ingress.Enabled {
+			return true
+		}
+	}
+	return false
+}
+
+func validateIngressEnvironment(ingress Expose, environment string) error {
+	field := "ingress.environments." + environment
+	if ingress.Enabled {
+		if ingress.Domain == "" {
+			return fmt.Errorf("%s.domain is required when %s.enabled is true", field, field)
+		}
+		if !domainPattern.MatchString(ingress.Domain) {
+			return fmt.Errorf("%s.domain must be a valid hostname", field)
+		}
+		for _, domain := range ingress.Domains {
+			if !domainPattern.MatchString(domain) {
+				return fmt.Errorf("%s.domains must contain valid hostnames", field)
+			}
+		}
+		if !pathPrefixPattern.MatchString(ingress.PathPrefix) {
+			return fmt.Errorf("%s.path_prefix must be an absolute HTTP path without query or fragment", field)
+		}
+	}
+	if ingress.BlueGreen != nil && *ingress.BlueGreen && !ingress.Enabled {
+		return fmt.Errorf("%s.blue_green requires %s.enabled", field, field)
+	}
 	return nil
 }
 

@@ -154,6 +154,21 @@ func TestValidateAllowsWildcardIngressDomain(t *testing.T) {
 	}
 }
 
+func TestValidateRequiresInternalPortForEnvironmentIngress(t *testing.T) {
+	m := Manifest{
+		Name:        "test",
+		Image:       Image{Repository: "repo"},
+		Healthcheck: Healthcheck{Test: []string{"CMD", "true"}},
+		Source:      Source{Context: ".", Dockerfile: "Dockerfile"},
+		IngressEnvironments: map[string]Expose{
+			"prod": {Enabled: true, Domain: "app.example.test", PathPrefix: "/"},
+		},
+	}
+	if err := m.Validate(); err == nil {
+		t.Fatal("expected environment ingress to require an internal port")
+	}
+}
+
 func TestValidateRequiresEnabledExposureForBlueGreen(t *testing.T) {
 	m := Manifest{
 		Name:        "test",

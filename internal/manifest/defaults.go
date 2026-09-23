@@ -122,6 +122,12 @@ func (m *Manifest) applyDefaults() {
 	if m.Expose.PathPrefix == "" {
 		m.Expose.PathPrefix = defaultExposePathPrefix
 	}
+	for environment, ingress := range m.IngressEnvironments {
+		if ingress.PathPrefix == "" {
+			ingress.PathPrefix = defaultExposePathPrefix
+		}
+		m.IngressEnvironments[environment] = ingress
+	}
 
 	if m.DependsOn == nil {
 		m.DependsOn = []string{}

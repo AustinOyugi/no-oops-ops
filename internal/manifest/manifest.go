@@ -7,18 +7,19 @@ import (
 )
 
 type Manifest struct {
-	Name        string      `yaml:"name"`
-	Source      Source      `yaml:"source"`
-	Image       Image       `yaml:"image"`
-	Service     Service     `yaml:"service"`
-	Healthcheck Healthcheck `yaml:"healthcheck"`
-	Rollout     Rollout     `yaml:"rollout"`
-	Expose      Expose      `yaml:"expose"`
-	Env         Env         `yaml:"env"`
-	Build       NoOpsBuild  `yaml:"build"`
-	DependsOn   []string    `yaml:"depends_on"`
-	Deploy      *bool       `yaml:"deploy"`
-	Volumes     []string    `yaml:"volumes"`
+	Name                string            `yaml:"name"`
+	Source              Source            `yaml:"source"`
+	Image               Image             `yaml:"image"`
+	Service             Service           `yaml:"service"`
+	Healthcheck         Healthcheck       `yaml:"healthcheck"`
+	Rollout             Rollout           `yaml:"rollout"`
+	Expose              Expose            `yaml:"expose"`
+	IngressEnvironments map[string]Expose `yaml:"-"`
+	Env                 Env               `yaml:"env"`
+	Build               NoOpsBuild        `yaml:"build"`
+	DependsOn           []string          `yaml:"depends_on"`
+	Deploy              *bool             `yaml:"deploy"`
+	Volumes             []string          `yaml:"volumes"`
 	// Compose is the selected, Compose-shaped document. It is deliberately a
 	// yaml.Node rather than a Go struct: Compose adds fields over time and No
 	// Oops must not discard fields it does not own.
@@ -176,14 +177,15 @@ type Rollback struct {
 }
 
 type Expose struct {
-	Domain         string   `yaml:"domain"`
-	Domains        []string `yaml:"domains"`
-	PathPrefix     string   `yaml:"path_prefix"`
-	Enabled        bool     `yaml:"enabled"`
-	BlueGreen      *bool    `yaml:"blue_green"`
-	TLS            bool     `yaml:"tls"`
-	TLSCertificate string   `yaml:"tls_certificate"`
-	Proxy          Proxy    `yaml:"proxy"`
+	Domain         string            `yaml:"domain"`
+	Domains        []string          `yaml:"domains"`
+	PathPrefix     string            `yaml:"path_prefix"`
+	Enabled        bool              `yaml:"enabled"`
+	BlueGreen      *bool             `yaml:"blue_green"`
+	TLS            bool              `yaml:"tls"`
+	TLSCertificate string            `yaml:"tls_certificate"`
+	Proxy          Proxy             `yaml:"proxy"`
+	Environments   map[string]Expose `yaml:"environments"`
 }
 
 type Proxy struct {
@@ -196,6 +198,18 @@ type Proxy struct {
 // updates instead.
 func (e Expose) BlueGreenEnabled() bool {
 	return e.BlueGreen == nil || *e.BlueGreen
+}
+
+// ForEnvironment selects the route settings for a deployment environment.
+// Flat ingress remains the backwards-compatible form and applies to whichever
+// environment is supplied to deploy. With ingress.environments, an unmapped
+// environment has no public route.
+func (m Manifest) ForEnvironment(environment string) Manifest {
+	if len(m.IngressEnvironments) == 0 {
+		return m
+	}
+	m.Expose = m.IngressEnvironments[environment]
+	return m
 }
 
 type Env struct {
