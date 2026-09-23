@@ -280,7 +280,14 @@ func composeManifest(compose ComposeFile) (Manifest, error) {
 			ingress = service.NoOps.Expose
 		}
 		ingressEnvironments := ingress.Environments
-		ingress.Environments = nil
+		// Environment-specific routes are authoritative. A top-level enabled
+		// flag is accepted as a feature switch, but is not an incomplete flat
+		// route that needs a domain of its own.
+		if len(ingressEnvironments) > 0 {
+			ingress = Expose{}
+		} else {
+			ingress.Environments = nil
+		}
 		normalizeIngress(&ingress)
 		for environment, settings := range ingressEnvironments {
 			normalizeIngress(&settings)

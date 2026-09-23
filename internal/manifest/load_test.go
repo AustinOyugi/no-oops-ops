@@ -56,6 +56,7 @@ func TestLoadSelectsIngressForDeploymentEnvironment(t *testing.T) {
     x-noops:
       service: {internal_port: 8080}
       ingress:
+        enabled: true
         environments:
           canary:
             domain: canary.partner.example.test
