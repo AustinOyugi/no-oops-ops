@@ -21,6 +21,11 @@ type App struct {
 
 type Settings struct {
 	Platform Platform `yaml:"platform"`
+	Upgrade  Upgrade  `yaml:"upgrade"`
+}
+
+type Upgrade struct {
+	Repository string `yaml:"repository"`
 }
 
 type Platform struct {

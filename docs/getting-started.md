@@ -42,6 +42,19 @@ make build
 ./.bin/noops status
 ```
 
+After the first installation, switch versions explicitly from an initialized workspace:
+
+```bash
+noops upgrade --check
+noops upgrade --to v0.1.1
+noops install
+```
+
+The upgrade command displays the current version, resolved target version, release repository, and workspace before
+asking for confirmation. Configure `settings.upgrade.repository` in `apps.yml` when releases come from a fork rather
+than `AustinOyugi/no-oops-ops`. `--to latest` resolves that repository's latest release while still showing its exact
+tag before confirmation.
+
 ## Create a workspace and initialize the platform
 
 No Oops does not use a global state directory. Run `init` once for each

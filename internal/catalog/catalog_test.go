@@ -26,3 +26,18 @@ func TestResolve(t *testing.T) {
 		t.Errorf("manifest = %q, want %q", got, want)
 	}
 }
+
+func TestLoadUpgradeRepository(t *testing.T) {
+	root := t.TempDir()
+	data := []byte("settings:\n  upgrade:\n    repository: example/noops-fork\napps: {}\n")
+	if err := os.WriteFile(filepath.Join(root, "apps.yml"), data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	file, err := Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := file.Settings.Upgrade.Repository; got != "example/noops-fork" {
+		t.Errorf("upgrade repository = %q", got)
+	}
+}

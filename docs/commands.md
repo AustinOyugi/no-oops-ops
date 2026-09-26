@@ -5,6 +5,8 @@ noops
 noops version
 noops --version
 noops init <workspace>
+noops [--workspace <workspace>] upgrade --check
+noops [--workspace <workspace>] upgrade --to <vMAJOR.MINOR.PATCH|latest> [--dry-run] [--yes]
 noops [--workspace <workspace>] install
 noops [--workspace <workspace>] uninstall [--purge]
 noops [--workspace <workspace>] doctor [--deploy-ready]
@@ -27,15 +29,23 @@ version without loading a workspace. Every other command runs in the current dir
 
 ## Platform commands
 
-| Command                 | Behavior                                                                                                                                                            |
-|-------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `init <workspace>`      | Creates the workspace-local `.noops/state` and `.noops/data` stores, plus an initial version-matched `apps.yml` when absent.                                        |
-| `install`               | Initializes Swarm when required, creates the shared network, deploys the registry and nginx ingress, waits for both to be ready, and records installation metadata. |
-| `doctor`                | Checks Docker, Swarm, installation artifacts, network, and registry.                                                                                                |
-| `doctor --deploy-ready` | Checks only the runtime prerequisites used by `deploy`.                                                                                                             |
-| `status`                | Reports recorded installation metadata and component status, including registry/nginx task readiness; partially running services are reported as degraded.          |
-| `uninstall`             | Removes managed app stacks, registry stack, shared network when Docker allows it, generated state, and installation metadata. It keeps persistent registry data.    |
-| `uninstall --purge`     | Performs uninstall and removes persistent registry data.                                                                                                            |
+| Command                 | Behavior                                                                                                                                                                                                                                                       |
+|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `init <workspace>`      | Creates the workspace-local `.noops/state` and `.noops/data` stores, plus an initial version-matched `apps.yml` when absent.                                                                                                                                    |
+| `upgrade --check`       | Fetches and displays the latest release tag from `settings.upgrade.repository` without changing the CLI or workspace.                                                                                                                                          |
+| `upgrade --to <tag>`    | Shows the current and target versions, asks for confirmation, verifies the release checksum and binary, adopts the version in the current catalog, and atomically replaces the CLI executable. Use `--yes` only for explicitly pinned automation.               |
+| `install`               | Initializes Swarm when required, creates the shared network, deploys the registry and nginx ingress, waits for both services to be ready, and records installation metadata.                                                                                   |
+| `doctor`                | Checks Docker, Swarm, installation artifacts, network, and registry.                                                                                                                                                                                            |
+| `doctor --deploy-ready` | Checks only the runtime prerequisites used by `deploy`.                                                                                                                                                                                                         |
+| `status`                | Reports recorded installation metadata and component status, including registry/nginx task readiness; partially running services are reported as degraded.                                                                                                      |
+| `uninstall`             | Removes managed app stacks, registry stack, shared network when Docker allows it, generated state, and installation metadata. It keeps persistent registry data.                                                                                                |
+| `uninstall --purge`     | Performs uninstall and removes persistent registry data.                                                                                                                                                                                                        |
+
+Bare `noops upgrade` never changes the executable: pass `--to` or `--check`. `--to latest` resolves the exact tag and
+shows it in the confirmation prompt before downloading. Downgrades require `--allow-downgrade`. The command validates
+the downloaded binary before changing `apps.yml`; if executable replacement fails, it restores the previous catalog
+version. Non-interactive `--yes` upgrades require an exact tag and cannot use `--to latest`. After a successful CLI
+upgrade, run `noops install` to reconcile managed platform services.
 
 `uninstall` does not remove the installed CLI executable. `make uninstall` additionally removes the repository-local
 `.bin/noops` after teardown succeeds. `uninstall --purge` removes only the workspace `.noops/state` and `.noops/data`

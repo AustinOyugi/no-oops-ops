@@ -16,6 +16,8 @@ const (
 const initialAppsCatalog = `version: %s
 
 settings:
+  upgrade:
+    repository: AustinOyugi/no-oops-ops
   platform:
     network:
       name: noops-platform

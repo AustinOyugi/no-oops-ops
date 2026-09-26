@@ -3,6 +3,7 @@ package workspace
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -19,5 +20,12 @@ func TestInitializeCreatesOnlyOwnedStore(t *testing.T) {
 	}
 	if _, err := Open(root); err != nil {
 		t.Fatalf("open initialized workspace: %v", err)
+	}
+	catalog, err := os.ReadFile(filepath.Join(root, "apps.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(catalog), "repository: AustinOyugi/no-oops-ops") {
+		t.Errorf("initial apps.yml is missing the default upgrade repository:\n%s", catalog)
 	}
 }

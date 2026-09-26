@@ -22,7 +22,7 @@ func NewRootCommand(ctx context.Context) *cobra.Command {
 	root.Flags().BoolP("version", "v", false, "Print version information")
 	root.PersistentFlags().StringVar(&rt.workspace, "workspace", "", "Workspace directory")
 	root.AddCommand(
-		newVersionCommand(), newInitCommand(), newInstallCommand(ctx, &rt),
+		newVersionCommand(), newInitCommand(), newUpgradeCommand(ctx, &rt), newInstallCommand(ctx, &rt),
 		newUninstallCommand(ctx, &rt), newDoctorCommand(ctx, &rt), newStatusCommand(ctx, &rt),
 		newReleaseCommand(ctx, &rt), newDeployCommand(ctx, &rt), newRollbackCommand(ctx, &rt),
 		newRemoveCommand(ctx, &rt), newSecretCommand(ctx, &rt), newCertificateCommand(ctx, &rt),

@@ -22,9 +22,11 @@ Commit `apps.yml` and `apps/`; add `.noops/` to `.gitignore`.
 truth for platform settings and app aliases:
 
 ```yaml
-version: v0.1.0
+version: 0.1.0
 
 settings:
+  upgrade:
+    repository: AustinOyugi/no-oops-ops
   platform:
     network:
       name: noops-platform
@@ -47,6 +49,10 @@ apps:
   api:
     manifest: ./apps/api/app.yml
 ```
+
+`upgrade.repository` selects the GitHub repository used to find and download No Oops releases. Use `owner/name`
+format. It defaults to `AustinOyugi/no-oops-ops` when omitted, allowing forks to opt into their own release stream
+without rebuilding the CLI.
 
 `platform.network.name` is used only by No Oops platform services. Application
 deployments use `platform.networks`: an explicit environment mapping wins, and
