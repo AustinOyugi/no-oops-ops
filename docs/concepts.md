@@ -63,9 +63,10 @@ recorded by that deployment. At least two successful deployments are required.
 Secrets are immutable, versioned Docker Swarm secrets scoped to an environment. `secret set` creates a new version and
 stores metadata only; secret values are never saved in No Oops Ops state or retrievable through the CLI.
 
-With `env.secrets.resolution: file`, the app receives `<KEY>_FILE=/run/secrets/<KEY>`. With `resolution: env`, No Oops
-Ops builds a small wrapper image that reads the mounted secret and exports `<KEY>` before starting the original image
-command. Prefer `file` when the application supports it.
+With `env.secrets.resolution: file`, the secret is mounted at `/run/secrets/<KEY>` and no value is exported. With
+`resolution: env`, No Oops Ops builds a small wrapper image that reads the mounted secret and exports `<KEY>` before
+starting the original image command. Neither mode injects a `<KEY>_FILE` variable; declare one yourself in the app
+environment file when the application supports file-based secrets. Prefer `file` when the application supports it.
 
 ## State
 

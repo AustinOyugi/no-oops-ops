@@ -8,9 +8,6 @@ services:
     command: {{ .OriginalCommand }}
     environment:
       NOOPS_SECRET_MAPPINGS: {{ yamlString .SecretMappings }}
-{{- range .Secrets }}
-      {{ .EnvKey }}_FILE: {{ yamlString (printf "/run/secrets/%s" .EnvKey) }}
-{{- end }}
 {{- end }}
     env_file:
       - .env

@@ -89,3 +89,14 @@ the value of `from_secret`; it must have been set for the deployment environment
 With `resolution: file`, the secret is mounted at `/run/secrets/DATABASE_URL` and no secret value is exported as an
 environment variable. With `resolution: env`, a generated wrapper reads the secret file and exports `DATABASE_URL`
 before the app starts.
+
+Neither mode sets a `DATABASE_URL_FILE` variable. To offer both, declare the variable yourself in the environment file
+alongside the secret-backed key:
+
+```yaml
+      - key: DATABASE_URL_FILE
+        value: "/run/secrets/DATABASE_URL"
+
+      - key: DATABASE_URL
+        from_secret: DATABASE_URL_SECRET
+```

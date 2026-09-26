@@ -254,7 +254,7 @@ func renderComposeStack(m manifest.Manifest, image string, bindings []SecretBind
 	normalizeServicePaths(selected, filepath.Dir(m.Path))
 	appendEnvFile(selected, generatedEnv)
 	if wrapper.UseWrapper {
-		applyWrapper(selected, wrapper, bindings)
+		applyWrapper(selected, wrapper)
 	}
 	appendSecrets(selected, bindings)
 	appendTopLevelSecrets(root, bindings)
@@ -395,7 +395,7 @@ func appendTopLevelSecrets(root *yaml.Node, bindings []SecretBinding) {
 	}
 }
 
-func applyWrapper(service *yaml.Node, wrapper WrapperConfig, bindings []SecretBinding) {
+func applyWrapper(service *yaml.Node, wrapper WrapperConfig) {
 	setMapping(service, "image", scalar(wrapper.WrapperImage))
 	setMapping(service, "entrypoint", &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq", Content: []*yaml.Node{scalar("/bin/sh"), scalar("/bootstrap.sh")}})
 	command := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
@@ -412,9 +412,6 @@ func applyWrapper(service *yaml.Node, wrapper WrapperConfig, bindings []SecretBi
 		return
 	}
 	setMapping(env, "NOOPS_SECRET_MAPPINGS", scalar(secretMappingsValue(wrapper.SecretMappings)))
-	for _, b := range bindings {
-		setMapping(env, b.EnvKey+"_FILE", scalar("/run/secrets/"+b.EnvKey))
-	}
 }
 
 func normalizeServicePaths(service *yaml.Node, base string) {

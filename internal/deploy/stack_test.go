@@ -71,6 +71,67 @@ secrets: {existing-secret: {external: true}}
 	}
 }
 
+func TestRenderComposeStackEnvSecretDoesNotInjectFileVariable(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "app.yml")
+	data := []byte(`services:
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: icpak
+    x-noops:
+      service:
+        internal_port: 5672
+      env:
+        file: env.yml
+        secrets:
+          resolution: env
+          resolvable:
+            - RABBITMQ_DEFAULT_PASS
+`)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m, err := manifest.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	binding := SecretBinding{
+		EnvKey:     "RABBITMQ_DEFAULT_PASS",
+		SecretName: "ICPAK_RABBITMQ_PASSWORD",
+		SwarmName:  "noops_prod_ICPAK_RABBITMQ_PASSWORD_v1",
+	}
+	wrapper := WrapperConfig{
+		UseWrapper:    true,
+		WrapperImage:  "127.0.0.1:5000/rabbitmq-wrapper:latest",
+		EffectiveExec: EffectiveExecution{Entrypoint: []string{"docker-entrypoint.sh"}, Cmd: []string{"rabbitmq-server"}},
+		SecretMappings: []SecretMapping{{
+			EnvKey:     binding.EnvKey,
+			SecretName: binding.SecretName,
+		}},
+	}
+
+	rendered, err := renderComposeStack(m, "rabbitmq:3.13-management-alpine", []SecretBinding{binding}, wrapper, "noops-prod", "prod-rabbitmq", "/state/.env")
+	if err != nil {
+		t.Fatal(err)
+	}
+	output := string(rendered)
+	for _, want := range []string{
+		"image: 127.0.0.1:5000/rabbitmq-wrapper:latest",
+		"RABBITMQ_DEFAULT_USER: icpak",
+		"NOOPS_SECRET_MAPPINGS: RABBITMQ_DEFAULT_PASS=/run/secrets/RABBITMQ_DEFAULT_PASS",
+		"source: noops_prod_ICPAK_RABBITMQ_PASSWORD_v1",
+		"target: RABBITMQ_DEFAULT_PASS",
+	} {
+		if !strings.Contains(output, want) {
+			t.Errorf("rendered Compose stack missing %q:\n%s", want, output)
+		}
+	}
+	if strings.Contains(output, "RABBITMQ_DEFAULT_PASS_FILE") {
+		t.Errorf("env mode should not inject RabbitMQ's deprecated _FILE variable, got:\n%s", output)
+	}
+}
+
 func TestReleaseStackNameUsesReleaseSpecificSwarmSafeSuffix(t *testing.T) {
 	if got, want := releaseStackName("prod", "sample", "2026-08-24T10:30:00Z"), "prod-sample-r2026-08-24t103000z"; got != want {
 		t.Errorf("releaseStackName() = %q, want %q", got, want)
@@ -159,7 +220,6 @@ func TestRenderStackTemplateWrapperMode(t *testing.T) {
 		`entrypoint: ["/bin/sh", "/bootstrap.sh"]`,
 		`command: ["java","-jar","app.jar"]`,
 		"NOOPS_SECRET_MAPPINGS:",
-		"REDIS_PASSWORD_FILE: /run/secrets/REDIS_PASSWORD",
 		"source: noops_dev_REDIS_PASSWORD_SECRET_v1",
 		"target: REDIS_PASSWORD",
 		"mode: 0444",
@@ -167,6 +227,9 @@ func TestRenderStackTemplateWrapperMode(t *testing.T) {
 		if !strings.Contains(output, want) {
 			t.Errorf("rendered stack does not contain %q:\n%s", want, output)
 		}
+	}
+	if strings.Contains(output, "REDIS_PASSWORD_FILE:") {
+		t.Errorf("env mode should not inject a _FILE environment variable, got:\n%s", output)
 	}
 }
 
