@@ -31,14 +31,14 @@ func TestRenderNginxStack(t *testing.T) {
 		`entrypoint: ["/bin/sh", "-c"]`,
 		"command:",
 		"- >-",
-		"--webroot-path /var/www/certbot --deploy-hook 'nginx_containers=\"$(docker ps -q",
-		"--filter label=com.docker.swarm.service.name=noops-nginx_nginx",
-		"\"$nginx_containers\" && for nginx_container in $nginx_containers",
-		"do docker exec \"$nginx_container\" nginx -s reload; done'; sleep 12h; done",
-		"/var/run/docker.sock:/var/run/docker.sock",
+		"nginx -g 'daemon off;' & nginx_pid=$!",
+		"while :; do certbot renew --webroot --webroot-path /var/www/certbot;",
 	} {
 		if !strings.Contains(output, want) {
 			t.Errorf("rendered stack does not contain %q:\n%s", want, output)
 		}
+	}
+	if strings.Contains(output, "/var/run/docker.sock") {
+		t.Errorf("rendered stack must not mount the Docker socket:\n%s", output)
 	}
 }

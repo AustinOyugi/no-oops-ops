@@ -10,6 +10,7 @@ import (
 
 	"github.com/AustinOyugi/no-oops-ops/internal/install"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
+	"github.com/AustinOyugi/no-oops-ops/internal/state"
 )
 
 //go:embed templates/nginx-stack.yml.tmpl
@@ -67,7 +68,7 @@ func (h *Host) WriteNginxStack(ctx context.Context) error {
 		}
 	}
 	if _, err := os.Stat(h.nginxConfigPath()); os.IsNotExist(err) {
-		if err := os.WriteFile(h.nginxConfigPath(), []byte(defaultNginxConfig), installMetadataFileMode); err != nil {
+		if err := state.WriteFile(h.nginxConfigPath(), []byte(defaultNginxConfig), installMetadataFileMode); err != nil {
 			return install.PrerequisiteError{Check: install.StepWriteNginxStack, Err: fmt.Errorf("write nginx config %q: %w", h.nginxConfigPath(), err)}
 		}
 	} else if err != nil {
@@ -89,7 +90,7 @@ func (h *Host) WriteNginxStack(ctx context.Context) error {
 		return install.PrerequisiteError{Check: install.StepWriteNginxStack, Err: fmt.Errorf("render nginx stack: %w", err)}
 	}
 
-	if err := os.WriteFile(path, append(rendered, '\n'), installMetadataFileMode); err != nil {
+	if err := state.WriteFile(path, append(rendered, '\n'), installMetadataFileMode); err != nil {
 		return install.PrerequisiteError{Check: install.StepWriteNginxStack, Err: fmt.Errorf("write nginx stack %q: %w", path, err)}
 	}
 	return nil
