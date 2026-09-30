@@ -35,17 +35,20 @@ func (s *Service) gitBuildContext(ctx context.Context, environment string, build
 	if !ok {
 		return "", GitMetadata{}, nil, fmt.Errorf("x-noops.build.source.git has no configuration for environment %q", environment)
 	}
+
 	s.logger.InfoContext(ctx, "fetching Git build source", "environment", environment, "repository", git.URL, "ref", settings.Ref, "secret_configured", settings.Secret != "")
 	root, err := os.MkdirTemp(s.config.DataDir, "build-source-")
 	if err != nil {
 		return "", GitMetadata{}, nil, fmt.Errorf("create temporary Git build context: %w", err)
 	}
+
 	cleanup := func() { _ = os.RemoveAll(root) }
 	scriptPath := filepath.Join(root, "git-fetch.sh")
 	if err := os.WriteFile(scriptPath, gitFetchScript, 0o700); err != nil {
 		cleanup()
 		return "", GitMetadata{}, nil, fmt.Errorf("write Git fetch script: %w", err)
 	}
+
 	args := []string{"run", "--rm", "--entrypoint", "/bin/sh", "--mount", "type=bind,src=" + root + ",dst=/work"}
 	if settings.Secret != "" {
 		metadata, err := s.secrets.Latest(ctx, environment, settings.Secret)
@@ -55,22 +58,26 @@ func (s *Service) gitBuildContext(ctx context.Context, environment string, build
 		}
 		return s.gitBuildContextWithSwarmSecret(ctx, root, git.URL, settings.Ref, metadata.SwarmName, settings.Secret, cleanup)
 	}
+
 	args = append(args, gitClientImage, "/work/git-fetch.sh", git.URL, settings.Ref)
 	result, err := s.runner.Run(ctx, "docker", args, command.RunOptions{})
 	if err != nil {
 		cleanup()
 		return "", GitMetadata{}, nil, fmt.Errorf("fetch Git build source: %s", gitFailure(result.Output))
 	}
+
 	commit := ""
 	for _, line := range strings.Fields(string(result.Output)) {
 		if gitCommitPattern.MatchString(line) {
 			commit = line
 		}
 	}
+
 	if commit == "" {
 		cleanup()
 		return "", GitMetadata{}, nil, fmt.Errorf("fetch Git build source: did not receive a commit SHA")
 	}
+	
 	s.logger.InfoContext(ctx, "Git build source fetched", "environment", environment, "repository", git.URL, "commit", commit)
 	return filepath.Join(root, "repository"), GitMetadata{URL: git.URL, Ref: settings.Ref, Commit: commit, Secret: settings.Secret}, cleanup, nil
 }
