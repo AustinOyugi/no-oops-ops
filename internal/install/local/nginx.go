@@ -3,9 +3,11 @@ package local
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/install"
@@ -40,6 +42,7 @@ func (h *Host) nginxImportedCertificateDir() string {
 type nginxStackTemplateData struct {
 	HTTPPort               string
 	HTTPSPort              string
+	EnvironmentNetworks    []string
 	NetworkName            string
 	ConfigPath             string
 	InternalHost           string
@@ -67,15 +70,51 @@ func (h *Host) WriteNginxStack(ctx context.Context) error {
 			return install.PrerequisiteError{Check: install.StepWriteNginxStack, Err: fmt.Errorf("create nginx certificate directory %q: %w", certificatePath, err)}
 		}
 	}
-	if _, err := os.Stat(h.nginxConfigPath()); os.IsNotExist(err) {
+	_, defaultErr := os.Stat(filepath.Join(h.nginxConfigDir(), "default.conf"))
+	if defaultErr != nil && !os.IsNotExist(defaultErr) {
+		return fmt.Errorf("inspect nginx default config: %w", defaultErr)
+	}
+	if _, err := os.Stat(h.nginxConfigPath()); os.IsNotExist(err) && os.IsNotExist(defaultErr) {
 		if err := state.WriteFile(h.nginxConfigPath(), []byte(defaultNginxConfig), installMetadataFileMode); err != nil {
 			return install.PrerequisiteError{Check: install.StepWriteNginxStack, Err: fmt.Errorf("write nginx config %q: %w", h.nginxConfigPath(), err)}
 		}
-	} else if err != nil {
+	} else if err != nil && !os.IsNotExist(err) {
 		return install.PrerequisiteError{Check: install.StepWriteNginxStack, Err: fmt.Errorf("inspect nginx config %q: %w", h.nginxConfigPath(), err)}
 	}
 
+	// Remove only the bootstrap config left by older reinstall behavior.
+	// Other legacy route files may contain active upstreams and must be preserved.
+	if defaultErr == nil {
+		legacy, err := os.ReadFile(h.nginxConfigPath())
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("read legacy nginx config: %w", err)
+		}
+		if string(legacy) == defaultNginxConfig {
+			if err := os.Remove(h.nginxConfigPath()); err != nil {
+				return fmt.Errorf("remove duplicate bootstrap nginx config: %w", err)
+			}
+		}
+	}
+
+	networks := make(map[string]bool)
+	networkData, err := os.ReadFile(filepath.Join(h.nginxDir(), "networks.json"))
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("read ingress networks: %w", err)
+	}
+	if err == nil {
+		if err := json.Unmarshal(networkData, &networks); err != nil {
+			return fmt.Errorf("decode ingress networks: %w", err)
+		}
+	}
+	var environmentNetworks []string
+	for network, attached := range networks {
+		if attached && network != h.networkName {
+			environmentNetworks = append(environmentNetworks, network)
+		}
+	}
+	sort.Strings(environmentNetworks)
 	rendered, err := renderTemplate("nginx-stack.yml.tmpl", nginxStackTemplateContents, nginxStackTemplateData{
+		EnvironmentNetworks:    environmentNetworks,
 		HTTPPort:               h.nginxHTTPPort,
 		HTTPSPort:              h.nginxHTTPSPort,
 		NetworkName:            h.networkName,

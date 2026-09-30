@@ -22,7 +22,11 @@ services:
       "{{ .NetworkName }}":
         aliases:
           - "{{ .InternalHost }}"
-    healthcheck:
+{{ range .EnvironmentNetworks }}
+      "{{ . }}":
+        aliases:
+          - "{{ $.InternalHost }}"
+{{ end }}    healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/__noops/health || exit 1"]
       interval: 10s
       timeout: 5s
@@ -58,3 +62,7 @@ services:
 networks:
   "{{ .NetworkName }}":
     external: true
+{{ range .EnvironmentNetworks }}
+  "{{ . }}":
+    external: true
+{{ end }}

@@ -1,6 +1,10 @@
 package local
 
 import (
+	"context"
+	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -40,5 +44,50 @@ func TestRenderNginxStack(t *testing.T) {
 	}
 	if strings.Contains(output, "/var/run/docker.sock") {
 		t.Errorf("rendered stack must not mount the Docker socket:\n%s", output)
+	}
+}
+
+func TestWriteNginxStackPreservesInstalledRoutesAndNetworks(t *testing.T) {
+	root := t.TempDir()
+	h := NewHost(slog.Default(), filepath.Join(root, "state"), filepath.Join(root, "data"), "test", "noops-net", "registry", "5000", "nginx", "80", "443")
+	if err := os.MkdirAll(h.nginxConfigDir(), 0700); err != nil {
+		t.Fatal(err)
+	}
+	for name, content := range map[string]string{
+		"conf/routes.conf":   defaultNginxConfig,
+		"conf/default.conf":  defaultNginxConfig,
+		"conf/external.conf": "include /etc/nginx/conf.d/external/*.conf;",
+		"networks.json":      `{"noops-prod":true,"noops-canary":true,"noops-net":true,"unused":false}`,
+	} {
+		if err := os.WriteFile(filepath.Join(h.nginxDir(), name), []byte(content), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := 0; i < 2; i++ {
+		if err := h.WriteNginxStack(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := os.Stat(h.nginxConfigPath()); !os.IsNotExist(err) {
+		t.Fatalf("legacy routes.conf recreated: %v", err)
+	}
+	content, err := os.ReadFile(filepath.Join(h.nginxConfigDir(), "external.conf"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != "include /etc/nginx/conf.d/external/*.conf;" {
+		t.Fatalf("routes overwritten: %s", content)
+	}
+	stack, err := os.ReadFile(h.nginxStackPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, network := range []string{"noops-prod", "noops-canary"} {
+		if strings.Count(string(stack), `"`+network+`":`) != 2 {
+			t.Fatalf("network missing attachment or declaration: %s", stack)
+		}
+	}
+	if strings.Contains(string(stack), "unused") {
+		t.Fatal("detached network included")
 	}
 }
