@@ -55,10 +55,13 @@ if [[ -n "$SNAPSHOT_REF" ]]; then
 import json
 import sys
 
-for artifact in json.load(open(sys.argv[1], encoding="utf-8")).get("artifacts", []):
-    if artifact["name"].startswith("noops-snapshot-") and not artifact["expired"]:
-        print(artifact["id"])
-        break
+artifacts = [
+    artifact
+    for artifact in json.load(open(sys.argv[1], encoding="utf-8")).get("artifacts", [])
+    if artifact["name"].startswith("noops-snapshot-") and not artifact["expired"]
+]
+if artifacts:
+    print(max(artifacts, key=lambda artifact: artifact["created_at"])["id"])
 ' "$TEMP_DIR/artifacts.json")"
     if [[ -z "$ARTIFACT_ID" ]]; then
       echo "No GitHub Actions snapshot artifact is available." >&2
