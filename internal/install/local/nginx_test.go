@@ -2,6 +2,8 @@ package local
 
 import (
 	"context"
+	"errors"
+	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -35,7 +37,8 @@ func TestRenderNginxStack(t *testing.T) {
 		`entrypoint: ["/bin/sh", "-c"]`,
 		"command:",
 		"- >-",
-		"nginx -g 'daemon off;' & nginx_pid=$!",
+		"nginx -t || exit $?; nginx -g 'daemon off;' & nginx_pid=$!",
+		"nginx -t && nginx -s reload || true",
 		"while :; do certbot renew --webroot --webroot-path /var/www/certbot;",
 	} {
 		if !strings.Contains(output, want) {
@@ -89,5 +92,27 @@ func TestWriteNginxStackPreservesInstalledRoutesAndNetworks(t *testing.T) {
 	}
 	if strings.Contains(string(stack), "unused") {
 		t.Fatal("detached network included")
+	}
+}
+
+type invalidNginxRunner struct{ calls [][]string }
+
+func (r *invalidNginxRunner) Run(_ context.Context, name string, args []string, _ command.RunOptions) (command.Result, error) {
+	r.calls = append(r.calls, append([]string{name}, args...))
+	return command.Result{Output: []byte("duplicate default server in routes.conf:2")}, errors.New("exit status 1")
+}
+func TestEnsureNginxRejectsInvalidConfigBeforeDeploy(t *testing.T) {
+	r := &invalidNginxRunner{}
+	h := &Host{runner: r, logger: slog.Default(), stateDir: t.TempDir(), dataDir: t.TempDir()}
+	err := h.EnsureNginx(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "duplicate default server") {
+		t.Fatalf("error = %v", err)
+	}
+	if len(r.calls) != 1 || r.calls[0][1] != "run" {
+		t.Fatalf("unexpected commands: %v", r.calls)
+	}
+	args := r.calls[0]
+	if args[len(args)-1] != "-t" {
+		t.Fatalf("missing config check: %v", args)
 	}
 }

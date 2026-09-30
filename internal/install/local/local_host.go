@@ -1,12 +1,15 @@
 package local
 
 import (
+	"context"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"log/slog"
 )
 
 type Host struct {
-	runner           *command.Runner
+	runner interface {
+		Run(context.Context, string, []string, command.RunOptions) (command.Result, error)
+	}
 	logger           *slog.Logger
 	stateDir         string
 	dataDir          string

@@ -161,9 +161,21 @@ func (h *Host) InspectNginxService(ctx context.Context) error {
 
 func (h *Host) EnsureNginx(ctx context.Context) error {
 	h.logger.InfoContext(ctx, "ensuring nginx ingress", "name", h.nginxName, "http_port", h.nginxHTTPPort, "https_port", h.nginxHTTPSPort)
+	// Validate with the same image and mounts before changing the running stack.
+	result, err := h.runner.Run(ctx, "docker", []string{
+		"run", "--rm", "--network", "none",
+		"--volume", h.nginxConfigDir() + ":/etc/nginx/conf.d:ro",
+		"--volume", h.nginxACMEWebroot() + ":/var/www/certbot:ro",
+		"--volume", h.nginxCertificateDir() + ":/etc/letsencrypt:ro",
+		"--volume", h.nginxImportedCertificateDir() + ":/etc/noops/certificates:ro",
+		"nginx:1.28-alpine", "nginx", "-t",
+	}, command.RunOptions{LogCommand: true})
+	if err != nil {
+		return install.PrerequisiteError{Check: install.StepEnsureNginx, Err: fmt.Errorf("validate nginx configuration before stack deploy: %w: %s", err, strings.TrimSpace(string(result.Output)))}
+	}
 	// Stack deploy is idempotent. Always apply the rendered stack so updates to
 	// the nginx or certbot definition take effect on an existing installation.
-	result, err := h.runner.Run(ctx, "docker", []string{"stack", "deploy", "--detach=true", "--compose-file", h.nginxStackPath(), h.nginxName}, command.RunOptions{
+	result, err = h.runner.Run(ctx, "docker", []string{"stack", "deploy", "--detach=true", "--compose-file", h.nginxStackPath(), h.nginxName}, command.RunOptions{
 		StreamOutput: true,
 		LogCommand:   true,
 		Stdout:       os.Stdout,

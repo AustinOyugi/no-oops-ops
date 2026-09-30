@@ -8,8 +8,8 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
-        nginx -g 'daemon off;' & nginx_pid=$!; while kill -0 "$nginx_pid" 2>/dev/null;
-        do sleep 5m & wait $!; nginx -s reload || true; done; wait "$nginx_pid"
+        nginx -t || exit $?; nginx -g 'daemon off;' & nginx_pid=$!; while kill -0 "$nginx_pid" 2>/dev/null;
+        do sleep 5m & wait $!; nginx -t && nginx -s reload || true; done; wait "$nginx_pid"
     ports:
       - "{{ .HTTPPort }}:80"
       - "{{ .HTTPSPort }}:443"

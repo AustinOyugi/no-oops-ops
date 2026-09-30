@@ -2,6 +2,7 @@ package ingress
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"path/filepath"
 	"reflect"
@@ -130,6 +131,8 @@ func TestReloadGracefullyReloadsRunningNginxContainers(t *testing.T) {
 
 	want := [][]string{
 		{"docker", "ps", "-q", "--filter", "label=com.docker.swarm.service.name=noops-nginx_nginx"},
+		{"docker", "exec", "nginx-one", "nginx", "-t"},
+		{"docker", "exec", "nginx-two", "nginx", "-t"},
 		{"docker", "exec", "nginx-one", "nginx", "-s", "reload"},
 		{"docker", "exec", "nginx-two", "nginx", "-s", "reload"},
 	}
@@ -139,8 +142,9 @@ func TestReloadGracefullyReloadsRunningNginxContainers(t *testing.T) {
 }
 
 type reloadRecordingRunner struct {
-	calls  [][]string
-	output string
+	calls   [][]string
+	output  string
+	invalid bool
 }
 
 func (r *reloadRecordingRunner) Run(_ context.Context, name string, args []string, _ command.RunOptions) (command.Result, error) {
@@ -148,7 +152,22 @@ func (r *reloadRecordingRunner) Run(_ context.Context, name string, args []strin
 	if len(args) > 0 && args[0] == "ps" {
 		return command.Result{Output: []byte(r.output)}, nil
 	}
+	if r.invalid && args[len(args)-1] == "-t" {
+		return command.Result{Output: []byte("invalid nginx config")}, errors.New("exit status 1")
+	}
 	return command.Result{}, nil
+}
+
+func TestReloadRejectsInvalidConfig(t *testing.T) {
+	r := &reloadRecordingRunner{output: "nginx-one", invalid: true}
+	s := &Service{logger: slog.Default(), runner: r, config: config.Config{NginxName: "noops-nginx"}}
+	err := s.reload(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "invalid nginx config") {
+		t.Fatalf("error = %v", err)
+	}
+	if len(r.calls) != 2 || r.calls[1][len(r.calls[1])-1] != "-t" {
+		t.Fatalf("reload attempted: %v", r.calls)
+	}
 }
 
 func TestValidateCloudflareRoutesRequiresImportedCertificate(t *testing.T) {

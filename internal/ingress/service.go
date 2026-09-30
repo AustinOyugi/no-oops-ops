@@ -377,6 +377,12 @@ func (s *Service) reload(ctx context.Context) error {
 		return fmt.Errorf("nginx service %q has no running containers", serviceName)
 	}
 	for _, container := range containers {
+		result, err = s.runner.Run(ctx, "docker", []string{"exec", container, "nginx", "-t"}, command.RunOptions{LogCommand: true})
+		if err != nil {
+			return fmt.Errorf("validate nginx configuration in container %q: %w: %s", container, err, strings.TrimSpace(string(result.Output)))
+		}
+	}
+	for _, container := range containers {
 		result, err = s.runner.Run(ctx, "docker", []string{"exec", container, "nginx", "-s", "reload"}, command.RunOptions{LogCommand: true})
 		if err != nil {
 			return fmt.Errorf("reload nginx container %q for service %q: %w: %s", container, serviceName, err, strings.TrimSpace(string(result.Output)))
