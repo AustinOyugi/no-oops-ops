@@ -21,11 +21,24 @@ func TestIsolatedBuildArgsHasOneBuildContext(t *testing.T) {
 	}
 }
 
-func TestIsolatedBuildArgsKeepsCacheWithoutSecrets(t *testing.T) {
+func TestIsolatedBuildArgsHasNoResourceLimitsByDefault(t *testing.T) {
 	got := isolatedBuildArgs("registry.example/app:tag", "Dockerfile", manifest.BuildResources{}, false, nil)
 	want := []string{
 		"-t", "registry.example/app:tag",
 		"-f", "/work/Dockerfile",
+		"/work",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("isolatedBuildArgs() = %q, want %q", got, want)
+	}
+}
+
+func TestIsolatedBuildArgsAddsOnlyConfiguredResourceLimits(t *testing.T) {
+	got := isolatedBuildArgs("registry.example/app:tag", "Dockerfile", manifest.BuildResources{Memory: "2Gi"}, false, nil)
+	want := []string{
+		"-t", "registry.example/app:tag",
+		"-f", "/work/Dockerfile",
+		"--memory", "2Gi",
 		"/work",
 	}
 	if !reflect.DeepEqual(got, want) {
