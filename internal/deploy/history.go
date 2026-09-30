@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
+	"github.com/AustinOyugi/no-oops-ops/internal/state"
 )
 
 type Deployment struct {
@@ -50,11 +51,24 @@ func (filesystemDeploymentStore) Save(cfg config.Config, deployment Deployment) 
 
 	data = append(data, '\n')
 	path := filepath.Join(dir, deploymentID(deployment.CreatedAt)+".json")
-	if err := os.WriteFile(path, data, 0o600); err != nil {
-		return "", fmt.Errorf("write deployment metadata %q: %w", path, err)
+	// O_EXCL gives callers a clear retryable error rather than silently
+	// replacing a history record created by another operation.
+	for attempt := 0; attempt < 100; attempt++ {
+		candidate := path
+		if attempt > 0 {
+			candidate = filepath.Join(dir, fmt.Sprintf("%s-%02d.json", deploymentID(deployment.CreatedAt), attempt))
+		}
+		if _, err := os.Stat(candidate); err == nil {
+			continue
+		} else if !os.IsNotExist(err) {
+			return "", fmt.Errorf("inspect deployment metadata %q: %w", candidate, err)
+		}
+		if err := state.WriteFile(candidate, data, 0o600); err != nil {
+			return "", fmt.Errorf("write deployment metadata %q: %w", candidate, err)
+		}
+		return candidate, nil
 	}
-
-	return path, nil
+	return "", fmt.Errorf("allocate unique deployment metadata filename after 100 attempts")
 }
 
 func (filesystemDeploymentStore) Previous(cfg config.Config, appName string, environment string) (Deployment, error) {
@@ -122,5 +136,5 @@ func deploymentHistoryDir(cfg config.Config, appName string, environment string)
 }
 
 func deploymentID(createdAt time.Time) string {
-	return createdAt.UTC().Format("20060102-150405")
+	return createdAt.UTC().Format("20060102-150405.000000000")
 }

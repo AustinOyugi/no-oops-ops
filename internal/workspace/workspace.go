@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/AustinOyugi/no-oops-ops/internal/state"
 )
 
 const (
@@ -59,7 +61,7 @@ func Initialize(root, noopsVersion string) (Paths, error) {
 	}
 	configPath := filepath.Join(paths.Store, ConfigName)
 	if _, err := os.Stat(configPath); errors.Is(err, os.ErrNotExist) {
-		if err := os.WriteFile(configPath, []byte("version: 1\n"), 0o600); err != nil {
+		if err := state.WriteFile(configPath, []byte("version: 1\n"), 0o600); err != nil {
 			return Paths{}, fmt.Errorf("write workspace config %q: %w", configPath, err)
 		}
 	} else if err != nil {
@@ -67,7 +69,7 @@ func Initialize(root, noopsVersion string) (Paths, error) {
 	}
 	appsPath := filepath.Join(paths.Root, "apps.yml")
 	if _, err := os.Stat(appsPath); errors.Is(err, os.ErrNotExist) {
-		if err := os.WriteFile(appsPath, []byte(fmt.Sprintf(initialAppsCatalog, noopsVersion)), 0o600); err != nil {
+		if err := state.WriteFile(appsPath, []byte(fmt.Sprintf(initialAppsCatalog, noopsVersion)), 0o600); err != nil {
 			return Paths{}, fmt.Errorf("write app catalog %q: %w", appsPath, err)
 		}
 	} else if err != nil {

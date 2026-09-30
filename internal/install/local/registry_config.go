@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/install"
+	"github.com/AustinOyugi/no-oops-ops/internal/state"
 )
 
 //go:embed assets/registry-config.yml
@@ -52,7 +53,7 @@ func (h *Host) WriteRegistryConfig(ctx context.Context) error {
 		}
 	}
 
-	if err := os.WriteFile(path, registryConfigContents, installMetadataFileMode); err != nil {
+	if err := state.WriteFile(path, registryConfigContents, installMetadataFileMode); err != nil {
 		return install.PrerequisiteError{
 			Check: install.StepWriteRegistryConfig,
 			Err:   fmt.Errorf("write registry config %q: %w", path, err),
@@ -95,7 +96,7 @@ func (h *Host) WriteRegistryStack(ctx context.Context) error {
 
 	rendered = append(rendered, '\n')
 
-	if err := os.WriteFile(path, rendered, installMetadataFileMode); err != nil {
+	if err := state.WriteFile(path, rendered, installMetadataFileMode); err != nil {
 		return install.PrerequisiteError{
 			Check: install.StepWriteRegistryStack,
 			Err:   fmt.Errorf("write registry stack %q: %w", path, err),

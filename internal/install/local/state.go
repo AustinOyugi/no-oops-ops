@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/install"
+	"github.com/AustinOyugi/no-oops-ops/internal/state"
 )
 
 const stateDirMode = 0o700
@@ -77,7 +78,7 @@ func (h *Host) WriteInstallMetadata(ctx context.Context) error {
 
 	data = append(data, '\n')
 
-	if err := os.WriteFile(path, data, installMetadataFileMode); err != nil {
+	if err := state.WriteFile(path, data, installMetadataFileMode); err != nil {
 		return install.PrerequisiteError{
 			Check: install.StepWriteInstallMetadata,
 			Err:   fmt.Errorf("write install metadata %q: %w", path, err),

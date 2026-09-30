@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"sort"
 	"syscall"
+
+	"github.com/AustinOyugi/no-oops-ops/internal/state"
 )
 
 type filesystemStore struct{}
@@ -29,7 +31,7 @@ func (filesystemStore) Save(stateDir string, metadata Metadata) (string, error) 
 	data = append(data, '\n')
 
 	path := metadataPath(dir, metadata.Version)
-	if err := os.WriteFile(path, data, 0o600); err != nil {
+	if err := state.WriteFile(path, data, 0o600); err != nil {
 		return "", fmt.Errorf("write secret metadata %q: %w", path, err)
 	}
 

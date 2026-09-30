@@ -9,6 +9,7 @@ import (
 	"regexp"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
+	"github.com/AustinOyugi/no-oops-ops/internal/state"
 )
 
 var certificateName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
@@ -41,10 +42,10 @@ func ImportCertificate(cfg config.Config, name, certificatePath, keyPath string)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("create certificate directory %q: %w", dir, err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "fullchain.pem"), certificate, 0o600); err != nil {
+	if err := state.WriteFile(filepath.Join(dir, "fullchain.pem"), certificate, 0o600); err != nil {
 		return fmt.Errorf("write certificate %q: %w", name, err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "privkey.pem"), key, 0o600); err != nil {
+	if err := state.WriteFile(filepath.Join(dir, "privkey.pem"), key, 0o600); err != nil {
 		return fmt.Errorf("write private key %q: %w", name, err)
 	}
 	return nil

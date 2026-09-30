@@ -47,10 +47,10 @@ func TestFilesystemDeploymentStorePreviousRequiresTwoDeployments(t *testing.T) {
 	}
 }
 
-func TestDeploymentIDUsesSecondPrecision(t *testing.T) {
+func TestDeploymentIDUsesNanosecondPrecision(t *testing.T) {
 	createdAt := time.Date(2026, 8, 15, 1, 47, 3, 78954000, time.FixedZone("EAT", 3*60*60))
 
-	if got, want := deploymentID(createdAt), "20260814-224703"; got != want {
+	if got, want := deploymentID(createdAt), "20260814-224703.078954000"; got != want {
 		t.Errorf("deploymentID() = %q, want %q", got, want)
 	}
 }

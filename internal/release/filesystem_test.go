@@ -79,6 +79,13 @@ func TestSourceTag(t *testing.T) {
 	}
 }
 
+func TestMetadataImmutableImageRetainsReleaseTagAndPinsDigest(t *testing.T) {
+	metadata := Metadata{RegistryImage: "127.0.0.1:5000/team/api:release-1", Digest: "127.0.0.1:5000/team/api@sha256:abc"}
+	if got, want := metadata.ImmutableImage(), "127.0.0.1:5000/team/api:release-1@sha256:abc"; got != want {
+		t.Errorf("ImmutableImage() = %q, want %q", got, want)
+	}
+}
+
 func TestListHistoryReturnsNewestReleaseFirst(t *testing.T) {
 	cfg := config.Config{StateDir: t.TempDir()}
 	for _, metadata := range []Metadata{

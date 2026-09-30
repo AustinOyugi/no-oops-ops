@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
+	"github.com/AustinOyugi/no-oops-ops/internal/state"
 	"os"
 	"path/filepath"
 	"strings"
@@ -147,7 +148,7 @@ func writeEnvMap(cfg config.Config, appName string, environment string, values m
 		}
 	}
 
-	if err := os.WriteFile(path, out.Bytes(), envFileMode); err != nil {
+	if err := state.WriteFile(path, out.Bytes(), envFileMode); err != nil {
 		return "", fmt.Errorf("write env file %q: %w", path, err)
 	}
 
@@ -171,7 +172,7 @@ func writeStackForService(cfg config.Config, environment string, m manifest.Mani
 		if err != nil {
 			return "", err
 		}
-		if err := os.WriteFile(path, append(rendered, '\n'), stackFileMode); err != nil {
+		if err := state.WriteFile(path, append(rendered, '\n'), stackFileMode); err != nil {
 			return "", fmt.Errorf("write stack file %q: %w", path, err)
 		}
 		return path, nil
@@ -222,7 +223,7 @@ func writeStackForService(cfg config.Config, environment string, m manifest.Mani
 
 	rendered = append(rendered, '\n')
 
-	if err := os.WriteFile(path, rendered, stackFileMode); err != nil {
+	if err := state.WriteFile(path, rendered, stackFileMode); err != nil {
 		return "", fmt.Errorf("write stack file %q: %w", path, err)
 	}
 
