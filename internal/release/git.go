@@ -77,7 +77,7 @@ func (s *Service) gitBuildContext(ctx context.Context, environment string, build
 		cleanup()
 		return "", GitMetadata{}, nil, fmt.Errorf("fetch Git build source: did not receive a commit SHA")
 	}
-	
+
 	s.logger.InfoContext(ctx, "Git build source fetched", "environment", environment, "repository", git.URL, "commit", commit)
 	return filepath.Join(root, "repository"), GitMetadata{URL: git.URL, Ref: settings.Ref, Commit: commit, Secret: settings.Secret}, cleanup, nil
 }

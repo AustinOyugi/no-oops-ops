@@ -71,33 +71,41 @@ the environment passed to `noops deploy`.
 
 ## Supported fields
 
-| Field                                           | Required        | Default   | Meaning                                                                                                                                                          |
-|-------------------------------------------------|-----------------|-----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `services.<name>`                               | Yes             | —         | A Compose service. Its `image`, `build`, execution, environment, networks, volumes, configs, secrets, health check, labels, and `deploy` settings are preserved. |
-| `services.<name>.image`                         | Yes             | —         | Upstream image reference. It is replaced in the generated stack with the recorded immutable release image.                                                       |
-| `services.<name>.build`                         | No              | —         | Standard Compose build configuration. When present, No Oops builds it before release.                                                                            |
-| `services.<name>.x-noops.service.internal_port` | Yes for ingress | —         | Private application port used by managed nginx ingress.                                                                                                          |
-| `services.<name>.x-noops.build.source.git`      | No              | —         | Environment-scoped Git repository used as the isolated build context.                                                                                            |
-| `services.<name>.x-noops.build.resources`       | No              | —         | CPU and memory limits applied to Docker build steps.                                                                                                             |
-| `services.<name>.x-noops.build.timeout`         | No              | —         | Maximum duration of a build.                                                                                                                                     |
-| `services.<name>.x-noops.build.no-cache`        | No              | `false`   | Passes `--no-cache` to Docker. Use for cache-warming builds whose mounted-cache side effects must run every release.                                             |
-| `services.<name>.x-noops.deploy`                | No              | `true`    | Set to `false` for a release-only service. `release --all` still builds it, while deploy, rollback, and remove skip it.                                          |
+| Field                                           | Required        | Default | Meaning                                                                                                                                                          |
+|-------------------------------------------------|-----------------|---------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `services.<name>`                               | Yes             | —       | A Compose service. Its `image`, `build`, execution, environment, networks, volumes, configs, secrets, health check, labels, and `deploy` settings are preserved. |
+| `services.<name>.image`                         | Yes             | —       | Upstream image reference. It is replaced in the generated stack with the recorded immutable release image.                                                       |
+| `services.<name>.build`                         | No              | —       | Standard Compose build configuration. When present, No Oops builds it before release.                                                                            |
+| `services.<name>.x-noops.service.internal_port` | Yes for ingress | —       | Private application port used by managed nginx ingress.                                                                                                          |
+| `services.<name>.x-noops.build.source.git`      | No              | —       | Environment-scoped Git repository used as the isolated build context.                                                                                            |
+| `services.<name>.x-noops.build.resources`       | No              | —       | CPU and memory limits applied to Docker build steps.                                                                                                             |
+| `services.<name>.x-noops.build.timeout`         | No              | —       | Maximum duration of a build.                                                                                                                                     |
+| `services.<name>.x-noops.build.no-cache`        | No              | `false` | Passes `--no-cache` to Docker. Use for cache-warming builds whose mounted-cache side effects must run every release.                                             |
+| `services.<name>.x-noops.deploy`                | No              | `true`  | Set to `false` for a release-only service. `release --all` still builds it, while deploy, rollback, and remove skip it.                                          |
 
-| `services.<name>.x-noops.env.file`              | No              | —         | Environment YAML file, relative to the manifest. Omit `x-noops.env` entirely when the service has no environment values or secret bindings.                      |
-| `services.<name>.x-noops.env.build.file`        | No              | —         | Relative dotenv file to generate in the temporary build context from ordinary environment values.                                                                |
-| `services.<name>.x-noops.env.secrets`           | No              | —         | Allow-listed versioned secret references and delivery mode.                                                                                                      |
-| `services.<name>.x-noops.ingress.*`             | No              | disabled  | Managed nginx route, TLS, and blue/green settings; `environments.<environment>` selects a route for that deployment environment.                                 |
-| `services.<name>.x-noops.rollout.*`             | No              | See below | No Oops convergence monitoring settings. It does not replace existing `deploy.update_config`, `rollback_config`, or restart policy.                              |
-| `services.<name>.x-noops.depends_on`            | No              | `[]`      | Release and deployment ordering for `--all`; not a runtime readiness guarantee.                                                                                  |
+| `services.<name>.x-noops.env.file`              | No | — | Environment YAML file, relative to the manifest. Omit
+`x-noops.env` entirely when the service has no environment values or secret bindings. |
+| `services.<name>.x-noops.env.build.file`        | No | — | Relative dotenv file to generate in the temporary build
+context from ordinary environment values. |
+| `services.<name>.x-noops.env.secrets`           | No | — | Allow-listed versioned secret references and delivery
+mode. |
+| `services.<name>.x-noops.ingress.*`             | No | disabled | Managed nginx route, TLS, and blue/green settings;
+`environments.<environment>` selects a route for that deployment environment. |
+| `services.<name>.x-noops.rollout.*`             | No | See below | No Oops convergence monitoring settings. It does
+not replace existing `deploy.update_config`, `rollback_config`, or restart policy. |
+| `services.<name>.x-noops.depends_on`            | No | `[]`      | Release and deployment ordering for `--all`; not a
+runtime readiness guarantee. |
 
-Build resource limits are opt-in. When `resources` is omitted, No Oops passes no CPU or memory limit to Docker. You may set either `cpus` or `memory` independently; only the explicitly configured value is passed to the build.
+Build resource limits are opt-in. When `resources` is omitted, No Oops passes no CPU or memory limit to Docker. You may
+set either `cpus` or `memory` independently; only the explicitly configured value is passed to the build.
 
 `healthcheck.test` must be an array accepted by Docker. Duration values use Go duration syntax, such as `30s` or `2m`.
 
 ## Git build contexts
 
 When `x-noops.build.source.git` is present, No Oops fetches the configured environment's repository/ref into a temporary
-workspace and records the resolved commit SHA with the release. Private-source tokens are mounted only into a one-shot Swarm Git-fetch task as a Swarm secret. The Compose
+workspace and records the resolved commit SHA with the release. Private-source tokens are mounted only into a one-shot
+Swarm Git-fetch task as a Swarm secret. The Compose
 `build.context` and `build.dockerfile` paths are resolved from that checkout; every resulting Docker build runs in a
 one-shot Swarm build task, and no application toolchain or Git installation is required on the host.
 
@@ -124,7 +132,8 @@ x-noops:
     no-cache: true
 ```
 
-The release tag uses that resolved commit SHA together with a build-input hash. When `x-noops.env.build.file` is configured,
+The release tag uses that resolved commit SHA together with a build-input hash. When `x-noops.env.build.file` is
+configured,
 ordinary values from `x-noops.env.file` are materialized into that ephemeral dotenv file before Docker builds;
 `from_secret` values remain runtime-only by default. An explicit `env.build.secrets` allow-list can make a private
 secret
