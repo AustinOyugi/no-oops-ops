@@ -186,7 +186,7 @@ func TestLoadBuildGitSource(t *testing.T) {
           git:
             url: https://github.com/example/api.git
             environments:
-              prod: {ref: refs/tags/v1.2.3, secret: github-readonly}
+              prod: {ref: 0123456789abcdef0123456789abcdef01234567, secret: github-readonly}
         resources: {cpus: "1.5", memory: 2Gi}
         timeout: 20m
         no-cache: true
@@ -198,7 +198,7 @@ func TestLoadBuildGitSource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if m.Build.Source.Git == nil || m.Build.Source.Git.Environments["prod"].Ref != "refs/tags/v1.2.3" || !m.Build.NoCache {
+	if m.Build.Source.Git == nil || m.Build.Source.Git.Environments["prod"].Ref != "0123456789abcdef0123456789abcdef01234567" || !m.Build.NoCache {
 		t.Fatalf("Git build source was not mapped: %#v", m.Build)
 	}
 }

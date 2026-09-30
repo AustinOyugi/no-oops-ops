@@ -13,6 +13,7 @@ import (
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
+	"github.com/AustinOyugi/no-oops-ops/internal/state"
 )
 
 type Options struct {
@@ -37,6 +38,13 @@ func NewService(logger *slog.Logger, cfg config.Config) *Service {
 func (s *Service) Run(ctx context.Context, options Options) (Plan, error) {
 	if options.Keep < 0 {
 		return Plan{}, fmt.Errorf("keep must be zero or greater")
+	}
+	if options.Apply {
+		unlock, err := state.AcquireLock(ctx, filepath.Join(s.cfg.StateDir, "registry.lock"))
+		if err != nil {
+			return Plan{}, err
+		}
+		defer unlock()
 	}
 	plan, err := s.buildPlan(ctx, options)
 	if err != nil || !options.Apply {

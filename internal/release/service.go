@@ -2,12 +2,12 @@ package release
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/environment"
@@ -45,131 +45,17 @@ func (s *Service) Run(ctx context.Context, environment string, path string) (Res
 		return Result{}, err
 	}
 
-	tag := releaseTag()
-	image := fmt.Sprintf("%s:%s", m.Image.Repository, tag)
-	registryImage := registryImage(s.config, image)
-
-	if m.Image.ShouldBuild() {
-		unlock, err := s.acquireBuildLock(ctx)
-		if err != nil {
-			return Result{}, err
-		}
-		defer unlock()
-		baseDir := filepath.Dir(absPath)
-		var gitMetadata *GitMetadata
-		cleanup := func() {}
-		if m.Build.Source.Git != nil {
-			gitBase, metadata, releaseCleanup, err := s.gitBuildContext(ctx, environment, m.Build)
-			if err != nil {
-				return Result{}, err
-			}
-			baseDir, cleanup = gitBase, releaseCleanup
-			gitMetadata = &metadata
-		}
-		defer cleanup()
-		var contextDir, dockerfile string
-		if m.Build.Source.Git != nil {
-			contextDir, err = resolveGitSourcePath(baseDir, m.Source.Context)
-			if err == nil {
-				dockerfile, err = resolveGitSourcePath(baseDir, m.Source.Dockerfile)
-			}
-			if err != nil {
-				return Result{}, err
-			}
-		} else {
-			contextDir = resolveSourcePath(baseDir, m.Source.Context)
-			dockerfile = resolveSourcePath(baseDir, m.Source.Dockerfile)
-		}
-
-		buildCtx := ctx
-		if m.Build.Timeout != "" {
-			limit, err := time.ParseDuration(m.Build.Timeout)
-			if err != nil {
-				return Result{}, fmt.Errorf("parse build timeout: %w", err)
-			}
-			var cancel context.CancelFunc
-			buildCtx, cancel = context.WithTimeout(ctx, limit)
-			defer cancel()
-		}
-		buildValues, err := buildEnvironmentValues(absPath, m, environment)
-		if err != nil {
-			return Result{}, err
-		}
-		cleanupBuildEnvironment, err := materializeBuildEnvironment(contextDir, m.Env.Build, buildValues)
-		if err != nil {
-			return Result{}, err
-		}
-		defer func() {
-			if err := cleanupBuildEnvironment(); err != nil {
-				s.logger.Warn("restore build environment", "error", err)
-			}
-		}()
-		buildSecrets, err := s.buildSecretBindings(buildCtx, absPath, m, environment)
-		if err != nil {
-			return Result{}, err
-		}
-		if err := s.buildImage(buildCtx, registryImage, dockerfile, contextDir, m.Build.Resources, m.Build.NoCache, buildSecrets); err != nil {
-			return Result{}, err
-		}
-		m.Source.Context = contextDir
-		m.Source.Dockerfile = dockerfile
-		if err := s.pushImage(ctx, registryImage); err != nil {
-			return Result{}, err
-		}
-		metadataHistoryPath, err := saveMetadataHistory(s.config, m.Name, Metadata{
-			App:           m.Name,
-			Build:         true,
-			CreateAt:      time.Now().UTC(),
-			Environment:   environment,
-			Image:         image,
-			RegistryImage: registryImage,
-			Git:           gitMetadata,
-			Tag:           tag,
-		})
-		if err != nil {
-			return Result{}, err
-		}
-		return Result{Environment: environment, MetadataPath: metadataHistoryPath, ManifestPath: absPath, Image: image, RegistryImage: registryImage, Built: true, Tag: tag, Pushed: true, Manifest: m}, nil
-	} else {
-		sourceReference := m.Image.SourceReference
-		if sourceReference == "" {
-			sourceReference = fmt.Sprintf("%s:%s", m.Image.Repository, m.Image.Tag)
-		}
-		if err := s.buildPulledImage(ctx, registryImage, sourceReference); err != nil {
-			return Result{}, err
-		}
-	}
-
-	if err := s.pushImage(ctx, registryImage); err != nil {
-		return Result{}, err
-	}
-
-	metadataHistoryPath, err := saveMetadataHistory(s.config, m.Name, Metadata{
-		App:           m.Name,
-		Build:         m.Image.ShouldBuild(),
-		CreateAt:      time.Now().UTC(),
-		Environment:   environment,
-		Image:         image,
-		RegistryImage: registryImage,
-		SourceTag:     sourceTag(m),
-		Tag:           tag,
-	})
-
+	unlock, err := s.acquireReleaseLocks(ctx, m.Name, environment)
 	if err != nil {
 		return Result{}, err
 	}
+	defer unlock()
 
-	return Result{
-		Environment:   environment,
-		MetadataPath:  metadataHistoryPath,
-		ManifestPath:  absPath,
-		Image:         image,
-		RegistryImage: registryImage,
-		Built:         true,
-		Tag:           tag,
-		Pushed:        true,
-		Manifest:      m,
-	}, nil
+	if m.Image.ShouldBuild() {
+		return s.releaseBuild(ctx, environment, absPath, m)
+	}
+
+	return s.releaseExternalImage(ctx, environment, absPath, m)
 }
 
 func (s *Service) buildPulledImage(ctx context.Context, targetImage, sourceImage string) error {
@@ -222,13 +108,16 @@ func resolveSourcePath(baseDir string, value string) string {
 
 func resolveGitSourcePath(baseDir, value string) (string, error) {
 	if filepath.IsAbs(value) {
-		return "", fmt.Errorf("Git build contexts require relative build.context and build.dockerfile paths")
+		return "", fmt.Errorf("git build contexts require relative build.context and build.dockerfile paths")
 	}
+
 	path := filepath.Clean(filepath.Join(baseDir, value))
 	rel, err := filepath.Rel(baseDir, path)
+
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf("Git build path %q escapes the checked-out repository", value)
+		return "", fmt.Errorf("git build path %q escapes the checked-out repository", value)
 	}
+
 	return path, nil
 }
 
@@ -236,8 +125,31 @@ func registryImage(cfg config.Config, image string) string {
 	return fmt.Sprintf("127.0.0.1:%s/%s", cfg.RegistryPort, image)
 }
 
-func releaseTag() string {
-	return time.Now().UTC().Format("20060102-150405")
+func (s *Service) resolvePushedDigest(ctx context.Context, image string) (string, error) {
+	result, err := s.runner.Run(ctx, "docker", []string{"image", "inspect", "--format", `{{join .RepoDigests "\n"}}`, image}, command.RunOptions{})
+	if err != nil {
+		return "", fmt.Errorf("inspect pushed image %q: %w: %s", image, err, strings.TrimSpace(string(result.Output)))
+	}
+
+	registry := strings.Split(image, "/")[0]
+	for _, candidate := range strings.Fields(string(result.Output)) {
+		if strings.HasPrefix(candidate, registry+"/") && strings.Contains(candidate, "@sha256:") {
+			return candidate, nil
+		}
+	}
+
+	return "", fmt.Errorf("inspect pushed image %q: registry digest is unavailable", image)
+}
+
+func (s *Service) ensureTagUnused(app, environment, tag string) error {
+	_, err := NewFilesystemStore().Find(s.config, app, environment, tag)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("inspect release tag %q: %w", tag, err)
+	}
+	return fmt.Errorf("deterministic release tag %q already exists; refusing to overwrite it", tag)
 }
 
 // sourceTag records the mutable upstream tag that was snapshotted when an

@@ -82,6 +82,7 @@ the environment passed to `noops deploy`.
 | `services.<name>.x-noops.build.timeout`         | No              | —         | Maximum duration of a build.                                                                                                                                     |
 | `services.<name>.x-noops.build.no-cache`        | No              | `false`   | Passes `--no-cache` to Docker. Use for cache-warming builds whose mounted-cache side effects must run every release.                                             |
 | `services.<name>.x-noops.deploy`                | No              | `true`    | Set to `false` for a release-only service. `release --all` still builds it, while deploy, rollback, and remove skip it.                                          |
+
 | `services.<name>.x-noops.env.file`              | No              | —         | Environment YAML file, relative to the manifest. Omit `x-noops.env` entirely when the service has no environment values or secret bindings.                      |
 | `services.<name>.x-noops.env.build.file`        | No              | —         | Relative dotenv file to generate in the temporary build context from ordinary environment values.                                                                |
 | `services.<name>.x-noops.env.secrets`           | No              | —         | Allow-listed versioned secret references and delivery mode.                                                                                                      |
@@ -89,11 +90,14 @@ the environment passed to `noops deploy`.
 | `services.<name>.x-noops.rollout.*`             | No              | See below | No Oops convergence monitoring settings. It does not replace existing `deploy.update_config`, `rollback_config`, or restart policy.                              |
 | `services.<name>.x-noops.depends_on`            | No              | `[]`      | Release and deployment ordering for `--all`; not a runtime readiness guarantee.                                                                                  |
 
+Build resource limits are opt-in. When `resources` is omitted, No Oops passes no CPU or memory limit to Docker. You may set either `cpus` or `memory` independently; only the explicitly configured value is passed to the build.
+
 `healthcheck.test` must be an array accepted by Docker. Duration values use Go duration syntax, such as `30s` or `2m`.
 
 ## Git build contexts
 
-When `x-noops.build.source.git` is present, No Oops fetches the configured environment's repository/ref into a temporary
+When `x-noops.build.source.git` is present, No Oops fetches the configured environment's repository/immutable commit
+SHA into a temporary
 workspace. Private-source tokens are mounted only into a one-shot Swarm Git-fetch task as a Swarm secret. The Compose
 `build.context` and `build.dockerfile` paths are resolved from that checkout; every resulting Docker build runs in a
 one-shot Swarm build task, and no application toolchain or Git installation is required on the host.
@@ -109,7 +113,8 @@ x-noops:
         url: https://github.com/example/api.git
         environments:
           prod:
-            ref: refs/tags/v1.2.3
+            # A 40-character lowercase Git commit SHA; branch and tag refs are rejected.
+            ref: 0123456789abcdef0123456789abcdef01234567
             secret: github-readonly
     resources:
       cpus: "1.5"
@@ -120,7 +125,7 @@ x-noops:
     no-cache: true
 ```
 
-No Oops resolves and records the resulting commit SHA with the release. When `x-noops.env.build.file` is configured,
+No Oops records the configured commit SHA with the release. When `x-noops.env.build.file` is configured,
 ordinary values from `x-noops.env.file` are materialized into that ephemeral dotenv file before Docker builds;
 `from_secret` values remain runtime-only by default. An explicit `env.build.secrets` allow-list can make a private
 secret

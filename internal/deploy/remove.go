@@ -34,6 +34,11 @@ func (s *Service) Remove(ctx context.Context, environment, path string) (RemoveR
 	if err != nil {
 		return RemoveResult{}, err
 	}
+	unlock, err := s.operationLock(ctx, m.Name, environment)
+	if err != nil {
+		return RemoveResult{}, err
+	}
+	defer unlock()
 
 	active, err := s.deployments.Latest(s.config, m.Name, environment)
 	if err != nil {

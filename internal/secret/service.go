@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
+	"github.com/AustinOyugi/no-oops-ops/internal/state"
 )
 
 var identifierPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*$`)
@@ -45,6 +47,11 @@ func (s *Service) Set(ctx context.Context, environment string, key string, value
 	if err := validateIdentifier("secret key", key); err != nil {
 		return Metadata{}, err
 	}
+	unlock, err := state.AcquireLock(ctx, filepath.Join(s.config.StateDir, "secrets", environment, key, "operation.lock"))
+	if err != nil {
+		return Metadata{}, err
+	}
+	defer unlock()
 
 	secretValue, err := io.ReadAll(value)
 	if err != nil {
@@ -123,6 +130,11 @@ func (s *Service) Delete(ctx context.Context, environment string, key string) ([
 	if err := validateIdentifier("secret key", key); err != nil {
 		return nil, err
 	}
+	unlock, err := state.AcquireLock(ctx, filepath.Join(s.config.StateDir, "secrets", environment, key, "operation.lock"))
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
 
 	items, err := s.store.List(s.config.StateDir, environment)
 	if err != nil {

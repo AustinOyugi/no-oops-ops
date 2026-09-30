@@ -1,6 +1,9 @@
 package manifest
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func boolPtr(value bool) *bool {
 	return &value
@@ -77,6 +80,19 @@ func TestValidateRequiresSourceForBuiltImage(t *testing.T) {
 
 	if err := m.Validate(); err == nil {
 		t.Fatal("expected source validation error for built image")
+	}
+}
+
+func TestValidateRejectsMutableGitReference(t *testing.T) {
+	m := Manifest{
+		Name: "test", Image: Image{Repository: "repo", Build: boolPtr(true)},
+		Service: Service{InternalPort: 8080}, Healthcheck: Healthcheck{Test: []string{"CMD", "true"}},
+		Source: Source{Context: ".", Dockerfile: "Dockerfile"},
+		Build:  NoOpsBuild{Source: BuildSource{Git: &GitSource{URL: "https://example.test/repo.git", Environments: map[string]GitEnvironment{"prod": {Ref: "refs/heads/main"}}}}},
+	}
+	err := m.Validate()
+	if err == nil || !strings.Contains(err.Error(), "immutable") {
+		t.Fatalf("Validate() = %v, want immutable reference error", err)
 	}
 }
 

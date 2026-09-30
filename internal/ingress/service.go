@@ -14,6 +14,7 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
+	"github.com/AustinOyugi/no-oops-ops/internal/state"
 )
 
 const (
@@ -62,6 +63,11 @@ func (s *Service) SetACMEEmail(email string) {
 // environment network. The connection is retained in workspace state so later
 // applications in the same environment do not update nginx again.
 func (s *Service) EnsureNetwork(ctx context.Context, network string) error {
+	unlock, err := state.AcquireLock(ctx, filepath.Join(s.ingressDir(), "operation.lock"))
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	networks, err := s.loadNetworks()
 	if err != nil {
 		return err
@@ -83,6 +89,11 @@ func (s *Service) EnsureNetwork(ctx context.Context, network string) error {
 }
 
 func (s *Service) Reconcile(ctx context.Context, environment string, m manifest.Manifest, upstreamService string) error {
+	unlock, err := state.AcquireLock(ctx, filepath.Join(s.ingressDir(), "operation.lock"))
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	routes, err := s.loadRoutes()
 	if err != nil {
 		return err
@@ -136,6 +147,11 @@ func (s *Service) Reconcile(ctx context.Context, environment string, m manifest.
 }
 
 func (s *Service) Remove(ctx context.Context, environment, app string) error {
+	unlock, err := state.AcquireLock(ctx, filepath.Join(s.ingressDir(), "operation.lock"))
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	routes, err := s.loadRoutes()
 	if err != nil {
 		return err
@@ -450,39 +466,5 @@ func sortRoutes(routes []Route) {
 }
 
 func atomicWrite(path string, data []byte) error {
-	if err := os.MkdirAll(filepath.Dir(path), dirMode); err != nil {
-		return fmt.Errorf("create ingress state directory %q: %w", filepath.Dir(path), err)
-	}
-	temp, err := os.CreateTemp(filepath.Dir(path), ".tmp-*")
-	if err != nil {
-		return fmt.Errorf("create temporary ingress file: %w", err)
-	}
-	tempPath := temp.Name()
-	defer func(name string) {
-		err := os.Remove(name)
-		if err != nil {
-
-		}
-	}(tempPath)
-	if err := temp.Chmod(fileMode); err != nil {
-		err := temp.Close()
-		if err != nil {
-			return err
-		}
-		return fmt.Errorf("set ingress file permissions: %w", err)
-	}
-	if _, err := temp.Write(data); err != nil {
-		err := temp.Close()
-		if err != nil {
-			return err
-		}
-		return fmt.Errorf("write temporary ingress file: %w", err)
-	}
-	if err := temp.Close(); err != nil {
-		return fmt.Errorf("close temporary ingress file: %w", err)
-	}
-	if err := os.Rename(tempPath, path); err != nil {
-		return fmt.Errorf("replace ingress file %q: %w", path, err)
-	}
-	return nil
+	return state.WriteFile(path, data, fileMode)
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"github.com/AustinOyugi/no-oops-ops/internal/release"
 	"github.com/AustinOyugi/no-oops-ops/internal/secret"
+	"github.com/AustinOyugi/no-oops-ops/internal/state"
 )
 
 type Service struct {
@@ -72,6 +73,14 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		return Result{}, err
 	}
 	m = m.ForEnvironment(environment)
+	unlock, err := s.operationLock(ctx, m.Name, environment)
+	if err != nil {
+		return Result{}, err
+	}
+	defer unlock()
+	if err := s.recoverJournal(ctx, m.Name, environment); err != nil {
+		return Result{}, err
+	}
 	if options.Quick {
 		monitor, err := quickRolloutMonitor(m)
 		if err != nil {
@@ -144,6 +153,7 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 	if err != nil {
 		return Result{}, err
 	}
+	immutableImage := releaseMetadata.ImmutableImage()
 
 	activeDeployment, err := s.deployments.Latest(s.config, m.Name, environment)
 	if err != nil {
@@ -173,28 +183,28 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 	var wrapperCfg WrapperConfig
 
 	if resolutionMode == "env" && len(secretBindings) > 0 {
-		if err := pullImage(ctx, s.runner, releaseMetadata.RegistryImage); err != nil {
+		if err := pullImage(ctx, s.runner, immutableImage); err != nil {
 			return Result{}, fmt.Errorf("pull application image: %w", err)
 		}
-		imgMeta, err := inspectImage(ctx, s.runner, releaseMetadata.RegistryImage)
+		imgMeta, err := inspectImage(ctx, s.runner, immutableImage)
 		if err != nil {
 			return Result{}, fmt.Errorf("inspect application image: %w", err)
 		}
 		if len(m.Service.Entrypoint) > 0 {
 			imgMeta.Entrypoint = m.Service.Entrypoint
 		}
-		wrapperCfg = BuildWrapperConfig(resolutionMode, releaseMetadata.RegistryImage, imgMeta, m.Service.Command, secretBindings)
+		wrapperCfg = BuildWrapperConfig(resolutionMode, immutableImage, imgMeta, m.Service.Command, secretBindings)
 		if !wrapperCfg.UseWrapper {
-			return Result{}, fmt.Errorf("application image %q has neither an entrypoint nor a command", releaseMetadata.RegistryImage)
+			return Result{}, fmt.Errorf("application image %q has neither an entrypoint nor a command", immutableImage)
 		}
-		wrappedImage, err := s.buildWrappedImage(ctx, releaseMetadata.RegistryImage, m.Name)
+		wrappedImage, err := s.buildWrappedImage(ctx, immutableImage, m.Name)
 		if err != nil {
 			return Result{}, fmt.Errorf("build wrapped application image: %w", err)
 		}
 		wrapperCfg.WrapperImage = wrappedImage
 	}
 
-	deployedImage := releaseMetadata.RegistryImage
+	deployedImage := immutableImage
 	if wrapperCfg.UseWrapper {
 		deployedImage = wrapperCfg.WrapperImage
 	}
@@ -203,12 +213,28 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 	if err := s.ensureNetwork(ctx, network); err != nil {
 		return Result{}, err
 	}
-	stackPath, err := writeStackForService(s.config, environment, m, releaseMetadata.RegistryImage, secretBindings, wrapperCfg, network, deploymentService, deploymentStackPath)
+	stackPath, err := writeStackForService(s.config, environment, m, immutableImage, secretBindings, wrapperCfg, network, deploymentService, deploymentStackPath)
 	if err != nil {
 		return Result{}, err
 	}
 
+	journal := operationJournal{Kind: "deploy", Stage: "started", StartedAt: time.Now().UTC(), StackName: deploymentStack, BlueGreen: blueGreen, ReleaseTag: releaseTag}
+	if err := saveJournal(s.config, m.Name, environment, journal); err != nil {
+		return Result{}, err
+	}
+	completed := false
+	defer func() {
+		if completed {
+			if err := clearJournal(s.config, m.Name, environment); err != nil {
+				s.logger.ErrorContext(ctx, "clear completed operation journal", "error", err)
+			}
+		}
+	}()
 	if err := s.deployStack(ctx, stackPath, deploymentStack); err != nil {
+		return Result{}, err
+	}
+	journal.Stage = "stack_deployed"
+	if err := saveJournal(s.config, m.Name, environment, journal); err != nil {
 		return Result{}, err
 	}
 
@@ -239,7 +265,7 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 			Environment:    environment,
 			Outcome:        outcome,
 			Reason:         err.Error(),
-			ReleaseImage:   releaseMetadata.RegistryImage,
+			ReleaseImage:   immutableImage,
 			ReleaseTag:     releaseMetadata.Tag,
 			StackName:      deploymentStack,
 			ServiceName:    deploymentSwarmService,
@@ -259,13 +285,17 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 	if err := s.ingress.Reconcile(ctx, environment, m, deploymentSwarmService); err != nil {
 		return Result{}, s.cleanupFailedCandidate(ctx, blueGreen, deploymentStack, fmt.Errorf("reconcile ingress route: %w", err))
 	}
+	journal.Stage = "ingress_reconciled"
+	if err := saveJournal(s.config, m.Name, environment, journal); err != nil {
+		return Result{}, err
+	}
 
 	deployment := Deployment{
 		App:            m.Name,
 		CreatedAt:      time.Now().UTC(),
 		Environment:    environment,
 		Outcome:        outcome,
-		ReleaseImage:   releaseMetadata.RegistryImage,
+		ReleaseImage:   immutableImage,
 		ReleaseTag:     releaseMetadata.Tag,
 		StackName:      deploymentStack,
 		ServiceName:    deploymentSwarmService,
@@ -275,10 +305,15 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 	if err != nil {
 		return Result{}, err
 	}
+	journal.Stage = "deployment_saved"
+	if err := saveJournal(s.config, m.Name, environment, journal); err != nil {
+		return Result{}, err
+	}
 	err = s.releases.SetLatest(s.config, m.Name, release.ActiveRelease{Tag: releaseTag, IsAvailable: true}, environment)
 	if err != nil {
 		return Result{}, err
 	}
+	completed = true
 
 	// The new service is recorded and ingress already targets it. Reconcile all
 	// older stacks belonging to this app/environment, including candidates left
@@ -293,7 +328,7 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		Verified:       true,
 		RunningTasks:   runningTasks,
 		SwarmOutcome:   outcome,
-		ReleaseImage:   releaseMetadata.RegistryImage,
+		ReleaseImage:   immutableImage,
 		ReleaseTag:     releaseMetadata.Tag,
 		ManifestPath:   absPath,
 		StackPath:      stackPath,
@@ -302,6 +337,19 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		EnvPath:        envPath,
 		Manifest:       m,
 	}, nil
+}
+
+func (s *Service) operationLock(ctx context.Context, app, environment string) (func(), error) {
+	unlockApp, err := state.AcquireLock(ctx, filepath.Join(appDir(s.config, app, environment), "operation.lock"))
+	if err != nil {
+		return nil, err
+	}
+	unlockRegistry, err := state.AcquireLock(ctx, filepath.Join(s.config.StateDir, "registry.lock"))
+	if err != nil {
+		unlockApp()
+		return nil, err
+	}
+	return func() { unlockRegistry(); unlockApp() }, nil
 }
 
 // cleanupFailedCandidate removes a blue/green stack whenever it has been
