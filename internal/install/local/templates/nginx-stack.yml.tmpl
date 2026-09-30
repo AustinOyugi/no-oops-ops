@@ -3,16 +3,20 @@ version: "3.9"
 services:
   nginx:
     image: nginx:1.28-alpine
-    # Reload its own configuration periodically. This lets certificate renewal
-    # take effect without granting the certbot container Docker-host access.
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - >-
-        nginx -c /etc/noops/nginx/nginx.conf -t || exit $$?; nginx -c /etc/noops/nginx/nginx.conf -g 'daemon off;' & nginx_pid=$$!; while kill -0 "$$nginx_pid" 2>/dev/null;
-        do sleep 5m & wait $$!; nginx -c /etc/noops/nginx/nginx.conf -t && nginx -c /etc/noops/nginx/nginx.conf -s reload || true; done; wait "$$nginx_pid"
+    # The supervisor validates, renews config, and forwards graceful shutdown.
+    entrypoint: ["/bin/sh"]
+    command: ["/etc/noops/nginx/start-nginx.sh"]
+    stop_signal: SIGQUIT
+    stop_grace_period: 2m
     ports:
-      - "{{ .HTTPPort }}:80"
-      - "{{ .HTTPSPort }}:443"
+      - target: 80
+        published: {{ .HTTPPort }}
+        protocol: tcp
+        mode: ingress
+      - target: 443
+        published: {{ .HTTPSPort }}
+        protocol: tcp
+        mode: ingress
     volumes:
       - "{{ .MainConfigDir }}:/etc/noops/nginx:ro"
       - "{{ .ConfigPath }}:/etc/nginx/conf.d:ro"
@@ -29,12 +33,25 @@ services:
           - "{{ $.InternalHost }}"
 {{ end }}    healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/__noops/health || exit 1"]
-      interval: 10s
-      timeout: 5s
+      interval: 2s
+      timeout: 1s
       retries: 3
-      start_period: 10s
+      start_period: 5s
     deploy:
-      replicas: 1
+      replicas: {{ .Replicas }}
+      update_config:
+        parallelism: 1
+        order: start-first
+        monitor: 30s
+        delay: 5s
+        failure_action: rollback
+        max_failure_ratio: 0
+      rollback_config:
+        parallelism: 1
+        order: start-first
+        monitor: 30s
+        failure_action: pause
+        max_failure_ratio: 0
       placement:
         constraints:
           - node.role == manager

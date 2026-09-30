@@ -13,6 +13,7 @@ import (
 
 func TestRenderNginxStack(t *testing.T) {
 	rendered, err := renderTemplate("nginx-stack.yml.tmpl", nginxStackTemplateContents, nginxStackTemplateData{
+		Replicas:      nginxReplicas,
 		HTTPPort:      "8080",
 		HTTPSPort:     "8443",
 		NetworkName:   "noops-net",
@@ -28,18 +29,20 @@ func TestRenderNginxStack(t *testing.T) {
 	output := string(rendered)
 	for _, want := range []string{
 		"image: nginx:1.28-alpine",
-		`- "8080:80"`,
-		`- "8443:443"`,
+		"published: 8080",
+		"published: 8443",
 		`- "/var/lib/noops/nginx/conf:/etc/nginx/conf.d:ro"`,
 		`"noops-net":`,
 		`- "ingress.noops.internal"`,
 		"wget -q --spider http://127.0.0.1/__noops/health || exit 1",
 		"external: true",
-		`entrypoint: ["/bin/sh", "-c"]`,
+		`entrypoint: ["/bin/sh"]`,
 		"command:",
-		"- >-",
-		"nginx -c /etc/noops/nginx/nginx.conf -t || exit $$?; nginx -c /etc/noops/nginx/nginx.conf -g 'daemon off;' & nginx_pid=$$!",
-		"nginx -c /etc/noops/nginx/nginx.conf -t && nginx -c /etc/noops/nginx/nginx.conf -s reload || true",
+		`command: ["/etc/noops/nginx/start-nginx.sh"]`,
+		"replicas: 2",
+		"order: start-first",
+		"failure_action: rollback",
+		"stop_grace_period: 2m",
 		"while :; do certbot renew --webroot --webroot-path /var/www/certbot;",
 	} {
 		if !strings.Contains(output, want) {

@@ -1,0 +1,44 @@
+#!/bin/sh
+set -eu
+
+nginx -c {{.ConfigPath}} -t
+nginx -c {{.ConfigPath}} -g 'daemon off;' &
+nginx_pid=$!
+
+# The shell is PID 1. Forward stop signals as QUIT so nginx finishes requests
+# rather than abandoning connections when Swarm retires an old task.
+shutdown() {
+  trap '' QUIT TERM INT
+  kill "$reload_pid" 2>/dev/null || true
+  kill -QUIT "$nginx_pid" 2>/dev/null || true
+  wait "$nginx_pid" || true
+  wait "$reload_pid" || true
+  exit 0
+}
+
+(
+  sleeper=
+  stop_reloader() {
+    if [ -n "$sleeper" ]; then kill "$sleeper" 2>/dev/null || true; fi
+    exit 0
+  }
+  trap stop_reloader QUIT TERM INT
+  while kill -0 "$nginx_pid" 2>/dev/null; do
+    sleep 300 &
+    sleeper=$!
+    wait "$sleeper"
+    sleeper=
+    if ! kill -0 "$nginx_pid" 2>/dev/null; then exit 0; fi
+    nginx -c {{.ConfigPath}} -t && nginx -c {{.ConfigPath}} -s reload || true
+  done
+) &
+reload_pid=$!
+trap shutdown QUIT TERM INT
+
+# Exit promptly when nginx fails, allowing Swarm to replace the failed task.
+set +e
+wait "$nginx_pid"
+status=$?
+kill "$reload_pid" 2>/dev/null || true
+wait "$reload_pid" || true
+exit "$status"

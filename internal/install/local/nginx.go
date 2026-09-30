@@ -20,6 +20,11 @@ import (
 //go:embed templates/nginx-stack.yml.tmpl
 var nginxStackTemplateContents string
 
+//go:embed templates/nginx-start.sh.tmpl
+var nginxStartTemplateContents string
+
+const nginxReplicas = 2
+
 func (h *Host) nginxDir() string {
 	return filepath.Join(h.stateDir, "nginx")
 }
@@ -42,6 +47,7 @@ func (h *Host) nginxImportedCertificateDir() string {
 }
 
 type nginxStackTemplateData struct {
+	Replicas               int
 	HTTPPort               string
 	HTTPSPort              string
 	EnvironmentNetworks    []string
@@ -123,11 +129,20 @@ func (h *Host) WriteNginxStack(ctx context.Context) error {
 		return err
 	}
 
+	startScript, err := renderTemplate("nginx-start.sh.tmpl", nginxStartTemplateContents, struct{ ConfigPath string }{nginxconfig.ContainerPath})
+	if err != nil {
+		return err
+	}
+	if err := state.WriteFile(filepath.Join(h.nginxDir(), "start-nginx.sh"), startScript, installMetadataFileMode); err != nil {
+		return err
+	}
+
 	environmentNetworks, err := h.ingressNetworks(ctx)
 	if err != nil {
 		return err
 	}
 	rendered, err := renderTemplate("nginx-stack.yml.tmpl", nginxStackTemplateContents, nginxStackTemplateData{
+		Replicas:               nginxReplicas,
 		EnvironmentNetworks:    environmentNetworks,
 		HTTPPort:               h.nginxHTTPPort,
 		HTTPSPort:              h.nginxHTTPSPort,
@@ -208,6 +223,11 @@ func (h *Host) EnsureNginx(ctx context.Context) error {
 	if err := h.validateNginx(ctx); err != nil {
 		return install.PrerequisiteError{Check: install.StepEnsureNginx, Err: err}
 	}
+	// Scale the old template first, so the initial one-replica migration has
+	// a healthy sibling before changing any serving container definition.
+	if err := h.prepareNginxUpdate(ctx); err != nil {
+		return install.PrerequisiteError{Check: install.StepEnsureNginx, Err: err}
+	}
 	// Stack deploy is idempotent. Always apply the rendered stack so updates to
 	// the nginx or certbot definition take effect on an existing installation.
 	result, err := h.runner.Run(ctx, "docker", []string{"stack", "deploy", "--detach=true", "--compose-file", h.nginxStackPath(), h.nginxName}, command.RunOptions{
@@ -219,7 +239,7 @@ func (h *Host) EnsureNginx(ctx context.Context) error {
 	if err != nil {
 		return install.PrerequisiteError{Check: install.StepEnsureNginx, Err: fmt.Errorf("deploy nginx stack %q: %w: %s", h.nginxName, err, strings.TrimSpace(string(result.Output)))}
 	}
-	if err := h.waitForServiceReady(ctx, h.nginxService); err != nil {
+	if err := h.waitForNginxHealthy(ctx, nginxReplicas, true); err != nil {
 		h.nginxReady = false
 		return install.PrerequisiteError{Check: install.StepEnsureNginx, Err: err}
 	}
