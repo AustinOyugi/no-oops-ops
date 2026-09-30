@@ -53,6 +53,7 @@ func TestRenderNginxStack(t *testing.T) {
 func TestWriteNginxStackPreservesInstalledRoutesAndNetworks(t *testing.T) {
 	root := t.TempDir()
 	h := NewHost(slog.Default(), filepath.Join(root, "state"), filepath.Join(root, "data"), "test", "noops-net", "registry", "5000", "nginx", "80", "443")
+	h.runner = &installedNetworkRunner{}
 	if err := os.MkdirAll(h.nginxConfigDir(), 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -115,4 +116,13 @@ func TestEnsureNginxRejectsInvalidConfigBeforeDeploy(t *testing.T) {
 	if args[len(args)-1] != "-t" {
 		t.Fatalf("missing config check: %v", args)
 	}
+}
+
+type installedNetworkRunner struct{}
+
+func (*installedNetworkRunner) Run(_ context.Context, _ string, args []string, _ command.RunOptions) (command.Result, error) {
+	if args[0] == "service" {
+		return command.Result{Output: []byte("[]")}, nil
+	}
+	return command.Result{}, nil
 }

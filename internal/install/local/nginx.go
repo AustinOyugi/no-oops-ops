@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/AustinOyugi/no-oops-ops/internal/ingressnet"
 	"github.com/AustinOyugi/no-oops-ops/internal/install"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"github.com/AustinOyugi/no-oops-ops/internal/state"
@@ -106,9 +107,23 @@ func (h *Host) WriteNginxStack(ctx context.Context) error {
 			return fmt.Errorf("decode ingress networks: %w", err)
 		}
 	}
+	liveNetworks, err := ingressnet.Attached(ctx, h.runner, h.nginxService)
+	if err != nil {
+		return err
+	}
+	for network := range liveNetworks {
+		networks[network] = true
+	}
 	var environmentNetworks []string
 	for network, attached := range networks {
 		if attached && network != h.networkName {
+			result, err := h.runner.Run(ctx, "docker", []string{"network", "inspect", network}, command.RunOptions{})
+			if err != nil {
+				if strings.Contains(string(result.Output), "not found") || strings.Contains(string(result.Output), "No such network") {
+					continue
+				}
+				return fmt.Errorf("inspect preserved ingress network %q: %w: %s", network, err, result.Output)
+			}
 			environmentNetworks = append(environmentNetworks, network)
 		}
 	}

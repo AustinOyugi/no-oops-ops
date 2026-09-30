@@ -21,6 +21,9 @@ type recordingRunner struct {
 
 func (r *recordingRunner) Run(_ context.Context, name string, args []string, _ command.RunOptions) (command.Result, error) {
 	r.calls = append(r.calls, append([]string{name}, args...))
+	if len(args) > 1 && args[0] == "service" && args[1] == "inspect" {
+		return command.Result{Output: []byte("[]")}, nil
+	}
 	return command.Result{}, nil
 }
 
@@ -109,7 +112,7 @@ func TestEnsureNetworkAddsInternalIngressAlias(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := [][]string{{
+	want := [][]string{{"docker", "service", "inspect", "--format", "{{json .Spec.TaskTemplate.Networks}}", "noops-nginx_nginx"}, {
 		"docker", "service", "update", "--network-add",
 		"name=noops-prod,alias=ingress.noops.internal", "noops-nginx_nginx",
 	}}
@@ -212,5 +215,19 @@ func TestReconcileRestoresRoutesAfterValidationFailure(t *testing.T) {
 	restored, _ := os.ReadFile(filepath.Join(s.configDir(), "external", "api-example-test.conf"))
 	if string(restored) != string(oldConfig) {
 		t.Fatalf("config not restored: %s", restored)
+	}
+}
+
+func TestEnsureNetworkRepairsStaleCache(t *testing.T) {
+	r := &recordingRunner{}
+	s := &Service{logger: slog.Default(), runner: r, config: config.Config{StateDir: t.TempDir(), NginxName: "noops-nginx"}}
+	if err := s.saveNetworks(map[string]bool{"noops-prod": true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.EnsureNetwork(context.Background(), "noops-prod"); err != nil {
+		t.Fatal(err)
+	}
+	if len(r.calls) != 2 || r.calls[1][2] != "update" {
+		t.Fatalf("missing repair: %v", r.calls)
 	}
 }

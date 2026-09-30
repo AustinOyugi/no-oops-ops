@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
+	"github.com/AustinOyugi/no-oops-ops/internal/ingressnet"
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"github.com/AustinOyugi/no-oops-ops/internal/state"
@@ -68,19 +69,23 @@ func (s *Service) EnsureNetwork(ctx context.Context, network string) error {
 		return err
 	}
 	defer unlock()
-	networks, err := s.loadNetworks()
+	service := s.config.NginxName + "_nginx"
+	networks, err := ingressnet.Attached(ctx, s.runner, service)
 	if err != nil {
 		return err
 	}
 	if networks[network] {
-		return nil
+		return s.saveNetworks(networks)
 	}
-	service := s.config.NginxName + "_nginx"
 	attachment := "name=" + network + ",alias=" + internalHost
 	if _, err := s.runner.Run(ctx, "docker", []string{"service", "update", "--network-add", attachment, service}, command.RunOptions{LogCommand: true}); err != nil {
 		return fmt.Errorf("attach ingress service %q to network %q: %w", service, network, err)
 	}
 	networks[network] = true
+	return s.saveNetworks(networks)
+}
+
+func (s *Service) saveNetworks(networks map[string]bool) error {
 	data, err := json.MarshalIndent(networks, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode ingress networks: %w", err)
