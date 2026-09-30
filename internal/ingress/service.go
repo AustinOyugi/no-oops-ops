@@ -88,7 +88,7 @@ func (s *Service) EnsureNetwork(ctx context.Context, network string) error {
 	return atomicWrite(s.networksPath(), append(data, '\n'))
 }
 
-func (s *Service) Reconcile(ctx context.Context, environment string, m manifest.Manifest, upstreamService string) error {
+func (s *Service) Reconcile(ctx context.Context, environment string, m manifest.Manifest, upstreamService string) (operationErr error) {
 	unlock, err := state.AcquireLock(ctx, filepath.Join(s.ingressDir(), "operation.lock"))
 	if err != nil {
 		return err
@@ -99,6 +99,11 @@ func (s *Service) Reconcile(ctx context.Context, environment string, m manifest.
 		return err
 	}
 
+	rollback, err := s.rollbackOnFailure(ctx)
+	if err != nil {
+		return err
+	}
+	defer rollback(&operationErr)
 	updated, changed, err := updateRoute(routes, environment, m, upstreamService)
 	if err != nil {
 		return err
@@ -146,7 +151,7 @@ func (s *Service) Reconcile(ctx context.Context, environment string, m manifest.
 	return s.reload(ctx)
 }
 
-func (s *Service) Remove(ctx context.Context, environment, app string) error {
+func (s *Service) Remove(ctx context.Context, environment, app string) (operationErr error) {
 	unlock, err := state.AcquireLock(ctx, filepath.Join(s.ingressDir(), "operation.lock"))
 	if err != nil {
 		return err
@@ -157,6 +162,11 @@ func (s *Service) Remove(ctx context.Context, environment, app string) error {
 		return err
 	}
 
+	rollback, err := s.rollbackOnFailure(ctx)
+	if err != nil {
+		return err
+	}
+	defer rollback(&operationErr)
 	updated := make([]Route, 0, len(routes))
 	for _, route := range routes {
 		if route.Environment == environment && route.App == app {

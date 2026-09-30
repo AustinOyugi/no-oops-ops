@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -178,5 +179,38 @@ func TestValidateCloudflareRoutesRequiresImportedCertificate(t *testing.T) {
 	}
 	if err := service.validateCloudflareRoutes([]Route{{Domain: "app.example.com", TLS: true, TLSCertificate: "cloudflare-origin"}}); err != nil {
 		t.Fatalf("error = %v, want nil", err)
+	}
+}
+
+func TestReconcileRestoresRoutesAfterValidationFailure(t *testing.T) {
+	root := t.TempDir()
+	r := &reloadRecordingRunner{output: "nginx-one", invalid: true}
+	s := &Service{logger: slog.Default(), runner: r, config: config.Config{StateDir: root, DataDir: root, NginxName: "nginx"}}
+	old := []Route{{Environment: "prod", App: "api", Domain: "api.example.test", PathPrefix: "/", Service: "old-service", Port: 8080}}
+	if err := s.writeConfig(old); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.writeRoutes(old); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(s.routesPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldConfig, err := os.ReadFile(filepath.Join(s.configDir(), "external", "api-example-test.conf"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := manifest.Manifest{Name: "api", Service: manifest.Service{InternalPort: 8080}, Expose: manifest.Expose{Enabled: true, Domain: "api.example.test", PathPrefix: "/"}}
+	if err := s.Reconcile(context.Background(), "prod", m, "deleted-candidate"); err == nil {
+		t.Fatal("expected validation failure")
+	}
+	after, _ := os.ReadFile(s.routesPath())
+	if string(after) != string(before) {
+		t.Fatalf("route state changed: %s", after)
+	}
+	restored, _ := os.ReadFile(filepath.Join(s.configDir(), "external", "api-example-test.conf"))
+	if string(restored) != string(oldConfig) {
+		t.Fatalf("config not restored: %s", restored)
 	}
 }
