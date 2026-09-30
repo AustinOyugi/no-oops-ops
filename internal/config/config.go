@@ -139,12 +139,16 @@ func (c *Config) RequireACMEEmail(in *bufio.Reader, out *os.File) error {
 	if !strings.Contains(email, "@") || strings.ContainsAny(email, "\r\n") {
 		return fmt.Errorf("a valid ACME email is required")
 	}
+	content, err := workspace.RenderConfig(email)
+	if err != nil {
+		return fmt.Errorf("render workspace config: %w", err)
+	}
 	f, err := os.OpenFile(c.ConfigPath, os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		return fmt.Errorf("open config file: %w", err)
 	}
 	defer f.Close()
-	if _, err := fmt.Fprintf(f, "version: 1\nacme_email: %s\n", email); err != nil {
+	if _, err := f.Write(content); err != nil {
 		return fmt.Errorf("store ACME email: %w", err)
 	}
 	c.ACMEEmail = email

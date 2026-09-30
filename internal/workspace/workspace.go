@@ -2,12 +2,14 @@
 package workspace
 
 import (
+	_ "embed"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/state"
+	"github.com/AustinOyugi/no-oops-ops/internal/templateutil"
 )
 
 const (
@@ -15,29 +17,8 @@ const (
 	ConfigName = "config.yml"
 )
 
-const initialAppsCatalog = `version: %s
-
-settings:
-  upgrade:
-    repository: AustinOyugi/no-oops-ops
-  platform:
-    network:
-      name: noops-platform
-    registry:
-      name: noops-registry
-      port: 5000
-    ingress:
-      name: noops-nginx
-      http_port: 80
-      https_port: 443
-      # Enable only when every public ingress hostname is Cloudflare-proxied.
-      cloudflare: false
-    networks:
-      default: "noops-{environment}"
-      environments: {}
-
-apps: {}
-`
+//go:embed templates/apps.yml.tmpl
+var initialAppsCatalog string
 
 // Paths identifies the only runtime locations No Oops may write to.
 type Paths struct {
@@ -61,7 +42,11 @@ func Initialize(root, noopsVersion string) (Paths, error) {
 	}
 	configPath := filepath.Join(paths.Store, ConfigName)
 	if _, err := os.Stat(configPath); errors.Is(err, os.ErrNotExist) {
-		if err := state.WriteFile(configPath, []byte("version: 1\n"), 0o600); err != nil {
+		content, err := RenderConfig("")
+		if err != nil {
+			return Paths{}, err
+		}
+		if err := state.WriteFile(configPath, content, 0o600); err != nil {
 			return Paths{}, fmt.Errorf("write workspace config %q: %w", configPath, err)
 		}
 	} else if err != nil {
@@ -69,7 +54,11 @@ func Initialize(root, noopsVersion string) (Paths, error) {
 	}
 	appsPath := filepath.Join(paths.Root, "apps.yml")
 	if _, err := os.Stat(appsPath); errors.Is(err, os.ErrNotExist) {
-		if err := state.WriteFile(appsPath, []byte(fmt.Sprintf(initialAppsCatalog, noopsVersion)), 0o600); err != nil {
+		content, err := templateutil.Render("apps.yml.tmpl", initialAppsCatalog, struct{ Version string }{noopsVersion})
+		if err != nil {
+			return Paths{}, err
+		}
+		if err := state.WriteFile(appsPath, content, 0o600); err != nil {
 			return Paths{}, fmt.Errorf("write app catalog %q: %w", appsPath, err)
 		}
 	} else if err != nil {
@@ -112,4 +101,12 @@ func resolve(root string) (Paths, error) {
 	}
 	store := filepath.Join(abs, DirName)
 	return Paths{Root: abs, Store: store, StateDir: filepath.Join(store, "state"), DataDir: filepath.Join(store, "data")}, nil
+}
+
+//go:embed templates/config.yml.tmpl
+var workspaceConfigTemplate string
+
+// RenderConfig generates the workspace settings file without changing its schema.
+func RenderConfig(email string) ([]byte, error) {
+	return templateutil.Render("config.yml.tmpl", workspaceConfigTemplate, struct{ ACMEEmail string }{email})
 }

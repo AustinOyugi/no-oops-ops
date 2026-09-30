@@ -1,0 +1,1 @@
+printf '%s %s HTTP/1.1\r\nHost: 127.0.0.1\r\nAccept: %s\r\nConnection: close\r\n\r\n' "$1" "$2" "$3" | nc -w 10 127.0.0.1 5000

@@ -14,6 +14,7 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"github.com/AustinOyugi/no-oops-ops/internal/secret"
+	"github.com/AustinOyugi/no-oops-ops/internal/templateutil"
 )
 
 type Service struct {
@@ -72,7 +73,11 @@ func (s *Service) buildPulledImage(ctx context.Context, targetImage, sourceImage
 	}(contextDir)
 
 	dockerfile := filepath.Join(contextDir, "Dockerfile")
-	if err := os.WriteFile(dockerfile, []byte(fmt.Sprintf("FROM %s\n", sourceImage)), 0o600); err != nil {
+	content, err := templateutil.Dockerfile(sourceImage, false)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(dockerfile, content, 0o600); err != nil {
 		return fmt.Errorf("write temporary Dockerfile: %w", err)
 	}
 

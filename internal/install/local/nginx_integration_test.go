@@ -72,7 +72,10 @@ func TestNginxDockerMigrationAndAtomicConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	content := nginxconfig.Wrap(body)
+	content, err := nginxconfig.Render(nginxconfig.Data{HTTPConfig: string(body)})
+	if err != nil {
+		t.Fatal(err)
+	}
 	main := filepath.Join(h.nginxDir(), "nginx.conf")
 	if err := state.WriteFile(main, content, 0600); err != nil {
 		t.Fatal(err)
@@ -92,7 +95,10 @@ func TestNginxDockerMigrationAndAtomicConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	updated := nginxconfig.Wrap(body)
+	updated, err := nginxconfig.Render(nginxconfig.Data{HTTPConfig: string(body)})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := state.WriteFile(main, updated, 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +108,11 @@ func TestNginxDockerMigrationAndAtomicConfig(t *testing.T) {
 	}
 	must("exec", name+"-nginx", "nginx", "-c", nginxconfig.ContainerPath, "-s", "reload")
 	invalid := filepath.Join(h.nginxDir(), "invalid.conf")
-	if err := state.WriteFile(invalid, nginxconfig.Wrap([]byte("server { listen 80 default_server; }\nserver { listen 80 default_server; }")), 0600); err != nil {
+	invalidContent, err := nginxconfig.Render(nginxconfig.Data{HTTPConfig: "server { listen 80 default_server; }\nserver { listen 80 default_server; }"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := state.WriteFile(invalid, invalidContent, 0600); err != nil {
 		t.Fatal(err)
 	}
 	output, err := docker("exec", name+"-nginx", "nginx", "-c", "/etc/noops/nginx/invalid.conf", "-t")

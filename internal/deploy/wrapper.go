@@ -12,6 +12,7 @@ import (
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
+	"github.com/AustinOyugi/no-oops-ops/internal/templateutil"
 )
 
 type ImageMetadata struct {
@@ -144,8 +145,8 @@ func wrappedImageRef(cfg config.Config, applicationImage, applicationName string
 	return fmt.Sprintf("127.0.0.1:%s/%s:%x", cfg.RegistryPort, applicationName, sum[:12])
 }
 
-func wrappedImageDockerfile(applicationImage string) string {
-	return fmt.Sprintf("FROM %s\nCOPY bootstrap.sh /bootstrap.sh\n", applicationImage)
+func wrappedImageDockerfile(applicationImage string) ([]byte, error) {
+	return templateutil.Dockerfile(applicationImage, true)
 }
 
 func (s *Service) buildWrappedImage(ctx context.Context, applicationImage, applicationName string) (string, error) {
@@ -161,7 +162,11 @@ func (s *Service) buildWrappedImage(ctx context.Context, applicationImage, appli
 	}(contextDir)
 
 	dockerfilePath := filepath.Join(contextDir, "Dockerfile")
-	if err := os.WriteFile(dockerfilePath, []byte(wrappedImageDockerfile(applicationImage)), 0o644); err != nil {
+	dockerfile, err := wrappedImageDockerfile(applicationImage)
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(dockerfilePath, dockerfile, 0o644); err != nil {
 		return "", fmt.Errorf("write wrapper Dockerfile: %w", err)
 	}
 

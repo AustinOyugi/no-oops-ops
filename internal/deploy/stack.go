@@ -8,6 +8,7 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 	"github.com/AustinOyugi/no-oops-ops/internal/state"
+	"github.com/AustinOyugi/no-oops-ops/internal/templateutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -141,14 +142,11 @@ func writeEnvMap(cfg config.Config, appName string, environment string, values m
 
 	path := envPath(cfg, appName, environment)
 
-	var out bytes.Buffer
-	for key, value := range values {
-		if _, err := fmt.Fprintf(&out, "%s=%s\n", key, value); err != nil {
-			return "", fmt.Errorf("render env file %q: %w", path, err)
-		}
+	content, err := templateutil.Environment(values, false)
+	if err != nil {
+		return "", fmt.Errorf("render env file %q: %w", path, err)
 	}
-
-	if err := state.WriteFile(path, out.Bytes(), envFileMode); err != nil {
+	if err := state.WriteFile(path, content, envFileMode); err != nil {
 		return "", fmt.Errorf("write env file %q: %w", path, err)
 	}
 

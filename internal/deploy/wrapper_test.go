@@ -121,7 +121,11 @@ func TestBuildWrapperConfigRejectsMissingExecutionContract(t *testing.T) {
 }
 
 func TestWrappedImageDockerfileUsesApplicationImageAsBase(t *testing.T) {
-	got := wrappedImageDockerfile("registry/app:v1")
+	rendered, err := wrappedImageDockerfile("registry/app:v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(rendered)
 	if !strings.Contains(got, "FROM registry/app:v1") || !strings.Contains(got, "COPY bootstrap.sh /bootstrap.sh") {
 		t.Fatalf("unexpected Dockerfile:\n%s", got)
 	}

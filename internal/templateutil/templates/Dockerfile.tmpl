@@ -1,0 +1,3 @@
+FROM {{.Image}}
+{{if .Bootstrap}}COPY bootstrap.sh /bootstrap.sh
+{{end}}

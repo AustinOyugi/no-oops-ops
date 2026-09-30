@@ -1,15 +1,15 @@
 package release
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 	"github.com/AustinOyugi/no-oops-ops/internal/state"
+	"github.com/AustinOyugi/no-oops-ops/internal/templateutil"
 )
 
 // materializeBuildEnvironment writes ordinary resolved values to the requested
@@ -36,10 +36,20 @@ func materializeBuildEnvironment(contextDir string, settings *manifest.EnvBuild,
 		return nil, err
 	}
 
-	if err := state.WriteFile(target, renderDotenv(values), 0o600); err != nil {
+	dotenv, err := templateutil.Environment(values, true)
+	if err != nil {
+		return nil, err
+	}
+	ignore, err := templateutil.Render("dockerignore.tmpl", dockerignoreTemplate, struct {
+		Previous string
+		Include  string
+	}{string(ignoreState.data), filepath.ToSlash(relative)})
+	if err != nil {
+		return nil, err
+	}
+	if err := state.WriteFile(target, dotenv, 0o600); err != nil {
 		return nil, fmt.Errorf("write build environment file %q: %w", target, err)
 	}
-	ignore := append(ignoreState.data, []byte("\n!"+filepath.ToSlash(relative)+"\n")...)
 	if err := state.WriteFile(ignorePath, ignore, 0o600); err != nil {
 		_ = restoreFile(target, targetState)
 		return nil, fmt.Errorf("update build ignore file %q: %w", ignorePath, err)
@@ -108,19 +118,5 @@ func buildEnvironmentPath(contextDir, name string) (string, string, error) {
 	return filepath.Join(contextDir, relative), relative, nil
 }
 
-func renderDotenv(values map[string]string) []byte {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	var out strings.Builder
-	for _, key := range keys {
-		out.WriteString(key)
-		out.WriteByte('=')
-		out.WriteString(strconv.Quote(values[key]))
-		out.WriteByte('\n')
-	}
-	return []byte(out.String())
-}
+//go:embed templates/dockerignore.tmpl
+var dockerignoreTemplate string

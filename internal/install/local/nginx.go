@@ -78,12 +78,16 @@ func (h *Host) WriteNginxStack(ctx context.Context) error {
 			return install.PrerequisiteError{Check: install.StepWriteNginxStack, Err: fmt.Errorf("create nginx certificate directory %q: %w", certificatePath, err)}
 		}
 	}
+	defaultConfig, err := renderTemplate("nginx-default.conf.tmpl", defaultNginxConfig, nil)
+	if err != nil {
+		return err
+	}
 	_, defaultErr := os.Stat(filepath.Join(h.nginxConfigDir(), "default.conf"))
 	if defaultErr != nil && !os.IsNotExist(defaultErr) {
 		return fmt.Errorf("inspect nginx default config: %w", defaultErr)
 	}
 	if _, err := os.Stat(h.nginxConfigPath()); os.IsNotExist(err) && os.IsNotExist(defaultErr) {
-		if err := state.WriteFile(h.nginxConfigPath(), []byte(defaultNginxConfig), installMetadataFileMode); err != nil {
+		if err := state.WriteFile(h.nginxConfigPath(), defaultConfig, installMetadataFileMode); err != nil {
 			return install.PrerequisiteError{Check: install.StepWriteNginxStack, Err: fmt.Errorf("write nginx config %q: %w", h.nginxConfigPath(), err)}
 		}
 	} else if err != nil && !os.IsNotExist(err) {
@@ -97,7 +101,7 @@ func (h *Host) WriteNginxStack(ctx context.Context) error {
 		if err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("read legacy nginx config: %w", err)
 		}
-		if string(legacy) == defaultNginxConfig {
+		if string(legacy) == string(defaultConfig) {
 			if err := os.Remove(h.nginxConfigPath()); err != nil {
 				return fmt.Errorf("remove duplicate bootstrap nginx config: %w", err)
 			}
@@ -108,7 +112,11 @@ func (h *Host) WriteNginxStack(ctx context.Context) error {
 	// route snippets. Subsequent route updates replace only this main file.
 	mainPath := filepath.Join(h.nginxDir(), "nginx.conf")
 	if _, err := os.Stat(mainPath); os.IsNotExist(err) {
-		if err := state.WriteFile(mainPath, nginxconfig.Wrap([]byte("include /etc/nginx/conf.d/*.conf;\n")), installMetadataFileMode); err != nil {
+		mainConfig, err := nginxconfig.Render(nginxconfig.Data{Legacy: true})
+		if err != nil {
+			return err
+		}
+		if err := state.WriteFile(mainPath, mainConfig, installMetadataFileMode); err != nil {
 			return err
 		}
 	} else if err != nil {
@@ -179,19 +187,8 @@ func (h *Host) ingressNetworks(ctx context.Context) ([]string, error) {
 
 const internalIngressHost = "ingress.noops.internal"
 
-const defaultNginxConfig = `server {
-  listen 80 default_server;
-  listen [::]:80 default_server;
-  server_name _;
-
-  location = /__noops/health {
-    add_header Content-Type text/plain;
-    return 200 'ok\n';
-  }
-
-  location / { return 404; }
-}
-`
+//go:embed templates/nginx-default.conf.tmpl
+var defaultNginxConfig string
 
 func (h *Host) InspectNginxService(ctx context.Context) error {
 	result, err := h.runner.Run(ctx, "docker", []string{"service", "inspect", h.nginxService}, command.RunOptions{})

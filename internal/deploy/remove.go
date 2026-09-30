@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"github.com/AustinOyugi/no-oops-ops/internal/release"
+	"github.com/AustinOyugi/no-oops-ops/internal/templateutil"
 )
 
 type RemoveResult struct {
@@ -198,9 +200,12 @@ func (c *registryDockerClient) request(ctx context.Context, method, path, accept
 		}
 	}
 
-	const script = `printf '%s %s HTTP/1.1\r\nHost: 127.0.0.1\r\nAccept: %s\r\nConnection: close\r\n\r\n' "$1" "$2" "$3" | nc -w 10 127.0.0.1 5000`
+	script, err := templateutil.Render("registry-request.sh.tmpl", registryRequestTemplate, nil)
+	if err != nil {
+		return "", err
+	}
 	result, err := c.runner.Run(ctx, "docker", []string{
-		"exec", c.containerID, "/bin/sh", "-c", script, "noops-registry-request", method, path, accept,
+		"exec", c.containerID, "/bin/sh", "-c", string(script), "noops-registry-request", method, path, accept,
 	}, command.RunOptions{})
 	if err != nil {
 		return "", fmt.Errorf("request registry API: %w: %s", err, strings.TrimSpace(string(result.Output)))
@@ -322,3 +327,6 @@ func registryReference(baseURL, ref string) (string, string, error) {
 	}
 	return name[:index], name[index+1:], nil
 }
+
+//go:embed templates/registry-request.sh.tmpl
+var registryRequestTemplate string

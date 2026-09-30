@@ -17,6 +17,7 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/nginxconfig"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"github.com/AustinOyugi/no-oops-ops/internal/state"
+	"github.com/AustinOyugi/no-oops-ops/internal/templateutil"
 )
 
 const (
@@ -246,8 +247,13 @@ func (s *Service) writeConfig(ctx context.Context, routes []Route) error {
 	if err != nil {
 		return err
 	}
+	data := nginxconfig.Data{HTTPConfig: string(body)}
 	if s.config.NginxCloudflare {
-		body = append([]byte(cloudflareRealIPConfig+"\n"), body...)
+		cloudflare, err := templateutil.Render("cloudflare.conf.tmpl", cloudflareRealIPConfig, nil)
+		if err != nil {
+			return err
+		}
+		data.CloudflareConfig = string(cloudflare)
 	}
 	// Preserve user-owned snippets, while excluding legacy managed files.
 	entries, err := os.ReadDir(s.configDir())
@@ -262,7 +268,7 @@ func (s *Service) writeConfig(ctx context.Context, routes []Route) error {
 		case "routes.conf", "default.conf", "external.conf", "internal.conf", "cloudflare.conf":
 			continue
 		}
-		body = append(body, []byte(fmt.Sprintf("\ninclude %q;\n", "/etc/nginx/conf.d/"+entry.Name()))...)
+		data.Includes = append(data.Includes, "/etc/nginx/conf.d/"+entry.Name())
 	}
 	candidate, err := os.CreateTemp(s.ingressDir(), ".candidate-*.conf")
 	if err != nil {
@@ -271,7 +277,10 @@ func (s *Service) writeConfig(ctx context.Context, routes []Route) error {
 	path := candidate.Name()
 	candidate.Close()
 	defer os.Remove(path)
-	content := nginxconfig.Wrap(body)
+	content, err := nginxconfig.Render(data)
+	if err != nil {
+		return err
+	}
 	if err := atomicWrite(path, content); err != nil {
 		return err
 	}

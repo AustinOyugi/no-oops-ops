@@ -11,8 +11,8 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/state"
 )
 
-//go:embed assets/registry-config.yml
-var registryConfigContents []byte
+//go:embed templates/registry-config.yml.tmpl
+var registryConfigContents string
 
 //go:embed templates/registry-stack.yml.tmpl
 var registryStackTemplateContents string
@@ -53,7 +53,11 @@ func (h *Host) WriteRegistryConfig(ctx context.Context) error {
 		}
 	}
 
-	if err := state.WriteFile(path, registryConfigContents, installMetadataFileMode); err != nil {
+	content, err := renderTemplate("registry-config.yml.tmpl", registryConfigContents, nil)
+	if err != nil {
+		return err
+	}
+	if err := state.WriteFile(path, content, installMetadataFileMode); err != nil {
 		return install.PrerequisiteError{
 			Check: install.StepWriteRegistryConfig,
 			Err:   fmt.Errorf("write registry config %q: %w", path, err),
