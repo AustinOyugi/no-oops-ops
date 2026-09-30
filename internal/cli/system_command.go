@@ -46,6 +46,6 @@ func newCleanupCommand(ctx context.Context, rt *runtime) *cobra.Command {
 	})
 	cmd.Flags().BoolVar(&apply, "apply", false, "Apply cleanup")
 	cmd.Flags().BoolVar(&orphaned, "orphaned", false, "Include orphaned app environments")
-	cmd.Flags().IntVar(&keep, "keep", 2, "Number of records to retain")
+	cmd.Flags().IntVar(&keep, "keep", cleanup.DefaultKeep, "Number of records to retain")
 	return cmd
 }

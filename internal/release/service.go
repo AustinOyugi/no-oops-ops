@@ -18,10 +18,11 @@ import (
 )
 
 type Service struct {
-	logger  *slog.Logger
-	config  config.Config
-	runner  *command.Runner
-	secrets *secret.Service
+	logger       *slog.Logger
+	config       config.Config
+	runner       *command.Runner
+	secrets      *secret.Service
+	afterRelease func(context.Context, Result) error
 }
 
 func NewService(logger *slog.Logger, cfg config.Config) *Service {
@@ -33,7 +34,29 @@ func NewService(logger *slog.Logger, cfg config.Config) *Service {
 	}
 }
 
-func (s *Service) Run(ctx context.Context, environment string, path string) (Result, error) {
+// SetAfterRelease installs a synchronous retention job. It runs after release
+// locks are released and only once the image and metadata were saved.
+func (s *Service) SetAfterRelease(job func(context.Context, Result) error) { s.afterRelease = job }
+
+func (s *Service) Run(ctx context.Context, environment, path string) (Result, error) {
+	result, err := s.runLocked(ctx, environment, path)
+	if err != nil {
+		return result, err
+	}
+	s.completeRelease(ctx, result)
+	return result, nil
+}
+
+func (s *Service) completeRelease(ctx context.Context, result Result) {
+	if s.afterRelease == nil || !result.Pushed {
+		return
+	}
+	if err := s.afterRelease(ctx, result); err != nil {
+		s.logger.WarnContext(ctx, "release completed but automatic cleanup failed", "app", result.Manifest.Name, "environment", result.Environment, "tag", result.Tag, "error", err)
+	}
+}
+
+func (s *Service) runLocked(ctx context.Context, environment string, path string) (Result, error) {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return Result{}, fmt.Errorf("resolve manifest path %q: %w", path, err)

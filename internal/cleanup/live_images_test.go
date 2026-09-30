@@ -1,6 +1,12 @@
 package cleanup
 
-import "testing"
+import (
+	"context"
+	"github.com/AustinOyugi/no-oops-ops/internal/config"
+	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
+	"strings"
+	"testing"
+)
 
 func TestTerminalTaskState(t *testing.T) {
 	if terminalTaskState("Running 12 seconds ago") {
@@ -24,4 +30,33 @@ func TestLocalImageInUse(t *testing.T) {
 	if !localImageInUse("conflict: unable to delete image (must be forced) - container abc is using its referenced image def") {
 		t.Fatal("container image conflict should be a non-fatal cache cleanup result")
 	}
+}
+
+func TestLiveInventoryProtectsSwarmRollbackImage(t *testing.T) {
+	s := NewService(nil, config.Config{})
+	s.runner = inventoryRunner{}
+	live, err := s.liveServices(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, image := range []string{"registry/api:current", "registry/api:previous"} {
+		if _, ok := live.images[image]; !ok {
+			t.Fatalf("unprotected image %s: %#v", image, live)
+		}
+	}
+}
+
+type inventoryRunner struct{}
+
+func (inventoryRunner) Run(_ context.Context, _ string, args []string, _ command.RunOptions) (command.Result, error) {
+	output := ""
+	switch {
+	case args[1] == "ls":
+		output = "service-id"
+	case args[1] == "inspect" && strings.Contains(args[3], "PreviousSpec"):
+		output = "registry/api:previous"
+	case args[1] == "inspect":
+		output = "prod-api|registry/api:current"
+	}
+	return command.Result{Output: []byte(output)}, nil
 }

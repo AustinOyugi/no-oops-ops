@@ -14,6 +14,12 @@ import (
 // determine image liveness. A service name is reused as an app is upgraded,
 // so it cannot identify a particular deployed version.
 func (s *Service) plan(live liveInventory, keep int, orphanedOnly bool) (Plan, error) {
+	return s.planOptions(live, Options{Keep: keep, Orphaned: orphanedOnly})
+}
+
+func (s *Service) planOptions(live liveInventory, options Options) (Plan, error) {
+	keep, orphanedOnly := options.Keep, options.Orphaned
+	protectedLocal := make(map[string]struct{})
 	protected := make(map[string]struct{}, len(live.images))
 	protectedImages := make(map[string]struct{}, len(live.images))
 	for image := range live.images {
@@ -51,10 +57,23 @@ func (s *Service) plan(live liveInventory, keep int, orphanedOnly bool) (Plan, e
 			if err != nil {
 				return plan, err
 			}
+			if options.App != "" && (app.Name() != options.App || env.Name() != options.Environment) {
+				for _, item := range releases {
+					protectedLocal[item.Image] = struct{}{}
+					protected[imageKey(item.RegistryImage)] = struct{}{}
+					protectedImages[item.RegistryImage] = struct{}{}
+				}
+				for _, item := range deployments {
+					protected[imageKey(item.ReleaseImage)] = struct{}{}
+					protectedImages[item.ReleaseImage] = struct{}{}
+				}
+				continue
+			}
 			orphaned := orphanedOnly && !hasLiveDeployment(deployments, live.services)
 			if !orphaned {
 				for i, item := range releases {
 					if i < keep {
+						protectedLocal[item.Image] = struct{}{}
 						protected[imageKey(item.RegistryImage)] = struct{}{}
 						protectedImages[item.RegistryImage] = struct{}{}
 					}
@@ -62,18 +81,24 @@ func (s *Service) plan(live liveInventory, keep int, orphanedOnly bool) (Plan, e
 			}
 			success := successfulDeployments(deployments)
 			for i, d := range success {
-				if !orphaned && i < keep {
+				if !options.ReleaseRetention && !orphaned && i < keep {
 					protected[imageKey(d.ReleaseImage)] = struct{}{}
 					protectedImages[d.ReleaseImage] = struct{}{}
 				}
 			}
 			for _, item := range releases {
 				_, protectedImage := protected[imageKey(item.RegistryImage)]
+				if protectedImage {
+					protectedLocal[item.Image] = struct{}{}
+				}
 				if orphaned || !protectedImage {
 					plan.ReleasePaths = append(plan.ReleasePaths, filepath.Join(dir, "releases", item.Tag+".json"))
 					if !orphaned && !protectedImage && item.RegistryImage != "" {
 						plan.Images = append(plan.Images, item.RegistryImage)
 						plan.LocalImages = append(plan.LocalImages, item.RegistryImage)
+						if options.ReleaseRetention && item.Image != "" {
+							plan.LocalImages = append(plan.LocalImages, item.Image)
+						}
 					}
 				}
 			}
@@ -87,6 +112,24 @@ func (s *Service) plan(live liveInventory, keep int, orphanedOnly bool) (Plan, e
 				}
 			}
 		}
+	}
+	if options.App != "" {
+		images := plan.Images[:0]
+		for _, image := range plan.Images {
+			if _, ok := protected[imageKey(image)]; !ok {
+				images = append(images, image)
+			}
+		}
+		plan.Images = images
+		locals := plan.LocalImages[:0]
+		for _, image := range plan.LocalImages {
+			_, protectedImage := protected[imageKey(image)]
+			_, protectedAlias := protectedLocal[image]
+			if !protectedImage && !protectedAlias {
+				locals = append(locals, image)
+			}
+		}
+		plan.LocalImages = locals
 	}
 	plan.Images = uniqueStrings(plan.Images)
 	plan.LocalImages = uniqueStrings(plan.LocalImages)

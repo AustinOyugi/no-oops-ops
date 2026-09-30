@@ -31,6 +31,15 @@ func (s *Service) liveServices(ctx context.Context) (liveInventory, error) {
 		result.services[name] = struct{}{}
 		result.images[image] = struct{}{}
 
+		// Swarm can still roll back to PreviousSpec even after those tasks
+		// have stopped. Retention must protect that image as well.
+		previous, err := s.runner.Run(ctx, "docker", []string{"service", "inspect", "--format", "{{if .PreviousSpec}}{{.PreviousSpec.TaskTemplate.ContainerSpec.Image}}{{end}}", id}, command.RunOptions{})
+		if err != nil {
+			return liveInventory{}, fmt.Errorf("inspect rollback image for service %q: %w", id, err)
+		}
+		if image := strings.TrimSpace(string(previous.Output)); image != "" {
+			result.images[image] = struct{}{}
+		}
 		// During a rolling update the service spec has the new image while old
 		// tasks may still be running. Protect every non-terminal task image.
 		tasks, err := s.runner.Run(ctx, "docker", []string{"service", "ps", "--no-trunc", "--format", "{{.CurrentState}}|{{.Image}}", id}, command.RunOptions{})

@@ -4,6 +4,7 @@ package cleanup
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -16,10 +17,15 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/state"
 )
 
+const DefaultKeep = 3
+
 type Options struct {
-	Apply    bool
-	Keep     int
-	Orphaned bool
+	Apply            bool
+	Keep             int
+	Orphaned         bool
+	App              string
+	Environment      string
+	ReleaseRetention bool
 }
 type Plan struct {
 	ReleasePaths, DeploymentPaths, Images, LocalImages, ProtectedImages []string
@@ -28,7 +34,11 @@ type Plan struct {
 type Service struct {
 	logger *slog.Logger
 	cfg    config.Config
-	runner *command.Runner
+	runner commandRunner
+}
+
+type commandRunner interface {
+	Run(context.Context, string, []string, command.RunOptions) (command.Result, error)
 }
 
 func NewService(logger *slog.Logger, cfg config.Config) *Service {
@@ -36,6 +46,12 @@ func NewService(logger *slog.Logger, cfg config.Config) *Service {
 }
 
 func (s *Service) Run(ctx context.Context, options Options) (Plan, error) {
+	if (options.App == "") != (options.Environment == "") {
+		return Plan{}, fmt.Errorf("cleanup app and environment must be supplied together")
+	}
+	if options.ReleaseRetention && options.App == "" {
+		return Plan{}, fmt.Errorf("automatic retention requires an app and environment")
+	}
 	if options.Keep < 0 {
 		return Plan{}, fmt.Errorf("keep must be zero or greater")
 	}
@@ -94,9 +110,14 @@ func (s *Service) buildPlan(ctx context.Context, options Options) (Plan, error) 
 	if err != nil {
 		return Plan{}, err
 	}
-	plan, err := s.plan(live, options.Keep, options.Orphaned)
+	plan, err := s.planOptions(live, options)
 	if err != nil {
 		return plan, err
+	}
+	// Scoped retention deletes only recorded builds for this app/environment;
+	// global registry inventory includes unrelated and unfinished releases.
+	if options.App != "" {
+		return plan, nil
 	}
 	client := s.registryClient()
 	if err := client.addRegistryCandidates(ctx, &plan); err != nil {
@@ -121,12 +142,23 @@ func (s *Service) removeLocalImage(ctx context.Context, image string) error {
 func localImageInUse(output string) bool {
 	return strings.Contains(output, "conflict: unable to delete") && strings.Contains(output, "is using its referenced image")
 }
-func (s *Service) garbageCollect(ctx context.Context) error {
+func (s *Service) garbageCollect(ctx context.Context) (operationErr error) {
 	service := s.cfg.RegistryName + "_registry"
+	defer func() {
+		restoreCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 45*time.Second)
+		defer cancel()
+		result, err := s.runner.Run(restoreCtx, "docker", []string{"service", "scale", service + "=1"}, command.RunOptions{LogCommand: true})
+		if err != nil {
+			operationErr = errors.Join(operationErr, fmt.Errorf("restart registry after cleanup: %w: %s", err, result.Output))
+			return
+		}
+		if err := s.waitForRegistry(restoreCtx); err != nil {
+			operationErr = errors.Join(operationErr, err)
+		}
+	}()
 	if _, err := s.runner.Run(ctx, "docker", []string{"service", "scale", service + "=0"}, command.RunOptions{LogCommand: true}); err != nil {
 		return err
 	}
-	defer s.runner.Run(context.Background(), "docker", []string{"service", "scale", service + "=1"}, command.RunOptions{LogCommand: true})
 	for i := 0; i < 60; i++ {
 		out, err := s.runner.Run(ctx, "docker", []string{"ps", "-q", "--filter", "name=" + service}, command.RunOptions{})
 		if err != nil {
@@ -143,4 +175,21 @@ func (s *Service) garbageCollect(ctx context.Context) error {
 		}
 	}
 	return fmt.Errorf("timed out waiting for registry service to stop")
+}
+
+// Wait for the registry API before a release --deploy or subsequent release
+// continues; scaling the service up alone does not mean it is ready to serve.
+func (s *Service) waitForRegistry(ctx context.Context) error {
+	for {
+		client := s.registryClient()
+		response, err := client.request(ctx, "GET", "/v2/", "application/json")
+		if err == nil && strings.Contains(response, " 200 ") {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("registry did not become ready after cleanup: %w", ctx.Err())
+		case <-time.After(time.Second):
+		}
+	}
 }

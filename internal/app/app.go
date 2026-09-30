@@ -67,7 +67,7 @@ func New(cfg config.Config) (*App, error) {
 		return nil, err
 	}
 
-	return &App{
+	application := &App{
 		logger:      logger,
 		config:      cfg,
 		installer:   installer,
@@ -78,5 +78,7 @@ func New(cfg config.Config) (*App, error) {
 		status:      status.NewService(logger, cfg, localHost),
 		secrets:     secret.NewService(logger, cfg),
 		cleaner:     cleanup.NewService(logger, cfg),
-	}, nil
+	}
+	application.releaser.SetAfterRelease(application.retainReleaseBuilds)
+	return application, nil
 }

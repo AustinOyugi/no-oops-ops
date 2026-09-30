@@ -11,7 +11,7 @@ import (
 )
 
 type registryClient struct {
-	runner             *command.Runner
+	runner             commandRunner
 	service, container string
 	port               string
 }
