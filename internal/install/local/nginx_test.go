@@ -2,7 +2,6 @@ package local
 
 import (
 	"context"
-	"errors"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"log/slog"
 	"os"
@@ -96,12 +95,31 @@ func TestWriteNginxStackPreservesInstalledRoutesAndNetworks(t *testing.T) {
 	}
 }
 
-type invalidNginxRunner struct{ calls [][]string }
+type invalidNginxRunner struct {
+	calls [][]string
+	valid bool
+}
 
 func (r *invalidNginxRunner) Run(_ context.Context, name string, args []string, _ command.RunOptions) (command.Result, error) {
 	r.calls = append(r.calls, append([]string{name}, args...))
-	return command.Result{Output: []byte("duplicate default server in routes.conf:2")}, errors.New("exit status 1")
+	if args[0] == "info" {
+		return command.Result{Output: []byte("node-id")}, nil
+	}
+	if args[0] == "service" && args[1] == "inspect" {
+		return command.Result{Output: []byte("[]")}, nil
+	}
+	if args[0] == "service" && args[1] == "ps" {
+		if r.valid {
+			return command.Result{Output: []byte("Complete 1 second ago|")}, nil
+		}
+		return command.Result{Output: []byte("Failed 1 second ago|task: non-zero exit (1)")}, nil
+	}
+	if args[0] == "service" && args[1] == "logs" {
+		return command.Result{Output: []byte("duplicate default server in routes.conf:2")}, nil
+	}
+	return command.Result{}, nil
 }
+
 func TestEnsureNginxRejectsInvalidConfigBeforeDeploy(t *testing.T) {
 	r := &invalidNginxRunner{}
 	h := &Host{runner: r, logger: slog.Default(), stateDir: t.TempDir(), dataDir: t.TempDir()}
@@ -109,13 +127,26 @@ func TestEnsureNginxRejectsInvalidConfigBeforeDeploy(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "duplicate default server") {
 		t.Fatalf("error = %v", err)
 	}
-	if len(r.calls) != 1 || r.calls[0][1] != "run" {
-		t.Fatalf("unexpected commands: %v", r.calls)
+	var validated bool
+	for _, call := range r.calls {
+		if call[1] == "stack" {
+			t.Fatalf("stack changed after validation failure: %v", r.calls)
+		}
+		if len(call) > 2 && call[1] == "service" && call[2] == "create" {
+			validated = call[len(call)-1] == "-t"
+			if !strings.Contains(strings.Join(call, " "), "--mode replicated-job") {
+				t.Fatalf("validation cannot join overlay networks: %v", call)
+			}
+		}
 	}
-	args := r.calls[0]
-	if args[len(args)-1] != "-t" {
-		t.Fatalf("missing config check: %v", args)
+	if !validated {
+		t.Fatalf("missing validation: %v", r.calls)
 	}
+	last := r.calls[len(r.calls)-1]
+	if last[1] != "service" || last[2] != "rm" {
+		t.Fatalf("job not cleaned up: %v", last)
+	}
+
 }
 
 type installedNetworkRunner struct{}
@@ -125,4 +156,33 @@ func (*installedNetworkRunner) Run(_ context.Context, _ string, args []string, _
 		return command.Result{Output: []byte("[]")}, nil
 	}
 	return command.Result{}, nil
+}
+
+func TestNginxValidationUsesApplicationNetworksAndCleansUp(t *testing.T) {
+	r := &invalidNginxRunner{valid: true}
+	h := &Host{runner: r, logger: slog.Default(), stateDir: t.TempDir(), dataDir: t.TempDir(), networkName: "shared", nginxService: "nginx_nginx"}
+	if err := os.MkdirAll(h.nginxDir(), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(h.nginxDir(), "networks.json"), []byte(`{"prod":true,"canary":true}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.validateNginx(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	var creation string
+	for _, call := range r.calls {
+		if len(call) > 2 && call[2] == "create" {
+			creation = strings.Join(call, " ")
+		}
+	}
+	for _, want := range []string{"--network shared", "--network prod", "--network canary", "--constraint node.id=node-id"} {
+		if !strings.Contains(creation, want) {
+			t.Fatalf("missing %q: %s", want, creation)
+		}
+	}
+	last := r.calls[len(r.calls)-1]
+	if last[2] != "rm" {
+		t.Fatalf("missing cleanup: %v", last)
+	}
 }
