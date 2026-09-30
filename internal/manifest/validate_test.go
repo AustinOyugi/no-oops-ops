@@ -1,7 +1,6 @@
 package manifest
 
 import (
-	"strings"
 	"testing"
 )
 
@@ -83,16 +82,15 @@ func TestValidateRequiresSourceForBuiltImage(t *testing.T) {
 	}
 }
 
-func TestValidateRejectsMutableGitReference(t *testing.T) {
+func TestValidateAcceptsGitReferenceResolvedAtRelease(t *testing.T) {
 	m := Manifest{
 		Name: "test", Image: Image{Repository: "repo", Build: boolPtr(true)},
 		Service: Service{InternalPort: 8080}, Healthcheck: Healthcheck{Test: []string{"CMD", "true"}},
 		Source: Source{Context: ".", Dockerfile: "Dockerfile"},
 		Build:  NoOpsBuild{Source: BuildSource{Git: &GitSource{URL: "https://example.test/repo.git", Environments: map[string]GitEnvironment{"prod": {Ref: "refs/heads/main"}}}}},
 	}
-	err := m.Validate()
-	if err == nil || !strings.Contains(err.Error(), "immutable") {
-		t.Fatalf("Validate() = %v, want immutable reference error", err)
+	if err := m.Validate(); err != nil {
+		t.Fatalf("Validate() = %v, want nil", err)
 	}
 }
 

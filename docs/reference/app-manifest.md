@@ -96,9 +96,8 @@ Build resource limits are opt-in. When `resources` is omitted, No Oops passes no
 
 ## Git build contexts
 
-When `x-noops.build.source.git` is present, No Oops fetches the configured environment's repository/immutable commit
-SHA into a temporary
-workspace. Private-source tokens are mounted only into a one-shot Swarm Git-fetch task as a Swarm secret. The Compose
+When `x-noops.build.source.git` is present, No Oops fetches the configured environment's repository/ref into a temporary
+workspace and records the resolved commit SHA with the release. Private-source tokens are mounted only into a one-shot Swarm Git-fetch task as a Swarm secret. The Compose
 `build.context` and `build.dockerfile` paths are resolved from that checkout; every resulting Docker build runs in a
 one-shot Swarm build task, and no application toolchain or Git installation is required on the host.
 
@@ -113,8 +112,8 @@ x-noops:
         url: https://github.com/example/api.git
         environments:
           prod:
-            # A 40-character lowercase Git commit SHA; branch and tag refs are rejected.
-            ref: 0123456789abcdef0123456789abcdef01234567
+            # May be a branch, tag, or commit SHA. The resolved commit is recorded.
+            ref: refs/heads/main
             secret: github-readonly
     resources:
       cpus: "1.5"
@@ -125,7 +124,7 @@ x-noops:
     no-cache: true
 ```
 
-No Oops records the configured commit SHA with the release. When `x-noops.env.build.file` is configured,
+The release tag uses that resolved commit SHA together with a build-input hash. When `x-noops.env.build.file` is configured,
 ordinary values from `x-noops.env.file` are materialized into that ephemeral dotenv file before Docker builds;
 `from_secret` values remain runtime-only by default. An explicit `env.build.secrets` allow-list can make a private
 secret

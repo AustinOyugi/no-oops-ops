@@ -197,10 +197,6 @@ func (b NoOpsBuild) Validate(imageBuild bool) error {
 		if strings.TrimSpace(environment) == "" || strings.TrimSpace(settings.Ref) == "" {
 			return fmt.Errorf("x-noops.build.source.git.environments entries require an environment and ref")
 		}
-		ref := strings.TrimSpace(settings.Ref)
-		if !regexp.MustCompile(`^[0-9a-f]{40}$|^[0-9a-f]{64}$`).MatchString(ref) {
-			return fmt.Errorf("x-noops.build.source.git.environments[%q].ref must be an immutable 40- or 64-character lowercase commit SHA", environment)
-		}
 	}
 	return nil
 }
