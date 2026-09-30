@@ -3,6 +3,7 @@ package ingress
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -135,10 +136,10 @@ func TestReloadGracefullyReloadsRunningNginxContainers(t *testing.T) {
 
 	want := [][]string{
 		{"docker", "ps", "-q", "--filter", "label=com.docker.swarm.service.name=noops-nginx_nginx"},
-		{"docker", "exec", "nginx-one", "nginx", "-t"},
-		{"docker", "exec", "nginx-two", "nginx", "-t"},
-		{"docker", "exec", "nginx-one", "nginx", "-s", "reload"},
-		{"docker", "exec", "nginx-two", "nginx", "-s", "reload"},
+		{"docker", "exec", "nginx-one", "nginx", "-c", "/etc/noops/nginx/nginx.conf", "-t"},
+		{"docker", "exec", "nginx-two", "nginx", "-c", "/etc/noops/nginx/nginx.conf", "-t"},
+		{"docker", "exec", "nginx-one", "nginx", "-c", "/etc/noops/nginx/nginx.conf", "-s", "reload"},
+		{"docker", "exec", "nginx-two", "nginx", "-c", "/etc/noops/nginx/nginx.conf", "-s", "reload"},
 	}
 	if !reflect.DeepEqual(runner.calls, want) {
 		t.Fatalf("reload commands = %v, want %v", runner.calls, want)
@@ -146,15 +147,20 @@ func TestReloadGracefullyReloadsRunningNginxContainers(t *testing.T) {
 }
 
 type reloadRecordingRunner struct {
-	calls   [][]string
-	output  string
-	invalid bool
+	calls       [][]string
+	output      string
+	invalid     bool
+	failReloads int
 }
 
 func (r *reloadRecordingRunner) Run(_ context.Context, name string, args []string, _ command.RunOptions) (command.Result, error) {
 	r.calls = append(r.calls, append([]string{name}, args...))
 	if len(args) > 0 && args[0] == "ps" {
 		return command.Result{Output: []byte(r.output)}, nil
+	}
+	if args[len(args)-1] == "reload" && r.failReloads > 0 {
+		r.failReloads--
+		return command.Result{Output: []byte("reload failed")}, errors.New("exit status 1")
 	}
 	if r.invalid && args[len(args)-1] == "-t" {
 		return command.Result{Output: []byte("invalid nginx config")}, errors.New("exit status 1")
@@ -190,7 +196,14 @@ func TestReconcileRestoresRoutesAfterValidationFailure(t *testing.T) {
 	r := &reloadRecordingRunner{output: "nginx-one", invalid: true}
 	s := &Service{logger: slog.Default(), runner: r, config: config.Config{StateDir: root, DataDir: root, NginxName: "nginx"}}
 	old := []Route{{Environment: "prod", App: "api", Domain: "api.example.test", PathPrefix: "/", Service: "old-service", Port: 8080}}
-	if err := s.writeConfig(old); err != nil {
+	if err := os.MkdirAll(s.configDir(), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(s.ingressDir(), "nginx.conf"), []byte("previous complete configuration"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	r.invalid = false
+	if err := s.writeConfig(context.Background(), old); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.writeRoutes(old); err != nil {
@@ -200,10 +213,11 @@ func TestReconcileRestoresRoutesAfterValidationFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	oldConfig, err := os.ReadFile(filepath.Join(s.configDir(), "external", "api-example-test.conf"))
+	oldConfig, err := os.ReadFile(filepath.Join(s.ingressDir(), "nginx.conf"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	r.invalid = true
 	m := manifest.Manifest{Name: "api", Service: manifest.Service{InternalPort: 8080}, Expose: manifest.Expose{Enabled: true, Domain: "api.example.test", PathPrefix: "/"}}
 	if err := s.Reconcile(context.Background(), "prod", m, "deleted-candidate"); err == nil {
 		t.Fatal("expected validation failure")
@@ -212,7 +226,7 @@ func TestReconcileRestoresRoutesAfterValidationFailure(t *testing.T) {
 	if string(after) != string(before) {
 		t.Fatalf("route state changed: %s", after)
 	}
-	restored, _ := os.ReadFile(filepath.Join(s.configDir(), "external", "api-example-test.conf"))
+	restored, _ := os.ReadFile(filepath.Join(s.ingressDir(), "nginx.conf"))
 	if string(restored) != string(oldConfig) {
 		t.Fatalf("config not restored: %s", restored)
 	}
@@ -229,5 +243,155 @@ func TestEnsureNetworkRepairsStaleCache(t *testing.T) {
 	}
 	if len(r.calls) != 2 || r.calls[1][2] != "update" {
 		t.Fatalf("missing repair: %v", r.calls)
+	}
+}
+
+func TestCandidateValidationLeavesPublishedConfigUntouched(t *testing.T) {
+	root := t.TempDir()
+	r := &candidateObserver{t: t, root: root}
+	s := &Service{logger: slog.Default(), runner: r, config: config.Config{StateDir: root, DataDir: root, NginxName: "nginx"}}
+	if err := os.MkdirAll(s.configDir(), 0700); err != nil {
+		t.Fatal(err)
+	}
+	main := filepath.Join(s.ingressDir(), "nginx.conf")
+	if err := os.WriteFile(main, []byte("old complete configuration"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	legacy := filepath.Join(s.configDir(), "routes.conf")
+	if err := os.WriteFile(legacy, []byte("legacy routes retained"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(s.configDir(), "custom.conf"), []byte("server { listen 8080; }"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	routes := []Route{{Environment: "prod", App: "api", Domain: "api.example.test", PathPrefix: "/", Service: "new-service", Port: 8080}}
+	if err := s.writeConfig(context.Background(), routes); err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(main)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.checked || !strings.Contains(string(content), "new-service") || !strings.Contains(string(content), `include "/etc/nginx/conf.d/custom.conf";`) {
+		t.Fatalf("incomplete publication: %s", content)
+	}
+	unchanged, _ := os.ReadFile(legacy)
+	if string(unchanged) != "legacy routes retained" {
+		t.Fatal("legacy snippets modified")
+	}
+	candidates, _ := filepath.Glob(filepath.Join(s.ingressDir(), ".candidate-*"))
+	if len(candidates) != 0 {
+		t.Fatalf("candidate files leaked: %v", candidates)
+	}
+}
+
+type candidateObserver struct {
+	t       *testing.T
+	root    string
+	checked bool
+}
+
+func (r *candidateObserver) Run(_ context.Context, _ string, args []string, _ command.RunOptions) (command.Result, error) {
+	if args[0] == "ps" {
+		return command.Result{Output: []byte("nginx-one")}, nil
+	}
+	active, err := os.ReadFile(filepath.Join(r.root, "nginx", "nginx.conf"))
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	if string(active) != "old complete configuration" {
+		r.t.Fatal("configuration published before validation")
+	}
+	candidate, err := os.ReadFile(filepath.Join(r.root, "nginx", filepath.Base(args[len(args)-2])))
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(candidate), "user nginx;") || !strings.HasSuffix(string(candidate), "\n}\n") || !strings.Contains(string(candidate), "new-service") {
+		r.t.Fatalf("incomplete candidate: %s", candidate)
+	}
+	r.checked = true
+	return command.Result{}, nil
+}
+
+func TestReconcileRestoresRouteAfterCertificateFailure(t *testing.T) {
+	root := t.TempDir()
+	r := &reloadRecordingRunner{output: "nginx-one"}
+	s := &Service{logger: slog.Default(), runner: r, config: config.Config{StateDir: root, DataDir: root, NginxName: "nginx"}}
+	if err := os.MkdirAll(s.configDir(), 0700); err != nil {
+		t.Fatal(err)
+	}
+	main := filepath.Join(s.ingressDir(), "nginx.conf")
+	if err := os.WriteFile(main, []byte("original configuration"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	old := []Route{{Environment: "prod", App: "api", Domain: "api.example.test", PathPrefix: "/", Service: "old-service", Port: 8080}}
+	if err := s.writeRoutes(old); err != nil {
+		t.Fatal(err)
+	}
+	m := manifest.Manifest{Name: "api", Service: manifest.Service{InternalPort: 8080}, Expose: manifest.Expose{Enabled: true, TLS: true, Domain: "api.example.test", PathPrefix: "/"}}
+	err := s.Reconcile(context.Background(), "prod", m, "candidate")
+	if err == nil || !strings.Contains(err.Error(), "ACME email") {
+		t.Fatalf("error=%v", err)
+	}
+	routes, err := s.loadRoutes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(routes) != 1 || routes[0].Service != "old-service" {
+		t.Fatalf("stale candidate persisted: %v", routes)
+	}
+	data, _ := os.ReadFile(main)
+	if string(data) != "original configuration" {
+		t.Fatalf("configuration not restored: %s", data)
+	}
+	reloads := 0
+	for _, call := range r.calls {
+		if call[len(call)-1] == "reload" {
+			reloads++
+		}
+	}
+	if reloads != 2 {
+		t.Fatalf("expected candidate and restored reloads, got %d", reloads)
+	}
+}
+
+func TestReconcileRestoresAfterReloadFailure(t *testing.T) {
+	for _, failures := range []int{1, 2} {
+		t.Run(fmt.Sprint(failures), func(t *testing.T) {
+			root := t.TempDir()
+			r := &reloadRecordingRunner{output: "nginx-one", failReloads: failures}
+			s := &Service{logger: slog.Default(), runner: r, config: config.Config{StateDir: root, DataDir: root, NginxName: "nginx"}}
+			if err := os.MkdirAll(s.configDir(), 0700); err != nil {
+				t.Fatal(err)
+			}
+			main := filepath.Join(s.ingressDir(), "nginx.conf")
+			if err := os.WriteFile(main, []byte("old complete configuration"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			old := []Route{{Environment: "prod", App: "api", Domain: "api.example.test", PathPrefix: "/", Service: "old-service", Port: 8080}}
+			if err := s.writeRoutes(old); err != nil {
+				t.Fatal(err)
+			}
+			m := manifest.Manifest{Name: "api", Service: manifest.Service{InternalPort: 8080}, Expose: manifest.Expose{Enabled: true, Domain: "api.example.test", PathPrefix: "/"}}
+			err := s.Reconcile(context.Background(), "prod", m, "candidate-service")
+			if err == nil {
+				t.Fatal("expected reload error")
+			}
+			routes, loadErr := s.loadRoutes()
+			if loadErr != nil {
+				t.Fatal(loadErr)
+			}
+			if len(routes) != 1 || routes[0].Service != "old-service" {
+				t.Fatalf("stale routes: %v", routes)
+			}
+			restored, _ := os.ReadFile(main)
+			if string(restored) != "old complete configuration" {
+				t.Fatalf("config not restored: %s", restored)
+			}
+			var recovery *RecoveryError
+			if errors.As(err, &recovery) != (failures == 2) {
+				t.Fatalf("unexpected recovery status: %v", err)
+			}
+		})
 	}
 }

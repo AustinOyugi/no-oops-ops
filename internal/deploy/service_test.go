@@ -1,6 +1,10 @@
 package deploy
 
 import (
+	"context"
+	"errors"
+	"github.com/AustinOyugi/no-oops-ops/internal/ingress"
+	"strings"
 	"testing"
 )
 
@@ -27,5 +31,14 @@ prod-sample-builder-service-other_app
 		if got[i] != want[i] {
 			t.Errorf("staleAppStacks()[%d] = %q, want %q", i, got[i], want[i])
 		}
+	}
+}
+
+func TestCleanupRetainsCandidateWhenIngressRecoveryFails(t *testing.T) {
+	s := &Service{}
+	cause := &ingress.RecoveryError{Err: errors.New("reload failed")}
+	err := s.cleanupFailedCandidate(context.Background(), true, "candidate-stack", cause)
+	if !errors.Is(err, cause) || !strings.Contains(err.Error(), "retained candidate stack") {
+		t.Fatalf("error=%v", err)
 	}
 }

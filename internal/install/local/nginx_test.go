@@ -2,6 +2,7 @@ package local
 
 import (
 	"context"
+	"errors"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"log/slog"
 	"os"
@@ -12,12 +13,13 @@ import (
 
 func TestRenderNginxStack(t *testing.T) {
 	rendered, err := renderTemplate("nginx-stack.yml.tmpl", nginxStackTemplateContents, nginxStackTemplateData{
-		HTTPPort:     "8080",
-		HTTPSPort:    "8443",
-		NetworkName:  "noops-net",
-		ConfigPath:   "/var/lib/noops/nginx/conf",
-		InternalHost: "ingress.noops.internal",
-		NginxService: "noops-nginx_nginx",
+		HTTPPort:      "8080",
+		HTTPSPort:     "8443",
+		NetworkName:   "noops-net",
+		ConfigPath:    "/var/lib/noops/nginx/conf",
+		MainConfigDir: "/var/lib/noops/nginx",
+		InternalHost:  "ingress.noops.internal",
+		NginxService:  "noops-nginx_nginx",
 	})
 	if err != nil {
 		t.Fatalf("render nginx stack: %v", err)
@@ -36,8 +38,8 @@ func TestRenderNginxStack(t *testing.T) {
 		`entrypoint: ["/bin/sh", "-c"]`,
 		"command:",
 		"- >-",
-		"nginx -t || exit $?; nginx -g 'daemon off;' & nginx_pid=$!",
-		"nginx -t && nginx -s reload || true",
+		"nginx -c /etc/noops/nginx/nginx.conf -t || exit $$?; nginx -c /etc/noops/nginx/nginx.conf -g 'daemon off;' & nginx_pid=$$!",
+		"nginx -c /etc/noops/nginx/nginx.conf -t && nginx -c /etc/noops/nginx/nginx.conf -s reload || true",
 		"while :; do certbot renew --webroot --webroot-path /var/www/certbot;",
 	} {
 		if !strings.Contains(output, want) {
@@ -149,11 +151,23 @@ func TestEnsureNginxRejectsInvalidConfigBeforeDeploy(t *testing.T) {
 
 }
 
-type installedNetworkRunner struct{}
+type installedNetworkRunner struct {
+	live    bool
+	missing string
+}
 
-func (*installedNetworkRunner) Run(_ context.Context, _ string, args []string, _ command.RunOptions) (command.Result, error) {
+func (r *installedNetworkRunner) Run(_ context.Context, _ string, args []string, _ command.RunOptions) (command.Result, error) {
 	if args[0] == "service" {
+		if r.live {
+			return command.Result{Output: []byte(`[{"Target":"live-id"}]`)}, nil
+		}
 		return command.Result{Output: []byte("[]")}, nil
+	}
+	if args[0] == "network" && len(args) > 3 && args[2] == "--format" {
+		return command.Result{Output: []byte("noops-live")}, nil
+	}
+	if args[0] == "network" && args[len(args)-1] == r.missing {
+		return command.Result{Output: []byte("network " + r.missing + " not found")}, errors.New("exit status 1")
 	}
 	return command.Result{}, nil
 }
@@ -184,5 +198,27 @@ func TestNginxValidationUsesApplicationNetworksAndCleansUp(t *testing.T) {
 	last := r.calls[len(r.calls)-1]
 	if last[2] != "rm" {
 		t.Fatalf("missing cleanup: %v", last)
+	}
+}
+
+func TestWriteNginxStackPreservesLiveNetworksWithoutCache(t *testing.T) {
+	root := t.TempDir()
+	h := NewHost(slog.Default(), filepath.Join(root, "state"), filepath.Join(root, "data"), "test", "shared", "registry", "5000", "nginx", "80", "443")
+	h.runner = &installedNetworkRunner{live: true, missing: "deleted"}
+	if err := os.MkdirAll(h.nginxDir(), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(h.nginxDir(), "networks.json"), []byte(`{"deleted":true}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.WriteNginxStack(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	stack, err := os.ReadFile(h.nginxStackPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(string(stack), `"noops-live":`) != 2 || strings.Contains(string(stack), `"deleted":`) {
+		t.Fatalf("incorrect preserved networks: %s", stack)
 	}
 }

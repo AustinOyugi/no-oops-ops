@@ -8,12 +8,13 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
-        nginx -t || exit $?; nginx -g 'daemon off;' & nginx_pid=$!; while kill -0 "$nginx_pid" 2>/dev/null;
-        do sleep 5m & wait $!; nginx -t && nginx -s reload || true; done; wait "$nginx_pid"
+        nginx -c /etc/noops/nginx/nginx.conf -t || exit $$?; nginx -c /etc/noops/nginx/nginx.conf -g 'daemon off;' & nginx_pid=$$!; while kill -0 "$$nginx_pid" 2>/dev/null;
+        do sleep 5m & wait $$!; nginx -c /etc/noops/nginx/nginx.conf -t && nginx -c /etc/noops/nginx/nginx.conf -s reload || true; done; wait "$$nginx_pid"
     ports:
       - "{{ .HTTPPort }}:80"
       - "{{ .HTTPSPort }}:443"
     volumes:
+      - "{{ .MainConfigDir }}:/etc/noops/nginx:ro"
       - "{{ .ConfigPath }}:/etc/nginx/conf.d:ro"
       - "{{ .ACMEWebroot }}:/var/www/certbot:ro"
       - "{{ .CertificateDir }}:/etc/letsencrypt:ro"

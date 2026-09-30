@@ -12,6 +12,7 @@ import (
 
 	"github.com/AustinOyugi/no-oops-ops/internal/ingressnet"
 	"github.com/AustinOyugi/no-oops-ops/internal/install"
+	"github.com/AustinOyugi/no-oops-ops/internal/nginxconfig"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"github.com/AustinOyugi/no-oops-ops/internal/state"
 )
@@ -46,6 +47,7 @@ type nginxStackTemplateData struct {
 	EnvironmentNetworks    []string
 	NetworkName            string
 	ConfigPath             string
+	MainConfigDir          string
 	InternalHost           string
 	ACMEWebroot            string
 	CertificateDir         string
@@ -54,6 +56,11 @@ type nginxStackTemplateData struct {
 }
 
 func (h *Host) WriteNginxStack(ctx context.Context) error {
+	unlock, err := state.AcquireLock(ctx, filepath.Join(h.nginxDir(), "operation.lock"))
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	path := h.nginxStackPath()
 	h.logger.InfoContext(ctx, "writing nginx stack", "path", path)
 
@@ -97,6 +104,17 @@ func (h *Host) WriteNginxStack(ctx context.Context) error {
 		}
 	}
 
+	// First install migrates the complete existing config without editing its
+	// route snippets. Subsequent route updates replace only this main file.
+	mainPath := filepath.Join(h.nginxDir(), "nginx.conf")
+	if _, err := os.Stat(mainPath); os.IsNotExist(err) {
+		if err := state.WriteFile(mainPath, nginxconfig.Wrap([]byte("include /etc/nginx/conf.d/*.conf;\n")), installMetadataFileMode); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	}
+
 	environmentNetworks, err := h.ingressNetworks(ctx)
 	if err != nil {
 		return err
@@ -107,6 +125,7 @@ func (h *Host) WriteNginxStack(ctx context.Context) error {
 		HTTPSPort:              h.nginxHTTPSPort,
 		NetworkName:            h.networkName,
 		ConfigPath:             h.nginxConfigDir(),
+		MainConfigDir:          h.nginxDir(),
 		InternalHost:           internalIngressHost,
 		ACMEWebroot:            h.nginxACMEWebroot(),
 		CertificateDir:         h.nginxCertificateDir(),
@@ -183,6 +202,11 @@ func (h *Host) InspectNginxService(ctx context.Context) error {
 }
 
 func (h *Host) EnsureNginx(ctx context.Context) error {
+	unlock, err := state.AcquireLock(ctx, filepath.Join(h.nginxDir(), "operation.lock"))
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	h.logger.InfoContext(ctx, "ensuring nginx ingress", "name", h.nginxName, "http_port", h.nginxHTTPPort, "https_port", h.nginxHTTPSPort)
 	if err := h.validateNginx(ctx); err != nil {
 		return install.PrerequisiteError{Check: install.StepEnsureNginx, Err: err}

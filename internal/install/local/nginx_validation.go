@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AustinOyugi/no-oops-ops/internal/nginxconfig"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 )
 
@@ -31,14 +32,14 @@ func (h *Host) validateNginx(ctx context.Context) error {
 	}
 	name := fmt.Sprintf("noops-nginx-check-%x", nonce)
 	args := []string{"service", "create", "--detach=true", "--name", name, "--mode", "replicated-job", "--restart-condition", "none", "--constraint", "node.id=" + node}
-	for _, mount := range [][2]string{{h.nginxConfigDir(), "/etc/nginx/conf.d"}, {h.nginxACMEWebroot(), "/var/www/certbot"}, {h.nginxCertificateDir(), "/etc/letsencrypt"}, {h.nginxImportedCertificateDir(), "/etc/noops/certificates"}} {
+	for _, mount := range [][2]string{{h.nginxDir(), "/etc/noops/nginx"}, {h.nginxConfigDir(), "/etc/nginx/conf.d"}, {h.nginxACMEWebroot(), "/var/www/certbot"}, {h.nginxCertificateDir(), "/etc/letsencrypt"}, {h.nginxImportedCertificateDir(), "/etc/noops/certificates"}} {
 		args = append(args, "--mount", "type=bind,source="+mount[0]+",target="+mount[1]+",readonly")
 	}
 	args = append(args, "--network", h.networkName)
 	for _, network := range networks {
 		args = append(args, "--network", network)
 	}
-	args = append(args, "nginx:1.28-alpine", "nginx", "-t")
+	args = append(args, "nginx:1.28-alpine", "nginx", "-c", nginxconfig.ContainerPath, "-t")
 	// Also clean up if creation fails after Docker accepted the service.
 	defer func() {
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)

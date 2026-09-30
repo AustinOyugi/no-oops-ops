@@ -120,3 +120,16 @@ connections to the origin will not trust a Cloudflare Origin certificate, which 
 `set_real_ip_from` is what makes the Cloudflare client-IP header safe. Nginx applies `CF-Connecting-IP` only if the
 source address is in a trusted Cloudflare network. Do not enable `cloudflare: true` for an ingress that accepts direct,
 non-Cloudflare public traffic; otherwise application logs and IP-based controls may be incorrect.
+
+## Upgrading existing ingress
+
+After upgrading the CLI, run `noops install` before deploying route changes. Install preserves existing route snippets,
+certificates and Docker network attachments, and migrates Nginx to a managed main configuration. The migration is
+validated by a temporary Swarm job on the ingress networks before the serving stack is changed. Validation failures
+include the Nginx diagnostic and leave the running stack in place.
+
+Subsequent route changes validate a complete candidate configuration inside the running ingress container, then replace
+`nginx/nginx.conf` atomically. Automatic reloads therefore see a complete configuration. Legacy generated snippets remain
+on disk for migration compatibility but are superseded by the managed configuration after the first route update.
+Additional user-owned top-level `.conf` files remain included. Failed route changes restore the previous configuration
+and saved routes, including failures during certificate issuance.

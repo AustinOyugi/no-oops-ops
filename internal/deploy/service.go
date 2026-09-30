@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"path/filepath"
@@ -358,6 +359,10 @@ func (s *Service) operationLock(ctx context.Context, app, environment string) (f
 func (s *Service) cleanupFailedCandidate(ctx context.Context, blueGreen bool, stack string, cause error) error {
 	if !blueGreen {
 		return cause
+	}
+	var recoveryErr *ingress.RecoveryError
+	if errors.As(cause, &recoveryErr) {
+		return fmt.Errorf("%w; retained candidate stack %q because ingress recovery requires attention", cause, stack)
 	}
 	if err := s.removeStack(ctx, stack); err != nil {
 		return fmt.Errorf("%w; remove failed blue-green candidate stack %q: %v", cause, stack, err)

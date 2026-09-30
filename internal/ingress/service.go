@@ -14,6 +14,7 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/ingressnet"
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
+	"github.com/AustinOyugi/no-oops-ops/internal/nginxconfig"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"github.com/AustinOyugi/no-oops-ops/internal/state"
 )
@@ -119,7 +120,7 @@ func (s *Service) Reconcile(ctx context.Context, environment string, m manifest.
 		}
 		// Platform-wide ingress settings, including Cloudflare trusted proxy
 		// configuration, may have changed even when this app's route did not.
-		if err := s.writeConfig(routes); err != nil {
+		if err := s.writeConfig(ctx, routes); err != nil {
 			return err
 		}
 		return s.reload(ctx)
@@ -134,7 +135,7 @@ func (s *Service) Reconcile(ctx context.Context, environment string, m manifest.
 	// challenge endpoint reachable before asking Let's Encrypt for a
 	// certificate. writeConfig only enables TLS for certificates that are
 	// already present on disk.
-	if err := s.writeConfig(updated); err != nil {
+	if err := s.writeConfig(ctx, updated); err != nil {
 		return err
 	}
 	if err := s.writeRoutes(updated); err != nil {
@@ -150,7 +151,7 @@ func (s *Service) Reconcile(ctx context.Context, environment string, m manifest.
 	if !issued {
 		return nil
 	}
-	if err := s.writeConfig(updated); err != nil {
+	if err := s.writeConfig(ctx, updated); err != nil {
 		return err
 	}
 	return s.reload(ctx)
@@ -182,7 +183,7 @@ func (s *Service) Remove(ctx context.Context, environment, app string) (operatio
 	if len(updated) == len(routes) {
 		return nil
 	}
-	if err := s.writeConfig(updated); err != nil {
+	if err := s.writeConfig(ctx, updated); err != nil {
 		return err
 	}
 	if err := s.writeRoutes(updated); err != nil {
@@ -200,20 +201,6 @@ func (s *Service) acmeWebroot() string {
 	return filepath.Join(s.config.DataDir, "nginx", "acme-webroot")
 }
 
-func (s *Service) loadNetworks() (map[string]bool, error) {
-	data, err := os.ReadFile(s.networksPath())
-	if os.IsNotExist(err) {
-		return map[string]bool{}, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("read ingress networks %q: %w", s.networksPath(), err)
-	}
-	var networks map[string]bool
-	if err := json.Unmarshal(data, &networks); err != nil {
-		return nil, fmt.Errorf("decode ingress networks %q: %w", s.networksPath(), err)
-	}
-	return networks, nil
-}
 func (s *Service) certificateDir() string {
 	return filepath.Join(s.config.DataDir, "nginx", "letsencrypt")
 }
@@ -244,56 +231,69 @@ func (s *Service) writeRoutes(routes []Route) error {
 	return atomicWrite(s.routesPath(), append(data, '\n'))
 }
 
-func (s *Service) writeConfig(routes []Route) error {
-	files, err := RenderFiles(s.routesWithAvailableCertificates(routes))
+// writeConfig validates a complete candidate before publishing it with one
+// atomic rename. The serving container mounts the parent directory so it sees
+// the replacement rather than remaining pinned to an old file inode.
+func (s *Service) writeConfig(ctx context.Context, routes []Route) error {
+	mainPath := filepath.Join(s.ingressDir(), "nginx.conf")
+	if _, err := os.Stat(mainPath); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("run noops install to migrate ingress before updating routes")
+		}
+		return err
+	}
+	body, err := RenderConfig(s.routesWithAvailableCertificates(routes))
 	if err != nil {
 		return err
 	}
-	for _, directory := range []string{"external", "internal"} {
-		if err := os.RemoveAll(filepath.Join(s.configDir(), directory)); err != nil {
-			return fmt.Errorf("clear generated nginx %s routes: %w", directory, err)
-		}
-	}
-	if err := os.Remove(s.configPath()); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("remove legacy nginx routes config: %w", err)
-	}
-	cloudflarePath := filepath.Join(s.configDir(), "cloudflare.conf")
 	if s.config.NginxCloudflare {
-		if err := atomicWrite(cloudflarePath, []byte(cloudflareRealIPConfig)); err != nil {
-			return fmt.Errorf("write Cloudflare real IP config: %w", err)
+		body = append([]byte(cloudflareRealIPConfig+"\n"), body...)
+	}
+	// Preserve user-owned snippets, while excluding legacy managed files.
+	entries, err := os.ReadDir(s.configDir())
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".conf") {
+			continue
 		}
-	} else if err := os.Remove(cloudflarePath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("remove Cloudflare real IP config: %w", err)
+		switch entry.Name() {
+		case "routes.conf", "default.conf", "external.conf", "internal.conf", "cloudflare.conf":
+			continue
+		}
+		body = append(body, []byte(fmt.Sprintf("\ninclude %q;\n", "/etc/nginx/conf.d/"+entry.Name()))...)
 	}
-	var hasExternal, hasInternal bool
-	for path := range files {
-		hasExternal = hasExternal || strings.HasPrefix(path, "external/")
-		hasInternal = hasInternal || strings.HasPrefix(path, "internal/")
-	}
-	defaultConfig, err := renderTemplate(configTemplateData{}, "default")
+	candidate, err := os.CreateTemp(s.ingressDir(), ".candidate-*.conf")
 	if err != nil {
 		return err
 	}
-	if err := atomicWrite(filepath.Join(s.configDir(), "default.conf"), defaultConfig); err != nil {
+	path := candidate.Name()
+	candidate.Close()
+	defer os.Remove(path)
+	content := nginxconfig.Wrap(body)
+	if err := atomicWrite(path, content); err != nil {
 		return err
 	}
-	externalConfig, err := renderTemplate(configTemplateData{HasExternal: hasExternal}, "external-include")
+	if err := s.validateCandidate(ctx, "/etc/noops/nginx/"+filepath.Base(path)); err != nil {
+		return err
+	}
+	return atomicWrite(mainPath, content)
+}
+
+func (s *Service) validateCandidate(ctx context.Context, path string) error {
+	result, err := s.runner.Run(ctx, "docker", []string{"ps", "-q", "--filter", "label=com.docker.swarm.service.name=" + s.config.NginxName + "_nginx"}, command.RunOptions{})
 	if err != nil {
-		return err
+		return fmt.Errorf("find nginx validation containers: %w: %s", err, result.Output)
 	}
-	if err := atomicWrite(filepath.Join(s.configDir(), "external.conf"), externalConfig); err != nil {
-		return err
+	containers := strings.Fields(string(result.Output))
+	if len(containers) == 0 {
+		return fmt.Errorf("nginx has no running containers to validate candidate configuration")
 	}
-	internalConfig, err := renderTemplate(configTemplateData{HasInternal: hasInternal}, "internal-server")
-	if err != nil {
-		return err
-	}
-	if err := atomicWrite(filepath.Join(s.configDir(), "internal.conf"), internalConfig); err != nil {
-		return err
-	}
-	for path, data := range files {
-		if err := atomicWrite(filepath.Join(s.configDir(), path), data); err != nil {
-			return err
+	for _, container := range containers {
+		result, err := s.runner.Run(ctx, "docker", []string{"exec", container, "nginx", "-c", path, "-t"}, command.RunOptions{LogCommand: true})
+		if err != nil {
+			return fmt.Errorf("validate nginx candidate in %q: %w: %s", container, err, result.Output)
 		}
 	}
 	return nil
@@ -392,13 +392,13 @@ func (s *Service) reload(ctx context.Context) error {
 		return fmt.Errorf("nginx service %q has no running containers", serviceName)
 	}
 	for _, container := range containers {
-		result, err = s.runner.Run(ctx, "docker", []string{"exec", container, "nginx", "-t"}, command.RunOptions{LogCommand: true})
+		result, err = s.runner.Run(ctx, "docker", []string{"exec", container, "nginx", "-c", nginxconfig.ContainerPath, "-t"}, command.RunOptions{LogCommand: true})
 		if err != nil {
 			return fmt.Errorf("validate nginx configuration in container %q: %w: %s", container, err, strings.TrimSpace(string(result.Output)))
 		}
 	}
 	for _, container := range containers {
-		result, err = s.runner.Run(ctx, "docker", []string{"exec", container, "nginx", "-s", "reload"}, command.RunOptions{LogCommand: true})
+		result, err = s.runner.Run(ctx, "docker", []string{"exec", container, "nginx", "-c", nginxconfig.ContainerPath, "-s", "reload"}, command.RunOptions{LogCommand: true})
 		if err != nil {
 			return fmt.Errorf("reload nginx container %q for service %q: %w: %s", container, serviceName, err, strings.TrimSpace(string(result.Output)))
 		}
