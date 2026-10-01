@@ -193,7 +193,7 @@ func TestNginxValidationUsesApplicationNetworksAndCleansUp(t *testing.T) {
 			creation = strings.Join(call, " ")
 		}
 	}
-	for _, want := range []string{"--network shared", "--network prod", "--network canary", "--constraint node.id=node-id"} {
+	for _, want := range []string{"--network shared", "--network prod", "--network canary", "--constraint node.id==node-id"} {
 		if !strings.Contains(creation, want) {
 			t.Fatalf("missing %q: %s", want, creation)
 		}

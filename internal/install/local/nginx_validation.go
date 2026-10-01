@@ -31,7 +31,7 @@ func (h *Host) validateNginx(ctx context.Context) error {
 		return err
 	}
 	name := fmt.Sprintf("noops-nginx-check-%x", nonce)
-	args := []string{"service", "create", "--detach=true", "--name", name, "--mode", "replicated-job", "--restart-condition", "none", "--constraint", "node.id=" + node}
+	args := []string{"service", "create", "--detach=true", "--name", name, "--mode", "replicated-job", "--restart-condition", "none", "--constraint", "node.id==" + node}
 	for _, mount := range [][2]string{{h.nginxDir(), "/etc/noops/nginx"}, {h.nginxConfigDir(), "/etc/nginx/conf.d"}, {h.nginxACMEWebroot(), "/var/www/certbot"}, {h.nginxCertificateDir(), "/etc/letsencrypt"}, {h.nginxImportedCertificateDir(), "/etc/noops/certificates"}} {
 		args = append(args, "--mount", "type=bind,source="+mount[0]+",target="+mount[1]+",readonly")
 	}
