@@ -82,7 +82,7 @@ three newest builds. This includes image-only releases and releases automaticall
 still used by a Swarm service, an active rollout, or Swarm's rollback specification remain protected, so a running
 service can temporarily require more than three retained builds. Other apps and environments are untouched.
 
-Cleanup removes expired release/deployment records, registry manifests, and local build tags. Registry garbage collection
+Cleanup removes expired release/deployment records, unreferenced generated blue/green stack manifests, registry manifests, and local build tags. It does not remove live Docker stacks; deploy reconciliation owns that operation. Registry garbage collection
 briefly stops the registry; cleanup restarts it and waits for its API before continuing to `--deploy`. Cleanup failures
 are logged as warnings and do not turn an already published release into a failed release. A later successful release
 or `noops cleanup --apply --keep 3` can retry cleanup.

@@ -25,7 +25,10 @@ func (a *App) Cleanup(ctx context.Context, options cleanup.Options) error {
 	for _, path := range plan.DeploymentPaths {
 		a.logger.InfoContext(ctx, "cleanup deployment record candidate", "path", path)
 	}
-	a.logger.InfoContext(ctx, "cleanup plan", "apply", options.Apply, "orphaned", options.Orphaned, "protected_images", plan.Protected, "release_records", len(plan.ReleasePaths), "deployment_records", len(plan.DeploymentPaths), "registry_images", len(plan.Images), "local_images", len(plan.LocalImages))
+	for _, path := range plan.StackPaths {
+		a.logger.InfoContext(ctx, "cleanup generated stack artifact candidate", "path", path)
+	}
+	a.logger.InfoContext(ctx, "cleanup plan", "apply", options.Apply, "orphaned", options.Orphaned, "protected_images", plan.Protected, "release_records", len(plan.ReleasePaths), "deployment_records", len(plan.DeploymentPaths), "stack_artifacts", len(plan.StackPaths), "registry_images", len(plan.Images), "local_images", len(plan.LocalImages))
 	return nil
 }
 

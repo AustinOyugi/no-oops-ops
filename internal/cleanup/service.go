@@ -28,8 +28,8 @@ type Options struct {
 	ReleaseRetention bool
 }
 type Plan struct {
-	ReleasePaths, DeploymentPaths, Images, LocalImages, ProtectedImages []string
-	Protected                                                           int
+	ReleasePaths, DeploymentPaths, StackPaths, Images, LocalImages, ProtectedImages []string
+	Protected                                                                       int
 }
 type Service struct {
 	logger *slog.Logger
@@ -88,9 +88,9 @@ func (s *Service) Run(ctx context.Context, options Options) (Plan, error) {
 			return plan, err
 		}
 	}
-	for _, path := range append(plan.ReleasePaths, plan.DeploymentPaths...) {
+	for _, path := range append(append(plan.ReleasePaths, plan.DeploymentPaths...), plan.StackPaths...) {
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-			return plan, fmt.Errorf("remove cleanup metadata %q: %w", path, err)
+			return plan, fmt.Errorf("remove cleanup artifact %q: %w", path, err)
 		}
 	}
 	// A previous run can delete registry manifests and then be interrupted

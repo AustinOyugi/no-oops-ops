@@ -182,6 +182,41 @@ func TestAutomaticRetentionDoesNotKeepExtraHistoricalDeployments(t *testing.T) {
 	}
 }
 
+func TestPlanPrunesUnreferencedGeneratedStackArtifacts(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "apps", "api", "prod")
+	for _, sub := range []string{"releases", "deployments"} {
+		if err := os.MkdirAll(filepath.Join(dir, sub), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	activeImage := "127.0.0.1:5000/api:active"
+	oldImage := "127.0.0.1:5000/api:old"
+	writeJSON(t, filepath.Join(dir, "releases", "active.json"), release.Metadata{Tag: "active", RegistryImage: activeImage, CreateAt: time.Unix(2, 0)})
+	writeJSON(t, filepath.Join(dir, "releases", "old.json"), release.Metadata{Tag: "old", RegistryImage: oldImage, CreateAt: time.Unix(1, 0)})
+	writeJSON(t, filepath.Join(dir, "deployments", "active.json"), deploy.Deployment{ReleaseImage: activeImage, StackName: "prod-api-ractive", CreatedAt: time.Unix(2, 0)})
+	writeJSON(t, filepath.Join(dir, "deployments", "old.json"), deploy.Deployment{ReleaseImage: oldImage, StackName: "prod-api-rold", CreatedAt: time.Unix(1, 0)})
+	for _, name := range []string{"stack-prod-api-ractive.yml", "stack-prod-api-rold.yml", "stack-prod-api-rorphan.yml"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("services: {}\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	plan, err := NewService(nil, config.Config{StateDir: root}).planOptions(liveInventory{images: map[string]struct{}{}, services: map[string]struct{}{}}, Options{Keep: 1, App: "api", Environment: "prod", ReleaseRetention: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.StackPaths) != 2 {
+		t.Fatalf("stack artifacts = %v, want old and orphan candidates", plan.StackPaths)
+	}
+	for _, path := range plan.StackPaths {
+		if strings.Contains(path, "ractive") {
+			t.Fatalf("retained active stack artifact selected: %s", path)
+		}
+	}
+}
+
 func TestGarbageCollectionWaitsForRegistryRestart(t *testing.T) {
 	r := &gcRunner{}
 	s := NewService(nil, config.Config{RegistryName: "registry", StateDir: t.TempDir(), DataDir: t.TempDir()})
