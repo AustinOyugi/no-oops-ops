@@ -11,6 +11,7 @@ noops [--workspace <workspace>] install
 noops [--workspace <workspace>] uninstall [--purge]
 noops [--workspace <workspace>] doctor [--deploy-ready]
 noops [--workspace <workspace>] status
+noops [--workspace <workspace>] ui
 noops [--workspace <workspace>] release [--deploy] <environment> <app> [--service <name> | --all]
 noops [--workspace <workspace>] release list <environment> <app> [--service <name> | --all]
 noops [--workspace <workspace>] deploy [--quick] <environment> <app> [--service <name> | --all]
@@ -106,3 +107,19 @@ Public Git sources omit it.
 use `x-noops.ingress.tls_certificate`. It is intended for trusted origin certificates such as Cloudflare Origin CA
 certificates. When `settings.platform.ingress.cloudflare: true`, imported certificates are required for every HTTPS
 route; No Oops does not request an ACME email or issue Let's Encrypt certificates in that mode.
+
+## Live service dashboard
+
+Run `noops ui` in an initialized workspace, or use `noops --workspace <workspace> ui`.
+The read-only terminal dashboard lists managed Swarm services with environment,
+app/deployment name, Docker service name, running/desired replicas, and state.
+It includes registry and ingress services, plus app services identified by the
+workspace's generated stack manifests, including blue/green candidates. It does
+not list unrelated Docker services or undeployed catalog entries.
+
+Use the up/down arrows to select a row and `q` or Ctrl-C to exit. The list refreshes
+every five seconds; selection follows the service across refreshes. Docker errors
+appear in the dashboard, retaining previous results until a successful refresh.
+`running` means all desired replicas are running, not that application health has
+been verified; zero desired replicas show `scaled down`. An interactive terminal
+is required. Quitting restores the terminal and cancels pending Docker queries.
