@@ -83,12 +83,19 @@ func streamCommand(ctx context.Context, executable string, args []string, output
 	command.Stderr = output // stdin remains closed: no terminal input can be consumed.
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	command.Cancel = func() error {
-		err := syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
+		err := command.Process.Signal(syscall.SIGTERM)
 		if err == syscall.ESRCH {
 			return os.ErrProcessDone
 		}
 		return err
 	}
-	command.WaitDelay = 2 * time.Second
-	return command.Run()
+	// Signal Noops itself so its cancelled context can remove Swarm workloads.
+	// Killing the process group here would also kill its Docker cleanup command.
+	command.WaitDelay = 30 * time.Second
+	err := command.Run()
+	if ctx.Err() != nil && command.Process != nil {
+		// Reap remaining descendants after graceful cleanup or the timeout.
+		_ = syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
+	}
+	return err
 }

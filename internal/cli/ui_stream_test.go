@@ -3,6 +3,8 @@ package cli
 import (
 	"bytes"
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -23,7 +25,7 @@ func TestStreamingCapturesOutputAndFailure(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	started := time.Now()
-	if err := streamCommand(ctx, "/bin/sh", []string{"-c", "sleep 10"}, &out); err == nil {
+	if err := streamCommand(ctx, "/bin/sh", []string{"-c", "exec sleep 10"}, &out); err == nil {
 		t.Fatal("cancellation succeeded unexpectedly")
 	}
 	if time.Since(started) > 3*time.Second {
@@ -44,5 +46,36 @@ func TestStreamingRouting(t *testing.T) {
 		if got := canStreamUIAction(config.Config{Workspace: "missing"}, tui.Action{Args: args}); got != item.want {
 			t.Errorf("%v: %v", item.args, got)
 		}
+	}
+}
+
+func TestStreamingCancellationAllowsCleanup(t *testing.T) {
+	root := t.TempDir()
+	ready, cleaned := filepath.Join(root, "ready"), filepath.Join(root, "cleaned")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	var out bytes.Buffer
+	go func() {
+		done <- streamCommand(ctx, "/bin/sh", []string{"-c", `trap 'echo cleaned > "$2"; exit 0' TERM; echo ready > "$1"; while :; do sleep 0.05; done`, "sh", ready, cleaned}, &out)
+	}()
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		if _, err := os.Stat(ready); err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("child did not start")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("cleanup did not finish")
+	}
+	if _, err := os.Stat(cleaned); err != nil {
+		t.Fatalf("child cleanup bypassed: %v", err)
 	}
 }

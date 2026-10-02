@@ -1,6 +1,6 @@
 # No Oops Ops
 
-No Oops Ops is a self-hosted CLI for repeatable Docker Swarm deployments. It fetches application source from Git when
+No Oops Ops is a self-hosted terminal dashboard and CLI for repeatable Docker Swarm deployments. It fetches application source from Git when
 configured, builds Compose services in isolated one-shot Swarm tasks, snapshots image-only services into an internal
 registry, and deploys immutable releases with Docker Stack. It also records deployment history and manages
 environment-scoped Swarm secrets.
@@ -25,10 +25,8 @@ cd /srv/noops/example
 # Add the `redis` app alias and its manifest path to apps.yml.
 noops install
 noops secret set prod REDIS_PASSWORD
-noops release prod redis
-noops deploy prod redis
-# Or create a fresh release and deploy that exact image in one command.
-noops release --deploy prod redis
+noops ui
+# Press r, choose redis and prod, and enable Deploy after release.
 ```
 
 `init` creates an empty, version-matched `apps.yml` catalog. Add each app's stable alias and Compose-shaped manifest
@@ -41,11 +39,25 @@ If the app uses secrets, create them before deployment:
 noops secret set prod AUTH_SERVER_API_CLIENT_SECRET
 ```
 
+The TUI is the preferred interface for daily operations: inspect services and tasks,
+release new services, deploy, and follow command output and blue/green progress.
+Press `:` for commands, `e` for selected-service actions, `r` for a new release, and
+Tab to switch panes. See the [TUI guide](docs/tui.md) for all controls.
+
+Use the CLI for automation or as a fallback:
+
+```bash
+noops release --deploy prod redis --service redis
+noops release list prod redis --service redis
+noops status
+```
+
 ## Documentation
 
 - [Getting started](docs/getting-started.md) — requirements, installation, and first deployment
+- [TUI guide](docs/tui.md) — preferred navigation, releases, output, metrics, and rollout progress
 - [Concepts](docs/concepts.md) — releases, deployments, rollouts, secrets, and state
-- [Command reference](docs/commands.md) — all implemented CLI commands
+- [Command reference](docs/commands.md) — CLI fallback and automation reference
 - [App manifest reference](docs/reference/app-manifest.md) — supported manifest fields and defaults
 - [Environment-file reference](docs/reference/env-file.md) — generated `.env` values and secret references
 - [Configuration and generated state](docs/reference/configuration.md)
@@ -54,6 +66,10 @@ noops secret set prod AUTH_SERVER_API_CLIENT_SECRET
 - [Current limitations](docs/limitations.md)
 
 ## Typical workflow
+
+Open `noops ui`, use `r` to release, or select a service and use `e` for its lifecycle
+actions. The `:` palette exposes platform, secret, certificate, and cleanup operations.
+The equivalent CLI workflow is:
 
 ```text
 install → secret set (when needed) → release → release list → deploy → rollback or remove

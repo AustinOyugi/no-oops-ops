@@ -25,7 +25,7 @@ Docker Desktop:
 }
 ```
 
-## Install the CLI
+## Install No Oops
 
 From a source checkout:
 
@@ -71,17 +71,29 @@ noops doctor
 Installation verifies Docker, initializes Swarm when necessary, creates the shared network, deploys the internal
 registry and nginx ingress, waits for both services to be ready, and writes installation metadata.
 
-## Release and deploy an app
+## Release and deploy in the TUI (preferred)
 
 Create an app manifest next to an environment file when the service needs environment values or secret bindings. Static
 services with neither can omit the environment file. The examples in `examples/` show both shapes.
 
 ```bash
-noops release prod api
-noops deploy prod api
+noops ui
+```
+
+Press `r`, choose the catalog app, Compose service, and environment, then enable
+**Deploy after release**. Tab through the fields to Run and press Enter. Build and
+deployment output streams into the dashboard while services and tasks refresh.
+For services already running, select their row and press `e` for actions. Press `:`
+for platform operations and other commands. See the [TUI guide](tui.md).
+
+### CLI fallback and automation
+
+```bash
+noops release prod api --service api
+noops deploy prod api --service api
 
 # Or release and deploy the same immutable image in one command.
-noops release --deploy prod api
+noops release --deploy prod api --service api
 ```
 
 `api` is an alias declared in the workspace `apps.yml`. Use

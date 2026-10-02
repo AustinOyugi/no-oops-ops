@@ -16,3 +16,14 @@
   diagnostics.
 - BuildKit dependency caches are local to the Docker builder. They can be shared between builds on that server using a
   common cache ID, but No Oops does not currently export or synchronize them between servers.
+
+- The TUI requires an interactive terminal. Use the [CLI](commands.md) for automation
+  and noninteractive sessions. Each dashboard runs one command at a time.
+- The output pane retains the latest 256 KB of command output, not a durable log
+  archive or a general service-log viewer. Interactive prompts use terminal handoff.
+- Host metrics cover the local Linux Docker host, not individual containers or the
+  entire Swarm. Remote/VM host resource metrics are unavailable.
+- Blue/green progress shows readiness and configured ingress ownership; it does not
+  measure HTTP traffic or implement percentage-based traffic shifting.
+- Cancellation requests cleanup of temporary build/fetch services, but daemon
+  outages or forced process termination can leave workloads requiring manual removal.

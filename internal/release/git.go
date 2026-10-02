@@ -90,7 +90,7 @@ func (s *Service) gitBuildContextWithSwarmSecret(ctx context.Context, root, repo
 	}
 	name := fmt.Sprintf("noops-git-fetch-%x", random)
 	defer func() {
-		_, _ = s.runner.Run(context.Background(), "docker", []string{"service", "rm", name}, command.RunOptions{})
+		s.removeTemporaryService(name)
 	}()
 	args := []string{"service", "create", "--detach", "--name", name, "--restart-condition", "none", "--constraint", "node.role==manager", "--mount", "type=bind,src=" + root + ",dst=/work", "--secret", "source=" + secretName + ",target=git-token,mode=0400", "--entrypoint", "/bin/sh", gitClientImage, "/work/git-fetch.sh", repository, ref}
 	if _, err := s.runner.Run(ctx, "docker", args, command.RunOptions{}); err != nil {

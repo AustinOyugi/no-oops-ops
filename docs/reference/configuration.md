@@ -91,6 +91,7 @@ registry/stack.yml
 nginx/stack.yml
 apps/<app>/<environment>/.env
 apps/<app>/<environment>/stack.yml
+apps/<app>/<environment>/rollout.json
 apps/<app>/<environment>/release.json
 apps/<app>/<environment>/releases/<timestamp>.json
 apps/<app>/<environment>/deployments/<timestamp>.json
@@ -100,3 +101,7 @@ secrets/<environment>/<key>/v<version>.json
 Secret files contain metadata only; values are stored by Docker Swarm. `remove` deletes an app environment's generated
 state but preserves its secrets and named volumes. `uninstall --purge` also deletes the configured persistent registry
 data.
+
+`apps/<app>/<environment>/rollout.json` contains best-effort blue/green display
+telemetry for the TUI. It is separate from the durable deployment recovery journal;
+missing display telemetry does not determine deployment success.

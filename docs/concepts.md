@@ -1,5 +1,11 @@
 # Concepts
 
+## Operating interface
+
+Use the [TUI](tui.md) for daily navigation, service/task inspection, releases, and
+live command output. The [CLI](commands.md) provides the same operations for
+scripts and fallback access. Both share workspace state, validation, and locks.
+
 ## Platform installation
 
 `noops install` prepares one local Swarm deployment platform: the `noops-platform` overlay network, the
@@ -52,6 +58,11 @@ in-place Swarm update for stateful services. If any candidate validation or ingr
 removes the unpromoted candidate stack. Direct
 service-to-service callers should use the stable nginx internal URL rather than a release-specific application service
 name.
+
+The TUI displays blue/green stage transitions, old/new releases and replica counts,
+and the configured ingress target. Promotion is a single handoff. The display is
+telemetry, independent of the recovery journal, and does not measure actual request
+traffic. See [rollout progress](tui.md#bluegreen-rollout-progress).
 
 ## Rollback
 

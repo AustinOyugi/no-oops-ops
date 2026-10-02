@@ -31,7 +31,7 @@ func (s *Service) buildImageIsolated(ctx context.Context, image, dockerfile, con
 
 	name := fmt.Sprintf("noops-build-%x", random)
 	defer func() {
-		_, _ = s.runner.Run(context.Background(), "docker", []string{"service", "rm", name}, command.RunOptions{})
+		s.removeTemporaryService(name)
 	}()
 
 	args := []string{"service", "create", "--detach", "--name", name, "--restart-condition", "none", "--constraint", "node.role==manager", "--mount", "type=bind,src=" + contextDir + ",dst=/work,readonly", "--mount", "type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock"}
