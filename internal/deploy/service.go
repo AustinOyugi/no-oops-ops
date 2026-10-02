@@ -61,7 +61,7 @@ func (s *Service) RunWithOptions(ctx context.Context, environment string, path s
 	return s.run(ctx, environment, path, optionalReleaseVersion, nil, options)
 }
 
-func (s *Service) run(ctx context.Context, environment string, path string, optionalReleaseVersion string, pinnedSecrets []SecretBinding, options RunOptions) (Result, error) {
+func (s *Service) run(ctx context.Context, environment string, path string, optionalReleaseVersion string, pinnedSecrets []SecretBinding, options RunOptions) (result Result, operationErr error) {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return Result{}, fmt.Errorf("resolve manifest path %q: %w", path, err)
@@ -181,6 +181,35 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		deploymentStackPath = releaseStackPath(s.config, m.Name, environment, deploymentStack)
 	}
 
+	progress := RolloutProgress{App: m.Name, Environment: environment, OldService: activeDeployment.ServiceName, NewService: deploymentSwarmService, OldRelease: activeDeployment.ReleaseTag, NewRelease: releaseTag, Traffic: "old", StartedAt: time.Now().UTC()}
+	if progress.OldService == "" && activeDeployment.StackName != "" {
+		progress.OldService = activeDeployment.StackName + "_" + serviceName(environment, m.Name)
+		if activeDeployment.StackName != stackName(environment, m.Name) {
+			progress.OldService = activeDeployment.StackName + "_app"
+		}
+	}
+	report := func(stage string) {
+		if !blueGreen {
+			return
+		}
+		progress.Stage = stage
+		progress.UpdatedAt = time.Now().UTC()
+		if err := saveRolloutProgress(s.config, progress); err != nil {
+			s.logger.WarnContext(ctx, "write rollout progress", "error", err)
+		}
+	}
+	if blueGreen {
+		report("preparing")
+		defer func() {
+			if operationErr != nil {
+				progress.FailedStage = progress.Stage
+				progress.Error = operationErr.Error()
+				progress.Finished = true
+				report("failed")
+			}
+		}()
+	}
+
 	var wrapperCfg WrapperConfig
 
 	if resolutionMode == "env" && len(secretBindings) > 0 {
@@ -231,6 +260,7 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 			}
 		}
 	}()
+	report("starting_candidate")
 	if err := s.deployStack(ctx, stackPath, deploymentStack); err != nil {
 		return Result{}, err
 	}
@@ -248,6 +278,7 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		return Result{}, s.cleanupFailedCandidate(ctx, blueGreen, deploymentStack, err)
 	}
 
+	report("waiting_readiness")
 	outcome, runningTasks, err := s.waitForSwarmConvergence(
 		ctx,
 		deploymentSwarmService,
@@ -278,14 +309,19 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		return Result{}, s.cleanupFailedCandidate(ctx, blueGreen, deploymentStack, err)
 	}
 
+	report("ready")
 	if m.Expose.Enabled {
 		if err := s.ingress.EnsureNetwork(ctx, network); err != nil {
 			return Result{}, s.cleanupFailedCandidate(ctx, blueGreen, deploymentStack, fmt.Errorf("connect ingress to environment network: %w", err))
 		}
 	}
+	progress.Traffic = "unknown"
+	report("promoting")
 	if err := s.ingress.Reconcile(ctx, environment, m, deploymentSwarmService); err != nil {
 		return Result{}, s.cleanupFailedCandidate(ctx, blueGreen, deploymentStack, fmt.Errorf("reconcile ingress route: %w", err))
 	}
+	progress.Traffic = "new"
+	report("ingress_reconciled")
 	journal.Stage = "ingress_reconciled"
 	if err := saveJournal(s.config, m.Name, environment, journal); err != nil {
 		return Result{}, err
@@ -319,7 +355,10 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 	// The new service is recorded and ingress already targets it. Reconcile all
 	// older stacks belonging to this app/environment, including candidates left
 	// behind by earlier No Oops versions.
+	report("cleaning_old_stacks")
 	s.removeStaleAppStacks(ctx, environment, m.Name, deploymentStack)
+	progress.Finished = true
+	report("completed")
 
 	return Result{
 		DeploymentPath: deploymentPath,

@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"github.com/AustinOyugi/no-oops-ops/internal/deploy"
 	"os"
 	"os/signal"
 	"strings"
@@ -17,6 +18,9 @@ import (
 )
 
 type dashboard struct {
+	rollouts                 []deploy.RolloutProgress
+	rolloutPane              *tview.TextView
+	rolloutVisible           bool
 	health                   *tview.TextView
 	keepKilledOutput         bool
 	output                   *tview.TextView
@@ -146,6 +150,7 @@ func (d *dashboard) refresh() {
 					return
 				}
 				d.rows = rows
+				d.updateRolloutPane()
 				values := make([][]string, 0, len(rows))
 				selected := 1
 				for i, r := range rows {
@@ -257,6 +262,7 @@ func Run(parent context.Context, in, out *os.File, query func(context.Context) (
 		once.Do(func() {
 			d.refresh()
 			d.monitorMetrics()
+			d.monitorRollouts()
 			go func() {
 				ticker := time.NewTicker(5 * time.Second)
 				defer ticker.Stop()

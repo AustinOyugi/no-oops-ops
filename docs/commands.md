@@ -210,3 +210,23 @@ Remote/VM Docker daemons display their hostname and connectivity, with resource
 metrics marked unavailable. Local computer readings are never presented as remote
 server usage; run the dashboard on the server for those metrics. These are host
 metrics, not per-container limits or a whole-Swarm aggregate.
+
+### Blue/green rollout progress
+
+Blue/green deployments write display-only rollout telemetry separately from the
+recovery journal. The dashboard polls it every second and displays old/new
+services, release tags, latest replica counts, candidate readiness, promotion,
+ingress reconciliation, and old-stack cleanup requests. Active rollouts are shown
+regardless of whether the deployment was launched from this dashboard or another
+CLI process sharing the workspace. Selecting an old/new service chooses its
+rollout; otherwise the newest active rollout is shown.
+
+Traffic switches in one ingress promotion, not percentage increments. During
+promotion, traffic ownership is marked unresolved; after reconciliation, NEW is
+shown as the configured ingress target. This is not an HTTP traffic probe.
+Cleanup is requested asynchronously, so old service disappearance is reflected
+by subsequent service snapshots. Failures show their last stage and error;
+an unfinished record whose operation lock is released is marked interrupted.
+Finished records remain visible for 90 seconds; interrupted records remain until
+the next deployment updates them. Display writes are best-effort
+and do not change deployment success or recovery behavior.

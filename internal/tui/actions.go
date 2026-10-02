@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"github.com/AustinOyugi/no-oops-ops/internal/deploy"
 	"io"
 	"strconv"
 	"strings"
@@ -16,6 +17,7 @@ type Action struct {
 	Args  []string
 }
 type Execution struct {
+	Rollouts  func(context.Context) ([]deploy.RolloutProgress, error)
 	CanStream func(Action) bool
 	Stream    func(context.Context, Action, io.Writer) error
 	Palette   func(*Row) ([]Command, error)
