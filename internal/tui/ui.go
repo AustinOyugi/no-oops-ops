@@ -60,6 +60,9 @@ func newDashboard(ctx context.Context, query func(context.Context) ([]Row, error
 			return nil
 		case d.modal:
 			return event
+		case event.Rune() == ':':
+			d.palette()
+			return nil
 		case event.Rune() == 'e':
 			d.actions()
 			return nil
@@ -222,7 +225,7 @@ func Run(parent context.Context, in, out *os.File, query func(context.Context) (
 	d := newDashboard(ctx, query, taskQuery)
 	if len(execution) > 0 {
 		d.execution = &execution[0]
-		d.footer.SetText("e commands · Tab pane · ↑/↓ select · q quit · refresh every 5s")
+		d.footer.SetText(" : all commands · e service actions · Tab pane · ↑/↓ select · q quit · refresh every 5s")
 	}
 	defer func() {
 		if d.taskCancel != nil {

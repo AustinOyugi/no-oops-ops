@@ -14,6 +14,7 @@ type Action struct {
 	Args  []string
 }
 type Execution struct {
+	Palette func(*Row) ([]Command, error)
 	Resolve func(Row) ([]Action, error)
 	Run     func(context.Context, Action) error
 }
@@ -52,12 +53,35 @@ func (d *dashboard) actions() {
 		d.notice(err.Error())
 		return
 	}
+	var forms []Command
+	if d.execution.Palette != nil {
+		forms, err = d.execution.Palette(&d.rows[row-1])
+		if err != nil {
+			d.notice(err.Error())
+			return
+		}
+	}
 	d.modal = true
 	menu := tview.NewList().ShowSecondaryText(true)
 	menu.SetBorder(true).SetTitle(" Noops commands · Esc to cancel ")
 	for _, action := range actions {
 		action := action
-		menu.AddItem(action.Label, CommandText(action), 0, func() { d.confirm(action) })
+		menu.AddItem(action.Label, CommandText(action), 0, func() {
+			label := action.Label
+			if label == "List releases" {
+				label = "Release list"
+			}
+			if label == "Platform status" {
+				label = "Status"
+			}
+			for _, form := range forms {
+				if form.Label == label {
+					d.commandForm(form)
+					return
+				}
+			}
+			d.confirm(action)
+		})
 	}
 	menu.SetDoneFunc(d.closeDialog)
 	d.app.SetRoot(menu, true).SetFocus(menu)

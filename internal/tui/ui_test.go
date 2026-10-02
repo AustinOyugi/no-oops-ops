@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -40,4 +41,35 @@ func TestActionConfirmationCancelsWithoutExecution(t *testing.T) {
 	if ran || d.modal || d.app.GetFocus() != d.services {
 		t.Fatal("Cancel executed command or failed to restore dashboard")
 	}
+}
+
+func TestPaletteAvailableWithoutSelectionAndInvalidForm(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	d := newDashboard(ctx, nil, nil)
+	called := false
+	d.execution = &Execution{Palette: func(row *Row) ([]Command, error) {
+		called = true
+		if row != nil {
+			t.Fatal("unexpected selection")
+		}
+		return []Command{}, nil
+	}}
+	d.palette()
+	if !called || !d.modal {
+		t.Fatal("palette unavailable without services")
+	}
+	d.closeDialog()
+	d.commandForm(Command{Label: "Required field", Fields: []Field{{Key: "name", Label: "Name"}}, Build: func(values map[string]string) (Action, error) {
+		if values["name"] == "" {
+			return Action{}, fmt.Errorf("name required")
+		}
+		return Action{Args: []string{"secret", "list", values["name"]}}, nil
+	}})
+	layout, ok := d.app.GetFocus().(*tview.InputField)
+	if !ok {
+		t.Fatalf("form did not focus input: %T", d.app.GetFocus())
+	}
+	layout.SetText("prod")
+	layout.SetText("")
 }

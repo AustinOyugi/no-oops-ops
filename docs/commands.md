@@ -143,3 +143,24 @@ service target, without a shell. The dashboard temporarily suspends so ordinary
 CLI prompts and live output work normally. Press Enter after completion to return;
 the dashboard reports success or failure and refreshes. Ctrl-C exits the dashboard
 and cancels an active command; it does not roll back work already performed.
+
+### Command palette
+
+Press `:` anywhere in the dashboard to search all CLI operations. Type to filter,
+then press Down or Tab to focus the results and Enter to open a command form.
+Escape closes the palette or form. Commands include version, initialization,
+installation, uninstall, status, doctor, upgrades, cleanup, app lifecycle operations,
+secrets, and certificate import. The `ui` command itself is excluded.
+
+Forms show a live argument preview and disable Run until inputs are valid.
+App choices come from the catalog, and changing the app updates service choices.
+All services disables individual service selection. Environment is an editable
+field; the selected service supplies defaults when its catalog mapping is unique.
+The `e` menu opens these same forms for service actions. Cleanup defaults to a dry
+run; purge, apply, and skip-confirmation options default off. Secret set asks for
+its value in the CLI hidden prompt, never in the form or preview. All commands
+still pass through the existing CLI validation and confirmation prompts.
+
+After upgrading, exit and restart the dashboard to load the new version. Init
+creates the specified workspace; the dashboard remains attached to its original
+workspace. Certificate paths are literal local paths (no shell expansion).

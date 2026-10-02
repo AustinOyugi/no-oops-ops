@@ -20,7 +20,7 @@ func newUICommand(ctx context.Context, rt *runtime) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return tui.Run(ctx, os.Stdin, os.Stdout, func(ctx context.Context) ([]tui.Row, error) { return tui.Services(ctx, cfg) }, tui.Tasks, tui.Execution{Resolve: func(row tui.Row) ([]tui.Action, error) { return uiActions(cfg, row) }, Run: runUIAction})
+			return tui.Run(ctx, os.Stdin, os.Stdout, func(ctx context.Context) ([]tui.Row, error) { return tui.Services(ctx, cfg) }, tui.Tasks, tui.Execution{Palette: func(row *tui.Row) ([]tui.Command, error) { return uiPalette(cfg, row) }, Resolve: func(row tui.Row) ([]tui.Action, error) { return uiActions(cfg, row) }, Run: runUIAction})
 		},
 	}
 }
