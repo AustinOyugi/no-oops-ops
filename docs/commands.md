@@ -164,3 +164,20 @@ still pass through the existing CLI validation and confirmation prompts.
 After upgrading, exit and restart the dashboard to load the new version. Init
 creates the specified workspace; the dashboard remains attached to its original
 workspace. Certificate paths are literal local paths (no shell expansion).
+
+### Streaming command output
+
+Noninteractive commands stream stdout and stderr into an output pane while the
+service/task dashboard continues refreshing. Press `o` to focus output, or use
+Tab to cycle through services, tasks, and output. Output is batched every 100 ms
+and retains the most recent 256 KB. Use `p` in the output pane to pause/resume
+auto-follow, arrow/PageUp/PageDown keys to scroll, and `x` to cancel the active
+command. Escape returns focus to services. Completion shows success or failure
+and the CLI exit error; output remains visible until the next streamed command.
+One command can run at a time per dashboard.
+
+Secret set, installation, and interactive upgrades retain the terminal handoff.
+Deploy/release-with-deploy also use handoff when a selected TLS service needs an
+ACME email that has not been configured. Cancellation stops the command process
+group; it does not reverse completed changes or guarantee remote Docker work
+has stopped. Quitting the dashboard cancels the running command.

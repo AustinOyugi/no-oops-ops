@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
@@ -15,9 +16,11 @@ type Action struct {
 	Args  []string
 }
 type Execution struct {
-	Palette func(*Row) ([]Command, error)
-	Resolve func(Row) ([]Action, error)
-	Run     func(context.Context, Action) error
+	CanStream func(Action) bool
+	Stream    func(context.Context, Action, io.Writer) error
+	Palette   func(*Row) ([]Command, error)
+	Resolve   func(Row) ([]Action, error)
+	Run       func(context.Context, Action) error
 }
 
 func CommandText(action Action) string {
@@ -94,6 +97,14 @@ func (d *dashboard) confirm(action Action) *tview.Modal {
 		SetDoneFunc(func(_ int, button string) {
 			d.closeDialog()
 			if button != "Run" {
+				return
+			}
+			if d.jobRunning {
+				d.notice("A command is already running. Press o to view output.")
+				return
+			}
+			if d.execution.Stream != nil && d.execution.CanStream != nil && d.execution.CanStream(action) {
+				d.startStream(action)
 				return
 			}
 			var err error

@@ -17,21 +17,24 @@ import (
 )
 
 type dashboard struct {
-	execution              *Execution
-	modal                  bool
-	app                    *tview.Application
-	services, tasks        *tview.Table
-	status, detail, footer *tview.TextView
-	layout                 *tview.Flex
-	rows                   []Row
-	instances              []Task
-	selected               string
-	generation             int
-	serviceBusy, taskBusy  bool
-	taskCancel             context.CancelFunc
-	ctx                    context.Context
-	query                  func(context.Context) ([]Row, error)
-	taskQuery              func(context.Context, string) ([]Task, error)
+	output                   *tview.TextView
+	outputFollow, jobRunning bool
+	jobCancel                context.CancelFunc
+	execution                *Execution
+	modal                    bool
+	app                      *tview.Application
+	services, tasks          *tview.Table
+	status, detail, footer   *tview.TextView
+	layout                   *tview.Flex
+	rows                     []Row
+	instances                []Task
+	selected                 string
+	generation               int
+	serviceBusy, taskBusy    bool
+	taskCancel               context.CancelFunc
+	ctx                      context.Context
+	query                    func(context.Context) ([]Row, error)
+	taskQuery                func(context.Context, string) ([]Task, error)
 }
 
 func newDashboard(ctx context.Context, query func(context.Context) ([]Row, error), taskQuery func(context.Context, string) ([]Task, error)) *dashboard {
@@ -60,6 +63,11 @@ func newDashboard(ctx context.Context, query func(context.Context) ([]Row, error
 			return nil
 		case d.modal:
 			return event
+		case event.Rune() == 'o':
+			if d.output != nil {
+				d.app.SetFocus(d.output)
+			}
+			return nil
 		case event.Rune() == ':':
 			d.palette()
 			return nil
@@ -73,7 +81,11 @@ func newDashboard(ctx context.Context, query func(context.Context) ([]Row, error
 			if d.app.GetFocus() == d.services {
 				d.app.SetFocus(d.tasks)
 			} else {
-				d.app.SetFocus(d.services)
+				if d.app.GetFocus() == d.tasks && d.output != nil {
+					d.app.SetFocus(d.output)
+				} else {
+					d.app.SetFocus(d.services)
+				}
 			}
 			return nil
 		}
@@ -225,7 +237,7 @@ func Run(parent context.Context, in, out *os.File, query func(context.Context) (
 	d := newDashboard(ctx, query, taskQuery)
 	if len(execution) > 0 {
 		d.execution = &execution[0]
-		d.footer.SetText(" : all commands · e service actions · Tab pane · ↑/↓ select · q quit · refresh every 5s")
+		d.footer.SetText(" : all commands · e service actions · o output · Tab pane · ↑/↓ select · q quit · refresh every 5s")
 	}
 	defer func() {
 		if d.taskCancel != nil {
