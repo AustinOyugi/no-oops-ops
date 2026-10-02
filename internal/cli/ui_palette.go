@@ -37,7 +37,7 @@ func uiPalette(cfg config.Config, row *tui.Row) ([]tui.Command, error) {
 	}
 	sort.Strings(names)
 	defaults := map[string]string{"environment": "", "app": "", "service": ""}
-	if row != nil && row.Environment != "platform" {
+	if row != nil && !row.Untracked && row.Environment != "platform" {
 		defaults["environment"] = row.Environment
 		if actions, err := uiActions(cfg, *row); err == nil {
 			for _, action := range actions {

@@ -157,7 +157,7 @@ func (d *dashboard) refresh() {
 				tableRows(d.services, []string{"ENV", "APP", "SERVICE", "REPLICAS", "AGE", "STATE"}, values)
 				d.status.SetText("Updated " + time.Now().Format("15:04:05"))
 				if len(rows) == 0 {
-					d.status.SetText("No managed services running in this workspace.")
+					d.status.SetText("No Swarm services found.")
 					d.loadTasks("")
 				} else {
 					d.services.Select(selected, 0)

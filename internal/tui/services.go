@@ -18,6 +18,7 @@ import (
 type Row struct {
 	ID, Environment, App, Service, Replicas, State string
 	CreatedAt                                      time.Time
+	Untracked                                      bool
 }
 type owner struct{ environment, app string }
 
@@ -54,6 +55,36 @@ func managedServices(cfg config.Config) (map[string]owner, error) {
 			result[stack+"_"+service] = o
 		}
 	}
+	// Deployment history survives removal of a generated blue/green manifest.
+	history, _ := filepath.Glob(filepath.Join(cfg.StateDir, "apps", "*", "*", "deployments", "*.json"))
+	for _, path := range history {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		var record struct {
+			ServiceName string `json:"service_name"`
+			StackName   string `json:"stack_name"`
+		}
+		if json.Unmarshal(data, &record) != nil {
+			continue
+		}
+		envDir := filepath.Dir(filepath.Dir(path))
+		o := owner{filepath.Base(envDir), filepath.Base(filepath.Dir(envDir))}
+		name := record.ServiceName
+		if name == "" && record.StackName != "" {
+			suffix := "app"
+			if record.StackName == o.environment+"-"+o.app {
+				suffix = record.StackName
+			}
+			name = record.StackName + "_" + suffix
+		}
+		if name != "" {
+			if _, known := result[name]; !known {
+				result[name] = o
+			}
+		}
+	}
 	return result, nil
 }
 
@@ -76,10 +107,10 @@ func Services(ctx context.Context, cfg config.Config) ([]Row, error) {
 	}
 	output, err = exec.CommandContext(ctx, "docker", args...).CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("Docker service ages: %w: %s", err, strings.TrimSpace(string(output)))
+		return rows, nil // Services may disappear between listing and inspection.
 	}
 	if err := applyServiceAges(rows, string(output)); err != nil {
-		return nil, err
+		return rows, nil // Keep discovery visible even when optional ages are unavailable.
 	}
 	return rows, nil
 }
@@ -96,7 +127,7 @@ func parseServices(output string, owners map[string]owner) ([]Row, error) {
 		}
 		o, ok := owners[service.Name]
 		if !ok {
-			continue
+			o = owner{"—", "untracked"}
 		}
 		state := "unknown"
 		var running, desired int
@@ -108,7 +139,7 @@ func parseServices(output string, owners map[string]owner) ([]Row, error) {
 				state = "running"
 			}
 		}
-		rows = append(rows, Row{ID: service.ID, Environment: o.environment, App: o.app, Service: service.Name, Replicas: service.Replicas, State: state})
+		rows = append(rows, Row{ID: service.ID, Environment: o.environment, App: o.app, Service: service.Name, Replicas: service.Replicas, State: state, Untracked: !ok})
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].Service < rows[j].Service })
 	return rows, nil

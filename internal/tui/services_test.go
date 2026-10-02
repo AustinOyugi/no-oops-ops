@@ -35,12 +35,15 @@ func TestServiceOwnershipAndStates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rows) != 3 {
+	if len(rows) != 4 {
 		t.Fatalf("rows = %+v", rows)
 	}
 	states := map[string]string{}
 	for _, r := range rows {
 		states[r.ID] = r.State
+		if r.ID == "4" && (!r.Untracked || r.App != "untracked") {
+			t.Fatal("unmatched service not labeled")
+		}
 	}
 	if states["1"] != "running" || states["2"] != "degraded" || states["3"] != "scaled down" {
 		t.Fatalf("states = %v", states)
@@ -64,5 +67,30 @@ func TestServiceAgeUsesCreationRatherThanTaskStart(t *testing.T) {
 	}
 	if err := applyServiceAges(rows, `{"Name":"api","CreatedAt":"invalid"}`); err == nil {
 		t.Fatal("invalid timestamp accepted")
+	}
+}
+
+func TestHistoryFindsServiceWithoutStackManifest(t *testing.T) {
+	cfg := config.Config{StateDir: t.TempDir()}
+	dir := filepath.Join(cfg.StateDir, "apps", "nyota-web", "prod", "deployments")
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "old.json"), []byte(`{"stack_name":"prod-nyota-web-old","service_name":"prod-nyota-web-old_app"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "corrupt.json"), []byte(`broken`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	owners, err := managedServices(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := parseServices(`{"ID":"web","Name":"prod-nyota-web-old_app","Replicas":"1/1"}`, owners)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].Untracked || rows[0].App != "nyota-web" || rows[0].Environment != "prod" {
+		t.Fatalf("missing history ownership: %+v", rows)
 	}
 }

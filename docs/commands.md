@@ -114,8 +114,11 @@ Run `noops ui` in an initialized workspace, or use `noops --workspace <workspace
 The tview terminal dashboard lists managed Swarm services with environment,
 app/deployment name, Docker service name, running/desired replicas, and state.
 It includes registry and ingress services, plus app services identified by the
-workspace's generated stack manifests, including blue/green candidates. It does
-not list unrelated Docker services or undeployed catalog entries.
+workspace's generated stack manifests, including blue/green candidates. Deployment history also identifies services whose generated stack files are gone.
+All unmatched live Swarm services are shown as `untracked`, with environment `—`;
+they support task inspection but offer only status/doctor in the service actions
+menu. The global palette still permits explicitly selected catalog targets.
+Undeployed catalog entries remain available through Release.
 
 Use the up/down arrows to select a row and `q` or Ctrl-C to exit. The list refreshes
 every five seconds; selection follows the service across refreshes. Docker errors

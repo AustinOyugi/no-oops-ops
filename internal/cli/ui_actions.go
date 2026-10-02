@@ -18,7 +18,7 @@ import (
 func uiActions(cfg config.Config, row tui.Row) ([]tui.Action, error) {
 	base := []string{"--workspace", cfg.Workspace}
 	actions := []tui.Action{{Label: "Platform status", Args: append(append([]string{}, base...), "status")}, {Label: "Doctor", Args: append(append([]string{}, base...), "doctor")}}
-	if row.Environment == "platform" {
+	if row.Untracked || row.Environment == "platform" {
 		return actions, nil
 	}
 	apps, err := catalog.Load(cfg.Workspace)

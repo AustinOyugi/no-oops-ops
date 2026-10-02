@@ -52,3 +52,15 @@ func TestPlatformActionsExcludeLifecycleCommands(t *testing.T) {
 		}
 	}
 }
+
+func TestUntrackedServiceDoesNotOfferTargetedActions(t *testing.T) {
+	actions, err := uiActions(config.Config{Workspace: t.TempDir()}, tui.Row{Untracked: true, Environment: "prod", App: "api"})
+	if err != nil || len(actions) != 2 {
+		t.Fatalf("untracked actions: %v %v", actions, err)
+	}
+	for _, action := range actions {
+		if action.Label != "Platform status" && action.Label != "Doctor" {
+			t.Fatalf("target action for untracked service: %v", action)
+		}
+	}
+}
