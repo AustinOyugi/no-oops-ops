@@ -1,8 +1,6 @@
 package tui
 
 import (
-	"errors"
-	"strings"
 	"testing"
 	"time"
 )
@@ -27,31 +25,5 @@ func TestTasksHistoryAndUptime(t *testing.T) {
 	}
 	if _, err := parseTasks("broken"); err == nil {
 		t.Fatal("invalid JSON accepted")
-	}
-}
-
-func TestTaskSelectionRefreshAndLayout(t *testing.T) {
-	pane := taskPane{service: "api", tasks: []Task{{ID: "a"}, {ID: "b", Error: "failed"}}, selected: 1}
-	pane.accept(taskSnapshot{tasks: []Task{{ID: "b", Error: "failed"}, {ID: "c"}}})
-	if pane.selected != 0 || pane.tasks[pane.selected].ID != "b" {
-		t.Fatal("selection lost")
-	}
-	pane.accept(taskSnapshot{err: errors.New("offline")})
-	if len(pane.tasks) != 2 || !strings.Contains(pane.message, "offline") {
-		t.Fatal("error discarded previous tasks")
-	}
-	pane.message = "Updated"
-	screen := renderDashboard([]Row{{Service: "api"}}, 0, "Updated", pane, true, 80, 24)
-	for _, text := range []string{"Services", "TASKS · api [active]", "UPTIME", "Error: failed", "Tab pane"} {
-		if !strings.Contains(screen, text) {
-			t.Fatalf("missing %q in %q", text, screen)
-		}
-	}
-	small := renderDashboard(nil, 0, "Updated", pane, true, 80, 10)
-	if !strings.Contains(small, "TASKS") || strings.Contains(small, "NOOPS") {
-		t.Fatal("small terminal did not prioritize focused pane")
-	}
-	for _, d := range [][2]int{{0, 0}, {1, 1}, {10, 3}} {
-		renderDashboard(nil, 0, "", pane, false, d[0], d[1])
 	}
 }

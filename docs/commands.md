@@ -111,7 +111,7 @@ route; No Oops does not request an ACME email or issue Let's Encrypt certificate
 ## Live service dashboard
 
 Run `noops ui` in an initialized workspace, or use `noops --workspace <workspace> ui`.
-The read-only terminal dashboard lists managed Swarm services with environment,
+The tview terminal dashboard lists managed Swarm services with environment,
 app/deployment name, Docker service name, running/desired replicas, and state.
 It includes registry and ingress services, plus app services identified by the
 workspace's generated stack manifests, including blue/green candidates. It does
@@ -130,4 +130,16 @@ only running tasks have uptime, measured from their running-state timestamp.
 Press `Tab` to switch focus between services and tasks, then use up/down to select.
 The selected task's full ID and failure message appear below the task table.
 Changing services cancels the previous task query; task errors retain previous
-results for the same service. On small terminals, the focused pane fills the screen.
+results for the same service. Tables scroll within their panes and resize with the terminal.
+
+Press `e` to open commands for the selected service: platform status, doctor,
+release list, release, deploy, rollback, and remove. The catalog resolves the app
+alias and Compose service; ambiguous or missing mappings are rejected rather than
+guessed. Platform services offer only status and doctor. Every command shows its
+exact arguments with Cancel selected before execution.
+
+Commands run through the current Noops executable with the explicit workspace and
+service target, without a shell. The dashboard temporarily suspends so ordinary
+CLI prompts and live output work normally. Press Enter after completion to return;
+the dashboard reports success or failure and refreshes. Ctrl-C exits the dashboard
+and cancels an active command; it does not roll back work already performed.

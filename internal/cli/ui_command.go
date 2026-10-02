@@ -10,7 +10,7 @@ import (
 )
 
 func newUICommand(ctx context.Context, rt *runtime) *cobra.Command {
-	return &cobra.Command{Use: "ui", Short: "Open the live, read-only service dashboard", Args: cobra.NoArgs,
+	return &cobra.Command{Use: "ui", Short: "Open the live service dashboard", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			root, err := rt.workspaceRoot()
 			if err != nil {
@@ -20,7 +20,7 @@ func newUICommand(ctx context.Context, rt *runtime) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return tui.Run(ctx, os.Stdin, os.Stdout, func(ctx context.Context) ([]tui.Row, error) { return tui.Services(ctx, cfg) }, tui.Tasks)
+			return tui.Run(ctx, os.Stdin, os.Stdout, func(ctx context.Context) ([]tui.Row, error) { return tui.Services(ctx, cfg) }, tui.Tasks, tui.Execution{Resolve: func(row tui.Row) ([]tui.Action, error) { return uiActions(cfg, row) }, Run: runUIAction})
 		},
 	}
 }
