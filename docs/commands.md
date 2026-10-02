@@ -123,3 +123,11 @@ appear in the dashboard, retaining previous results until a successful refresh.
 `running` means all desired replicas are running, not that application health has
 been verified; zero desired replicas show `scaled down`. An interactive terminal
 is required. Quitting restores the terminal and cancels pending Docker queries.
+
+The dashboard also shows tasks for the selected service, including task ID, node,
+state, running uptime, and errors. Retained stopped/failed tasks remain visible;
+only running tasks have uptime, measured from their running-state timestamp.
+Press `Tab` to switch focus between services and tasks, then use up/down to select.
+The selected task's full ID and failure message appear below the task table.
+Changing services cancels the previous task query; task errors retain previous
+results for the same service. On small terminals, the focused pane fills the screen.

@@ -14,6 +14,13 @@ import (
 	"golang.org/x/term"
 )
 
+type taskSnapshot struct {
+	service    string
+	generation int
+	tasks      []Task
+	err        error
+}
+
 type snapshot struct {
 	rows []Row
 	err  error
@@ -21,7 +28,7 @@ type snapshot struct {
 
 // Run owns the terminal only for the duration of the dashboard. Docker reads
 // run separately, with a timeout, so navigation and cancellation stay responsive.
-func Run(parent context.Context, in, out *os.File, query func(context.Context) ([]Row, error)) error {
+func Run(parent context.Context, in, out *os.File, query func(context.Context) ([]Row, error), taskQuery func(context.Context, string) ([]Task, error)) error {
 	if !term.IsTerminal(int(in.Fd())) || !term.IsTerminal(int(out.Fd())) {
 		return fmt.Errorf("noops ui requires an interactive terminal")
 	}
@@ -60,12 +67,63 @@ func Run(parent context.Context, in, out *os.File, query func(context.Context) (
 	selected := 0
 	message := "Loading services…"
 	escape := ""
+	taskResults := make(chan taskSnapshot, 1)
+	pane := taskPane{message: "Select a service"}
+	taskFocus := false
+	generation := 0
+	taskBusy := false
+	var taskCancel context.CancelFunc
+	defer func() {
+		if taskCancel != nil {
+			taskCancel()
+		}
+	}()
+	loadTasks := func(service string) {
+		if taskCancel != nil {
+			taskCancel()
+		}
+		generation++
+		current := generation
+		if pane.service != service {
+			pane = taskPane{service: service, message: "Loading tasks…"}
+		}
+		if service == "" {
+			taskBusy = false
+			pane = taskPane{message: "Select a service"}
+			return
+		}
+		taskBusy = true
+		readCtx, done := context.WithTimeout(ctx, 10*time.Second)
+		taskCancel = done
+		go func() {
+			defer done()
+			tasks, err := taskQuery(readCtx, service)
+			select {
+			case taskResults <- taskSnapshot{service, current, tasks, err}:
+			case <-ctx.Done():
+			}
+		}()
+	}
+	selectedService := func() string {
+		if selected < len(rows) {
+			return rows[selected].Service
+		}
+		return ""
+	}
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-ticker.C:
 			refresh()
+			if !taskBusy {
+				loadTasks(selectedService())
+			}
+		case result := <-taskResults:
+			if result.generation == generation && result.service == pane.service {
+				taskBusy = false
+				pane.accept(result)
+			}
 		case result := <-results:
 			busy = false
 			if result.err != nil {
@@ -84,6 +142,9 @@ func Run(parent context.Context, in, out *os.File, query func(context.Context) (
 					}
 				}
 				message = "Updated " + time.Now().Format("15:04:05")
+				if pane.service != selectedService() {
+					loadTasks(selectedService())
+				}
 			}
 		default:
 		}
@@ -91,7 +152,7 @@ func Run(parent context.Context, in, out *os.File, query func(context.Context) (
 		if err != nil {
 			return err
 		}
-		fmt.Fprint(out, render(rows, selected, message, width, height))
+		fmt.Fprint(out, renderDashboard(rows, selected, message, pane, taskFocus, width, height))
 		fds := []unix.PollFd{{Fd: int32(in.Fd()), Events: unix.POLLIN}}
 		_, err = unix.Poll(fds, 100)
 		if err == unix.EINTR {
@@ -118,6 +179,11 @@ func Run(parent context.Context, in, out *os.File, query func(context.Context) (
 			if key == 'q' || key == 3 {
 				return nil
 			}
+			if key == '\t' {
+				taskFocus = !taskFocus
+				escape = ""
+				continue
+			}
 			if key == 27 {
 				escape = "\x1b"
 				continue
@@ -127,11 +193,24 @@ func Run(parent context.Context, in, out *os.File, query func(context.Context) (
 				continue
 			}
 			if escape == "\x1b[" {
-				if key == 'A' && selected > 0 {
-					selected--
-				}
-				if key == 'B' && selected+1 < len(rows) {
-					selected++
+				if taskFocus {
+					if key == 'A' && pane.selected > 0 {
+						pane.selected--
+					}
+					if key == 'B' && pane.selected+1 < len(pane.tasks) {
+						pane.selected++
+					}
+				} else {
+					previous := selectedService()
+					if key == 'A' && selected > 0 {
+						selected--
+					}
+					if key == 'B' && selected+1 < len(rows) {
+						selected++
+					}
+					if previous != selectedService() {
+						loadTasks(selectedService())
+					}
 				}
 			}
 			escape = ""

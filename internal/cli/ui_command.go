@@ -20,7 +20,7 @@ func newUICommand(ctx context.Context, rt *runtime) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return tui.Run(ctx, os.Stdin, os.Stdout, func(ctx context.Context) ([]tui.Row, error) { return tui.Services(ctx, cfg) })
+			return tui.Run(ctx, os.Stdin, os.Stdout, func(ctx context.Context) ([]tui.Row, error) { return tui.Services(ctx, cfg) }, tui.Tasks)
 		},
 	}
 }
