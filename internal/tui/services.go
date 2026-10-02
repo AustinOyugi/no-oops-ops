@@ -22,8 +22,7 @@ type Row struct {
 }
 type owner struct{ environment, app string }
 
-// Generated stack manifests identify this workspace's services, including
-// blue/green candidates. Avoid guessing ownership from Docker name prefixes.
+// Generated manifests and deployment history provide exact service ownership.
 func managedServices(cfg config.Config) (map[string]owner, error) {
 	result := map[string]owner{
 		cfg.RegistryName + "_registry": {"platform", "registry"},
@@ -101,6 +100,7 @@ func Services(ctx context.Context, cfg config.Config) ([]Row, error) {
 	if err != nil || len(rows) == 0 {
 		return rows, err
 	}
+	resolveCatalogServices(cfg, rows)
 	args := []string{"service", "inspect", "--format", `{"Name":{{json .Spec.Name}},"CreatedAt":{{json .CreatedAt}}}`}
 	for _, row := range rows {
 		args = append(args, row.Service)

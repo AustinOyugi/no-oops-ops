@@ -41,7 +41,7 @@ func uiPalette(cfg config.Config, row *tui.Row) ([]tui.Command, error) {
 		defaults["environment"] = row.Environment
 		if actions, err := uiActions(cfg, *row); err == nil {
 			for _, action := range actions {
-				if action.Label == "Deploy" {
+				if action.Label == "Release" {
 					defaults["app"] = action.Args[4]
 					defaults["service"] = action.Args[6]
 				}

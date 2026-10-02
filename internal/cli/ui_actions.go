@@ -25,7 +25,11 @@ func uiActions(cfg config.Config, row tui.Row) ([]tui.Action, error) {
 	if err != nil {
 		return nil, err
 	}
-	var matches []struct{ app, service string }
+	type targetMatch struct {
+		app, service string
+		deployable   bool
+	}
+	var matches []targetMatch
 	names := make([]string, 0, len(apps.Apps))
 	for name := range apps.Apps {
 		names = append(names, name)
@@ -46,7 +50,7 @@ func uiActions(cfg config.Config, row tui.Row) ([]tui.Action, error) {
 				return nil, err
 			}
 			if m.Name == row.App {
-				matches = append(matches, struct{ app, service string }{name, service})
+				matches = append(matches, targetMatch{name, service, m.ShouldDeploy()})
 			}
 		}
 	}
@@ -58,6 +62,9 @@ func uiActions(cfg config.Config, row tui.Row) ([]tui.Action, error) {
 		label   string
 		command []string
 	}{{"List releases", []string{"release", "list"}}, {"Release", []string{"release"}}, {"Deploy", []string{"deploy"}}, {"Rollback", []string{"rollback"}}, {"Remove", []string{"remove"}}} {
+		if !target.deployable && (item.label == "Deploy" || item.label == "Rollback" || item.label == "Remove") {
+			continue
+		}
 		args := append([]string{}, base...)
 		args = append(args, item.command...)
 		args = append(args, row.Environment, target.app, "--service", target.service)

@@ -64,3 +64,25 @@ func TestUntrackedServiceDoesNotOfferTargetedActions(t *testing.T) {
 		}
 	}
 }
+
+func TestReleaseOnlyServiceActions(t *testing.T) {
+	root := t.TempDir()
+	os.WriteFile(filepath.Join(root, "apps.yml"), []byte("apps:\n  shop:\n    manifest: compose.yml\n"), 0600)
+	os.WriteFile(filepath.Join(root, "compose.yml"), []byte("services:\n  library:\n    image: busybox\n    x-noops: {deploy: false}\n"), 0600)
+	actions, err := uiActions(config.Config{Workspace: root}, tui.Row{Environment: "prod", App: "library"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := false
+	for _, action := range actions {
+		if action.Label == "Release" {
+			release = true
+		}
+		if action.Label == "Deploy" || action.Label == "Rollback" || action.Label == "Remove" {
+			t.Fatalf("deployment action for release-only service: %+v", action)
+		}
+	}
+	if !release {
+		t.Fatal("release unavailable")
+	}
+}
