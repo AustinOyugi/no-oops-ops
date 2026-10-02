@@ -73,3 +73,21 @@ func TestPaletteAvailableWithoutSelectionAndInvalidForm(t *testing.T) {
 	layout.SetText("prod")
 	layout.SetText("")
 }
+
+func TestNewReleaseAvailableWithoutRunningService(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	d := newDashboard(ctx, nil, nil)
+	d.execution = &Execution{Palette: func(row *Row) ([]Command, error) {
+		if row != nil {
+			t.Fatal("unexpected running service")
+		}
+		return []Command{{Label: "Release", Build: func(map[string]string) (Action, error) {
+			return Action{Label: "Release", Args: []string{"release", "prod", "new-app", "--service", "api"}}, nil
+		}}}, nil
+	}}
+	d.newRelease()
+	if !d.modal {
+		t.Fatal("new release form not opened without running services")
+	}
+}

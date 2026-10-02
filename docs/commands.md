@@ -181,3 +181,13 @@ Deploy/release-with-deploy also use handoff when a selected TLS service needs an
 ACME email that has not been configured. Cancellation stops the command process
 group; it does not reverse completed changes or guarantee remote Docker work
 has stopped. Quitting the dashboard cancels the running command.
+
+The services table includes AGE, measured from Docker's service creation timestamp,
+separately from task uptime. Updating an existing service preserves its age;
+recreating a service or creating a blue/green candidate starts a new service age.
+
+Press `n` to release a new service. The form lists all apps and Compose services
+from the current workspace catalog, including services not yet deployed to Swarm.
+Choose the app, service, and environment; enable deploy to release and launch it.
+A service must be declared in a catalog-referenced manifest first. You can also
+open Release through `:`. New catalog entries are read whenever the form opens.

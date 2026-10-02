@@ -213,3 +213,33 @@ func (d *dashboard) commandForm(command Command) {
 	layout.SetBorder(true).SetTitle(" "+command.Label+" ").SetTitleAlign(tview.AlignLeft).SetBorderColor(mutedColor).SetBackgroundColor(panelColor).SetBorderPadding(1, 1, 2, 2)
 	d.showOverlay(layout, form, 84, height)
 }
+
+// New releases select from the catalog, including services without Swarm tasks.
+func (d *dashboard) newRelease() {
+	if d.execution == nil || d.execution.Palette == nil {
+		return
+	}
+	var selected *Row
+	row, _ := d.services.GetSelection()
+	if row > 0 && row <= len(d.rows) {
+		r := d.rows[row-1]
+		selected = &r
+	}
+	commands, err := d.execution.Palette(selected)
+	if err != nil {
+		d.notice(err.Error())
+		return
+	}
+	for _, command := range commands {
+		if command.Label == "Release" {
+			for i := range command.Fields {
+				if command.Fields[i].Key == "app" || command.Fields[i].Key == "service" {
+					command.Fields[i].Default = ""
+				}
+			}
+			command.Description = "Release a catalog service, including services that have never been deployed. Enable deploy to launch it afterward."
+			d.commandForm(command)
+			return
+		}
+	}
+}

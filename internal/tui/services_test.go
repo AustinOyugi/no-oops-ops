@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 )
@@ -46,5 +47,22 @@ func TestServiceOwnershipAndStates(t *testing.T) {
 	}
 	if _, err := parseServices("not json", owners); err == nil {
 		t.Fatal("malformed Docker output accepted")
+	}
+}
+
+func TestServiceAgeUsesCreationRatherThanTaskStart(t *testing.T) {
+	rows := []Row{{Service: "api"}, {Service: "unknown"}}
+	if err := applyServiceAges(rows, `{"Name":"api","CreatedAt":"2026-10-01T00:00:00Z"}`); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 10, 2, 4, 0, 0, 0, time.UTC)
+	if got := serviceAge(rows[0], now); got != "1d 4h" {
+		t.Fatalf("age %s", got)
+	}
+	if got := serviceAge(rows[1], now); got != "—" {
+		t.Fatalf("unknown age %s", got)
+	}
+	if err := applyServiceAges(rows, `{"Name":"api","CreatedAt":"invalid"}`); err == nil {
+		t.Fatal("invalid timestamp accepted")
 	}
 }

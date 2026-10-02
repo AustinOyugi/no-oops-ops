@@ -77,7 +77,11 @@ func uiPalette(cfg config.Config, row *tui.Row) ([]tui.Command, error) {
 		flags := []string{}
 		if item.flag != "" {
 			flags = append(flags, item.flag)
-			fields = append(fields, boolean(item.flag, item.flag))
+			label := "Quick rollout"
+			if item.flag == "deploy" {
+				label = "Deploy after release"
+			}
+			fields = append(fields, boolean(item.flag, label))
 		}
 		specs = append(specs, paletteSpec{label: item.label, description: "Run " + strings.Join(item.command, " ") + " for the selected app target", command: item.command, required: []string{"environment", "app"}, fields: fields, flags: flags})
 	}

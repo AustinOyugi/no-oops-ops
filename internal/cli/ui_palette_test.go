@@ -120,3 +120,20 @@ func TestPaletteTargetsFlagsAndSecrets(t *testing.T) {
 		}
 	}
 }
+
+func TestReleaseCanTargetUndeployedCatalogService(t *testing.T) {
+	for _, command := range paletteFixture(t) {
+		if command.Label == "Release" {
+			action, err := command.Build(map[string]string{"environment": "prod", "app": "shop", "service": "worker", "deploy": "true"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			args := strings.Join(action.Args, " ")
+			if !strings.Contains(args, "--service worker") || !strings.Contains(args, "--deploy") {
+				t.Fatalf("new service release: %s", args)
+			}
+			return
+		}
+	}
+	t.Fatal("missing release form")
+}

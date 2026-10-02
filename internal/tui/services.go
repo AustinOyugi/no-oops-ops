@@ -9,12 +9,16 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"gopkg.in/yaml.v3"
 )
 
-type Row struct{ ID, Environment, App, Service, Replicas, State string }
+type Row struct {
+	ID, Environment, App, Service, Replicas, State string
+	CreatedAt                                      time.Time
+}
 type owner struct{ environment, app string }
 
 // Generated stack manifests identify this workspace's services, including
@@ -62,7 +66,22 @@ func Services(ctx context.Context, cfg config.Config) ([]Row, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Docker: %w: %s", err, strings.TrimSpace(string(output)))
 	}
-	return parseServices(string(output), owners)
+	rows, err := parseServices(string(output), owners)
+	if err != nil || len(rows) == 0 {
+		return rows, err
+	}
+	args := []string{"service", "inspect", "--format", `{"Name":{{json .Spec.Name}},"CreatedAt":{{json .CreatedAt}}}`}
+	for _, row := range rows {
+		args = append(args, row.Service)
+	}
+	output, err = exec.CommandContext(ctx, "docker", args...).CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("Docker service ages: %w: %s", err, strings.TrimSpace(string(output)))
+	}
+	if err := applyServiceAges(rows, string(output)); err != nil {
+		return nil, err
+	}
+	return rows, nil
 }
 
 func parseServices(output string, owners map[string]owner) ([]Row, error) {
@@ -89,8 +108,35 @@ func parseServices(output string, owners map[string]owner) ([]Row, error) {
 				state = "running"
 			}
 		}
-		rows = append(rows, Row{service.ID, o.environment, o.app, service.Name, service.Replicas, state})
+		rows = append(rows, Row{ID: service.ID, Environment: o.environment, App: o.app, Service: service.Name, Replicas: service.Replicas, State: state})
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].Service < rows[j].Service })
 	return rows, nil
+}
+
+func applyServiceAges(rows []Row, output string) error {
+	dates := map[string]time.Time{}
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		if line == "" {
+			continue
+		}
+		var item struct {
+			Name      string
+			CreatedAt time.Time
+		}
+		if err := json.Unmarshal([]byte(line), &item); err != nil {
+			return fmt.Errorf("decode service age: %w", err)
+		}
+		dates[item.Name] = item.CreatedAt
+	}
+	for i := range rows {
+		rows[i].CreatedAt = dates[rows[i].Service]
+	}
+	return nil
+}
+func serviceAge(row Row, now time.Time) string {
+	if row.CreatedAt.IsZero() {
+		return "—"
+	}
+	return uptime(Task{State: "running", StartedAt: row.CreatedAt}, now)
 }

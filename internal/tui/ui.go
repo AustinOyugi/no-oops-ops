@@ -68,6 +68,9 @@ func newDashboard(ctx context.Context, query func(context.Context) ([]Row, error
 				d.app.SetFocus(d.output)
 			}
 			return nil
+		case event.Rune() == 'n':
+			d.newRelease()
+			return nil
 		case event.Rune() == ':':
 			d.palette()
 			return nil
@@ -141,12 +144,12 @@ func (d *dashboard) refresh() {
 				values := make([][]string, 0, len(rows))
 				selected := 1
 				for i, r := range rows {
-					values = append(values, []string{r.Environment, r.App, r.Service, r.Replicas, r.State})
+					values = append(values, []string{r.Environment, r.App, r.Service, r.Replicas, serviceAge(r, time.Now()), r.State})
 					if r.Service == d.selected {
 						selected = i + 1
 					}
 				}
-				tableRows(d.services, []string{"ENV", "APP", "SERVICE", "REPLICAS", "STATE"}, values)
+				tableRows(d.services, []string{"ENV", "APP", "SERVICE", "REPLICAS", "AGE", "STATE"}, values)
 				d.status.SetText("Updated " + time.Now().Format("15:04:05"))
 				if len(rows) == 0 {
 					d.status.SetText("No managed services running in this workspace.")
@@ -237,7 +240,7 @@ func Run(parent context.Context, in, out *os.File, query func(context.Context) (
 	d := newDashboard(ctx, query, taskQuery)
 	if len(execution) > 0 {
 		d.execution = &execution[0]
-		d.footer.SetText(" : all commands · e service actions · o output · Tab pane · ↑/↓ select · q quit · refresh every 5s")
+		d.footer.SetText(": commands · n release · e actions · o output · Tab panes · q quit")
 	}
 	defer func() {
 		if d.taskCancel != nil {
