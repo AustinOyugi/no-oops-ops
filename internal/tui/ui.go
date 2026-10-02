@@ -17,6 +17,7 @@ import (
 )
 
 type dashboard struct {
+	health                   *tview.TextView
 	keepKilledOutput         bool
 	output                   *tview.TextView
 	outputFollow, jobRunning bool
@@ -45,11 +46,12 @@ func newDashboard(ctx context.Context, query func(context.Context) ([]Row, error
 	d.tasks = tview.NewTable().SetSelectable(true, false).SetFixed(1, 0)
 	d.services.SetBorder(true).SetTitle(" Services ")
 	d.tasks.SetBorder(true).SetTitle(" Tasks ")
+	d.health = tview.NewTextView().SetText("HOST · Sampling metrics…").SetTextColor(accentColor).SetWrap(true)
 	d.status = tview.NewTextView().SetText("Loading services…")
 	d.detail = tview.NewTextView().SetWrap(true)
 	d.footer = tview.NewTextView().SetText("Tab pane · ↑/↓ select · q quit · refresh every 5s")
 	d.layout = tview.NewFlex().SetDirection(tview.FlexRow).
-		AddItem(d.status, 2, 0, false).AddItem(d.services, 0, 1, true).
+		AddItem(d.health, 3, 0, false).AddItem(d.status, 2, 0, false).AddItem(d.services, 0, 1, true).
 		AddItem(d.tasks, 0, 1, false).AddItem(d.detail, 3, 0, false).AddItem(d.footer, 1, 0, false)
 	d.services.SetSelectionChangedFunc(func(row, col int) {
 		if row > 0 && row <= len(d.rows) && d.rows[row-1].Service != d.selected {
@@ -254,6 +256,7 @@ func Run(parent context.Context, in, out *os.File, query func(context.Context) (
 	d.app.SetBeforeDrawFunc(func(tcell.Screen) bool {
 		once.Do(func() {
 			d.refresh()
+			d.monitorMetrics()
 			go func() {
 				ticker := time.NewTicker(5 * time.Second)
 				defer ticker.Stop()

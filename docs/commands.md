@@ -192,3 +192,18 @@ from the current workspace catalog, including services not yet deployed to Swarm
 Choose the app, service, and environment; enable deploy to release and launch it.
 A service must be declared in a catalog-referenced manifest first. You can also
 open Release through `:`. New catalog entries are read whenever the form opens.
+
+### Host health
+
+A persistent strip above services samples CPU, RAM, disk capacity/free space,
+load averages, uptime, and Docker connectivity every two seconds independently
+of service refresh and command output. Overlays leave the strip visible. For a
+local Linux Docker daemon with a matching hostname, disk usage covers Docker's
+reported data directory. Missing readings show `—`; old snapshots are marked
+STALE. When Docker is unavailable, metrics are explicitly labeled LOCAL HOST
+and disk usage covers `/`.
+
+Remote/VM Docker daemons display their hostname and connectivity, with resource
+metrics marked unavailable. Local computer readings are never presented as remote
+server usage; run the dashboard on the server for those metrics. These are host
+metrics, not per-container limits or a whole-Swarm aggregate.

@@ -21,19 +21,23 @@ func (o *overlay) SetRect(x, y, w, h int)        { o.x, o.y, o.w, o.h = x, y, w,
 func (o *overlay) GetRect() (int, int, int, int) { return o.x, o.y, o.w, o.h }
 func (o *overlay) Draw(screen tcell.Screen) {
 	w := min(o.width, max(1, o.w-4))
-	h := min(o.height, max(1, o.h-2))
+	top := 0
+	if o.background != nil && o.h > 8 {
+		top = 3
+	}
+	h := min(o.height, max(1, o.h-top-2))
 	if o.background != nil {
 		o.background.SetRect(o.x, o.y, o.w, o.h)
 		o.background.Draw(screen)
 	}
-	x, y := o.x+(o.w-w)/2, o.y+(o.h-h)/2
+	x, y := o.x+(o.w-w)/2, o.y+top+(o.h-top-h)/2
 	style := tcell.StyleDefault.Background(panelColor).Foreground(tcell.ColorWhite)
 	for row := y; row < y+h; row++ {
 		for col := x; col < x+w; col++ {
 			screen.SetContent(col, row, ' ', nil, style)
 		}
 	}
-	o.Primitive.SetRect(o.x+(o.w-w)/2, o.y+(o.h-h)/2, w, h)
+	o.Primitive.SetRect(o.x+(o.w-w)/2, o.y+top+(o.h-top-h)/2, w, h)
 	o.Primitive.Draw(screen)
 }
 func (d *dashboard) showOverlay(content tview.Primitive, focus tview.Primitive, width, height int) {
