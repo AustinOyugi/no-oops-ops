@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
 
@@ -36,7 +37,7 @@ func (d *dashboard) closeDialog() {
 }
 func (d *dashboard) notice(text string) {
 	d.modal = true
-	modal := tview.NewModal().SetText(tview.Escape(clean(text))).AddButtons([]string{"Close"}).SetDoneFunc(func(int, string) { d.closeDialog() })
+	modal := tview.NewModal().SetBackgroundColor(panelColor).SetTextColor(tcell.ColorWhite).SetButtonBackgroundColor(tcell.NewHexColor(0x1f2937)).SetButtonTextColor(tcell.ColorWhite).SetText(tview.Escape(clean(text))).AddButtons([]string{"Close"}).SetDoneFunc(func(int, string) { d.closeDialog() })
 	d.app.SetRoot(modal, true).SetFocus(modal)
 }
 func (d *dashboard) actions() {
@@ -62,8 +63,9 @@ func (d *dashboard) actions() {
 		}
 	}
 	d.modal = true
-	menu := tview.NewList().ShowSecondaryText(true)
-	menu.SetBorder(true).SetTitle(" Noops commands · Esc to cancel ")
+	menu := tview.NewList().ShowSecondaryText(true).SetMainTextColor(tcell.ColorWhite).SetSecondaryTextColor(mutedColor).SetSelectedTextColor(tcell.ColorBlack).SetSelectedBackgroundColor(accentColor).SetHighlightFullLine(true)
+	menu.SetBackgroundColor(panelColor)
+	menu.SetBorder(true).SetTitle(" Service actions · Esc close ").SetTitleAlign(tview.AlignLeft).SetBorderColor(mutedColor).SetBorderPadding(1, 1, 2, 2)
 	for _, action := range actions {
 		action := action
 		menu.AddItem(action.Label, CommandText(action), 0, func() {
@@ -84,11 +86,11 @@ func (d *dashboard) actions() {
 		})
 	}
 	menu.SetDoneFunc(d.closeDialog)
-	d.app.SetRoot(menu, true).SetFocus(menu)
+	d.showOverlay(menu, menu, 84, len(actions)*2+6)
 }
 func (d *dashboard) confirm(action Action) *tview.Modal {
 	d.modal = true
-	modal := tview.NewModal().SetText(tview.Escape("Run this command?\n\n" + CommandText(action))).AddButtons([]string{"Cancel", "Run"}).
+	modal := tview.NewModal().SetBackgroundColor(panelColor).SetTextColor(tcell.ColorWhite).SetButtonBackgroundColor(tcell.NewHexColor(0x1f2937)).SetButtonTextColor(tcell.ColorWhite).SetText(tview.Escape("Run this command?\n\n" + CommandText(action))).AddButtons([]string{"Cancel", "Run"}).
 		SetDoneFunc(func(_ int, button string) {
 			d.closeDialog()
 			if button != "Run" {

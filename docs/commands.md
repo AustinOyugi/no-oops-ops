@@ -147,7 +147,7 @@ and cancels an active command; it does not roll back work already performed.
 ### Command palette
 
 Press `:` anywhere in the dashboard to search all CLI operations. Type to filter,
-then press Down or Tab to focus the results and Enter to open a command form.
+use up/down to choose a result while typing, and Enter to open its form. Tab switches focus to the results.
 Escape closes the palette or form. Commands include version, initialization,
 installation, uninstall, status, doctor, upgrades, cleanup, app lifecycle operations,
 secrets, and certificate import. The `ui` command itself is excluded.
