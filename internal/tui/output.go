@@ -70,9 +70,10 @@ func (d *dashboard) startStream(action Action) {
 				d.outputFollow = !d.outputFollow
 				return nil
 			case 'x':
-				if d.jobCancel != nil && d.jobRunning {
-					d.jobCancel()
-				}
+				d.cancelStream(false)
+				return nil
+			case 'X':
+				d.cancelStream(true)
 				return nil
 			}
 			if event.Key() == tcell.KeyEscape {
@@ -81,13 +82,15 @@ func (d *dashboard) startStream(action Action) {
 			}
 			return event
 		})
-		d.layout.RemoveItem(d.footer)
-		d.layout.AddItem(d.output, 0, 1, false).AddItem(d.footer, 1, 0, false)
+
 	}
+	d.showOutput()
+	d.keepKilledOutput = false
 	d.jobRunning = true
 	d.outputFollow = true
-	d.output.SetText(CommandText(action) + "\n").SetTitle(" Output · " + action.Label + " · running · p pause · x cancel ")
+	d.output.SetText(CommandText(action) + "\n").SetTitle(" Output · " + action.Label + " · running · x kill & keep logs · X kill & close ")
 	d.app.SetFocus(d.output)
+	d.footer.SetText("x kill, keep logs · Shift+x kill, close view · p pause/follow · Tab panes")
 	ctx, cancel := context.WithCancel(d.ctx)
 	d.jobCancel = cancel
 	buffer := &outputBuffer{}
@@ -131,6 +134,10 @@ func (d *dashboard) startStream(action Action) {
 						state = "failed"
 					}
 					d.output.SetTitle(" Output · " + action.Label + " · " + state + " · p follow · Esc services ")
+					if !d.keepKilledOutput {
+						d.hideOutput()
+					}
+					d.footer.SetText(action.Label + " " + state + " · o review output · r release · : commands")
 					d.refresh()
 				}
 			})
@@ -150,3 +157,35 @@ func (d *dashboard) startStream(action Action) {
 }
 
 var _ io.Writer = (*outputBuffer)(nil)
+
+func (d *dashboard) showOutput() {
+	if d.outputVisible || d.output == nil {
+		return
+	}
+	d.outputVisible = true
+	d.layout.RemoveItem(d.footer)
+	d.layout.ResizeItem(d.services, 0, 2).ResizeItem(d.tasks, 0, 1).ResizeItem(d.detail, 2, 0)
+	d.layout.AddItem(d.output, 0, 3, false).AddItem(d.footer, 1, 0, false)
+}
+func (d *dashboard) hideOutput() {
+	if !d.outputVisible {
+		return
+	}
+	d.outputVisible = false
+	d.layout.RemoveItem(d.output)
+	d.layout.ResizeItem(d.services, 0, 1).ResizeItem(d.tasks, 0, 1).ResizeItem(d.detail, 3, 0)
+	if d.app.GetFocus() == d.output {
+		d.app.SetFocus(d.services)
+	}
+}
+
+func (d *dashboard) cancelStream(closeView bool) {
+	if !d.jobRunning || d.jobCancel == nil {
+		return
+	}
+	d.keepKilledOutput = !closeView
+	d.jobCancel()
+	if closeView {
+		d.hideOutput()
+	}
+}

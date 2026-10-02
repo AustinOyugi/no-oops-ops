@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/gdamore/tcell/v2"
+	"github.com/rivo/tview"
 	"io"
 	"strings"
 	"sync"
@@ -55,6 +56,9 @@ func TestStreamCompletesInsideDashboard(t *testing.T) {
 	completed := make(chan string, 1)
 	d.app.SetAfterDrawFunc(func(tcell.Screen) {
 		if !d.jobRunning {
+			if d.outputVisible {
+				t.Error("completed output pane still visible")
+			}
 			select {
 			case completed <- d.output.GetText(false):
 			default:
@@ -79,5 +83,29 @@ func TestStreamCompletesInsideDashboard(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Error("dashboard did not exit")
+	}
+}
+
+func TestCancelKeepOutputOrClose(t *testing.T) {
+	for _, closeView := range []bool{false, true} {
+		ctx, cancel := context.WithCancel(context.Background())
+		d := newDashboard(ctx, nil, nil)
+		d.output = tview.NewTextView()
+		d.showOutput()
+		d.app.SetFocus(d.output)
+		jobCtx, jobCancel := context.WithCancel(ctx)
+		d.jobCancel = jobCancel
+		d.jobRunning = true
+		d.cancelStream(closeView)
+		if jobCtx.Err() == nil {
+			t.Fatal("command not canceled")
+		}
+		if d.outputVisible == closeView {
+			t.Fatalf("close=%v visible=%v", closeView, d.outputVisible)
+		}
+		if d.keepKilledOutput == closeView {
+			t.Fatal("wrong output retention")
+		}
+		cancel()
 	}
 }

@@ -17,8 +17,10 @@ import (
 )
 
 type dashboard struct {
+	keepKilledOutput         bool
 	output                   *tview.TextView
 	outputFollow, jobRunning bool
+	outputVisible            bool
 	jobCancel                context.CancelFunc
 	execution                *Execution
 	modal                    bool
@@ -65,6 +67,7 @@ func newDashboard(ctx context.Context, query func(context.Context) ([]Row, error
 			return event
 		case event.Rune() == 'o':
 			if d.output != nil {
+				d.showOutput()
 				d.app.SetFocus(d.output)
 			}
 			return nil
@@ -84,7 +87,7 @@ func newDashboard(ctx context.Context, query func(context.Context) ([]Row, error
 			if d.app.GetFocus() == d.services {
 				d.app.SetFocus(d.tasks)
 			} else {
-				if d.app.GetFocus() == d.tasks && d.output != nil {
+				if d.app.GetFocus() == d.tasks && d.outputVisible {
 					d.app.SetFocus(d.output)
 				} else {
 					d.app.SetFocus(d.services)

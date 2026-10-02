@@ -171,9 +171,10 @@ Noninteractive commands stream stdout and stderr into an output pane while the
 service/task dashboard continues refreshing. Press `o` to focus output, or use
 Tab to cycle through services, tasks, and output. Output is batched every 100 ms
 and retains the most recent 256 KB. Use `p` in the output pane to pause/resume
-auto-follow, arrow/PageUp/PageDown keys to scroll, and `x` to cancel the active
-command. Escape returns focus to services. Completion shows success or failure
-and the CLI exit error; output remains visible until the next streamed command.
+auto-follow, arrow/PageUp/PageDown keys to scroll, and `x` to kill the active command while keeping its output open.
+Use `X` (Shift+x) to kill the command and close its output pane. Escape returns focus to services. Completion shows success or failure
+and the CLI exit error; the output pane closes automatically and restores the services/tasks layout.
+Press `o` to reopen the retained output for review.
 One command can run at a time per dashboard.
 
 Secret set, installation, and interactive upgrades retain the terminal handoff.
