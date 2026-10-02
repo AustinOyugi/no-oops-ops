@@ -35,7 +35,7 @@ type dashboard struct {
 }
 
 func newDashboard(ctx context.Context, query func(context.Context) ([]Row, error), taskQuery func(context.Context, string) ([]Task, error)) *dashboard {
-	d := &dashboard{app: tview.NewApplication(), ctx: ctx, query: query, taskQuery: taskQuery}
+	d := &dashboard{app: tview.NewApplication().EnableMouse(true), ctx: ctx, query: query, taskQuery: taskQuery}
 	d.services = tview.NewTable().SetSelectable(true, false).SetFixed(1, 0)
 	d.tasks = tview.NewTable().SetSelectable(true, false).SetFixed(1, 0)
 	d.services.SetBorder(true).SetTitle(" Services ")
