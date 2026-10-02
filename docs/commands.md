@@ -186,7 +186,7 @@ The services table includes AGE, measured from Docker's service creation timesta
 separately from task uptime. Updating an existing service preserves its age;
 recreating a service or creating a blue/green candidate starts a new service age.
 
-Press `n` to release a new service. The form lists all apps and Compose services
+Press `r` to release a new service. The form lists all apps and Compose services
 from the current workspace catalog, including services not yet deployed to Swarm.
 Choose the app, service, and environment; enable deploy to release and launch it.
 A service must be declared in a catalog-referenced manifest first. You can also

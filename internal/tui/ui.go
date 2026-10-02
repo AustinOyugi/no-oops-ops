@@ -68,7 +68,7 @@ func newDashboard(ctx context.Context, query func(context.Context) ([]Row, error
 				d.app.SetFocus(d.output)
 			}
 			return nil
-		case event.Rune() == 'n':
+		case event.Rune() == 'r':
 			d.newRelease()
 			return nil
 		case event.Rune() == ':':
@@ -240,7 +240,7 @@ func Run(parent context.Context, in, out *os.File, query func(context.Context) (
 	d := newDashboard(ctx, query, taskQuery)
 	if len(execution) > 0 {
 		d.execution = &execution[0]
-		d.footer.SetText(": commands · n release · e actions · o output · Tab panes · q quit")
+		d.footer.SetText(": commands · r release · e actions · o output · Tab panes · q quit")
 	}
 	defer func() {
 		if d.taskCancel != nil {
