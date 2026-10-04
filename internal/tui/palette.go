@@ -232,11 +232,6 @@ func (d *dashboard) newRelease() {
 	}
 	for _, command := range commands {
 		if command.Label == "Release" {
-			for i := range command.Fields {
-				if command.Fields[i].Key == "app" || command.Fields[i].Key == "service" {
-					command.Fields[i].Default = ""
-				}
-			}
 			command.Description = "Release a catalog service, including services that have never been deployed. Enable deploy to launch it afterward."
 			d.commandForm(command)
 			return
