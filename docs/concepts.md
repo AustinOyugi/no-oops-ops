@@ -84,5 +84,7 @@ environment file when the application supports file-based secrets. Prefer `file`
 No Oops Ops uses workspace-local state and persistent registry data below `.noops/`. Paths and retention are described
 in [Configuration and generated state](reference/configuration.md). Deployments keep a durable operation journal while
 they transition Docker, ingress, and history. A restarted command automatically removes an unpromoted blue/green
-candidate; an interrupted in-place or already-promoted operation stops with the journal path so its live state is
-inspected rather than guessed at.
+candidate. For an in-place operation at `stack_deployed`, a retry inspects the live Swarm update status.
+If it is `paused`, `rollback_paused`, or `rollback_completed`, noops archives the journal as
+`operation.json.failed-<timestamp>` and permits the new deployment. Other interrupted or already-promoted
+operations stop with the journal path so their live state is inspected rather than guessed at.

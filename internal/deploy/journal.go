@@ -59,9 +59,8 @@ func clearJournal(cfg config.Config, app, environment string) error {
 	return nil
 }
 
-// recoverJournal removes an unpromoted blue/green candidate. In-place work is
-// deliberately not guessed at: users must inspect it instead of risking a
-// destructive automatic rollback.
+// recoverJournal removes an unpromoted blue/green candidate. In-place work
+// can be retried only when Swarm confirms a stopped rollout before promotion.
 func (s *Service) recoverJournal(ctx context.Context, app, environment string) error {
 	journal, exists, err := loadJournal(s.config, app, environment)
 	if err != nil || !exists {
@@ -72,6 +71,25 @@ func (s *Service) recoverJournal(ctx context.Context, app, environment string) e
 			return fmt.Errorf("recover interrupted blue/green deploy: %w", err)
 		}
 		return clearJournal(s.config, app, environment)
+	}
+	if journal.Kind == "deploy" && !journal.BlueGreen && journal.Stage == "stack_deployed" && journal.StackName == stackName(environment, app) {
+		service := swarmServiceName(environment, app)
+		status, message, _, err := s.serviceUpdateStatus(ctx, service)
+		if err != nil {
+			return fmt.Errorf("inspect unfinished deploy for %s/%s: %w", environment, app, err)
+		}
+		switch status {
+		case "paused", "rollback_paused", "rollback_completed":
+			// Preserve the intent record for diagnosis without blocking the next
+			// attempt. This does not roll back or otherwise mutate the service.
+			path := journalPath(s.config, app, environment)
+			archive := path + ".failed-" + time.Now().UTC().Format("20060102-150405.000000000")
+			if err := os.Rename(path, archive); err != nil {
+				return fmt.Errorf("archive failed deployment journal: %w", err)
+			}
+			s.logger.WarnContext(ctx, "retrying stopped Swarm rollout", "service", service, "status", status, "reason", message, "journal_archive", archive)
+			return nil
+		}
 	}
 	return fmt.Errorf("unfinished %s operation for %s/%s at stage %q; inspect the live stack and journal %q before retrying", journal.Kind, environment, app, journal.Stage, journalPath(s.config, app, environment))
 }
