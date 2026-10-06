@@ -8,7 +8,24 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 )
 
-type runtime struct{ workspace string }
+type runtime struct {
+	workspace           string
+	stateDir            string
+	environment         string
+	selectedEnvironment string
+}
+
+func (r runtime) options() config.Options {
+	return config.Options{Environment: r.selectedEnvironment, StateDir: r.stateDir}
+}
+
+func (r runtime) configuration() (config.Config, error) {
+	root, err := r.workspaceRoot()
+	if err != nil {
+		return config.Config{}, err
+	}
+	return config.LoadWithOptions(root, r.options())
+}
 
 func (r runtime) workspaceRoot() (string, error) {
 	root := r.workspace
@@ -23,11 +40,7 @@ func (r runtime) workspaceRoot() (string, error) {
 }
 
 func (r runtime) application() (*app.App, error) {
-	root, err := r.workspaceRoot()
-	if err != nil {
-		return nil, err
-	}
-	cfg, err := config.Load(root)
+	cfg, err := r.configuration()
 	if err != nil {
 		return nil, err
 	}

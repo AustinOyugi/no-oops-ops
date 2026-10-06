@@ -1,8 +1,8 @@
 # Workspace storage
 
 No Oops is workspace-based. Initialize a workspace with `noops init <directory>`.
-After initialization, the CLI writes runtime state only below that workspace's
-`.noops/` directory. `init` may also create the workspace's initial `apps.yml`
+After initialization, the CLI writes runtime files below the selected store,
+which defaults to the workspace's `.noops/` directory. `init` may also create the workspace's initial `apps.yml`
 catalog when it is absent. Use the workspace as the current directory or
 provide it with `--workspace`.
 
@@ -17,6 +17,70 @@ workspace/
 ```
 
 Commit `apps.yml` and `apps/`; add `.noops/` to `.gitignore`.
+
+## Separate installation stores
+
+Use `settings.state` in the shared `apps.yml` to select a store for each
+environment without duplicating manifests or environment files:
+
+```yaml
+settings:
+  state:
+    directory: .noops
+    environments:
+      dev: .noops-dev
+      prod: /srv/rolengi/prod/.noops
+      corp: .noops-corp
+```
+
+Each selected directory contains its own `config.yml`, `state/`, and `data/`.
+This isolates installation metadata, release/deployment history, locks,
+secret metadata, certificates, and registry data. Relative paths are resolved
+from the source workspace, not the shell's working directory. Add your selected
+local store directories to `.gitignore`; stores outside the workspace are not
+part of the source checkout.
+
+Select the environment for initialization, platform commands, and the dashboard:
+
+```sh
+noops --environment dev init .
+noops --environment prod init .
+noops --environment dev install
+noops --environment prod ui
+```
+
+Lifecycle and secret commands already name their environment and automatically
+use its configured store:
+
+```sh
+noops release prod lango --all
+noops secret set dev DATABASE_PASSWORD
+noops logs prod
+```
+
+`--state-dir <path>` overrides the catalog selection for every command, including
+`init`, `install`, `ui`, cleanup, and uninstall. This option names the complete
+runtime store, rather than just its `state/` child:
+
+```sh
+noops --state-dir /srv/rolengi/dev/.noops init .
+noops --state-dir /srv/rolengi/dev/.noops --environment dev ui
+```
+
+The selection order is: `--state-dir`, the environment mapping, `directory`, then
+`.noops`. A directory may contain `{environment}`; a command must select an
+environment before that template can be expanded. A selected uninitialized
+store produces an error and never falls back to another store. An explicit
+`--environment` must agree with any positional command environment. Dashboard
+child commands preserve the selected store and environment.
+
+Existing state is not moved automatically. To preserve an installation when
+changing its path, move its complete store (`config.yml`, `state/`, and `data/`)
+while noops operations are stopped, then select the new directory. `init` creates
+an empty store when it does not exist. Separate stores do not rename Docker
+resources: installations sharing one Docker host also require distinct platform
+network, registry, and ingress names and published ports. Separate servers can
+reuse the same platform settings.
 
 `init` writes an initial `apps.yml` when none exists. It is the source of
 truth for platform settings and app aliases:

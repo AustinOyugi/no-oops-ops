@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -16,7 +17,7 @@ import (
 )
 
 func uiActions(cfg config.Config, row tui.Row) ([]tui.Action, error) {
-	base := []string{"--workspace", cfg.Workspace}
+	base := runtimeCLIArgs(cfg)
 	actions := []tui.Action{{Label: "Platform status", Args: append(append([]string{}, base...), "status")}, {Label: "Doctor", Args: append(append([]string{}, base...), "doctor")}}
 	if row.Untracked || row.Environment == "platform" {
 		return actions, nil
@@ -72,6 +73,25 @@ func uiActions(cfg config.Config, row tui.Row) ([]tui.Action, error) {
 		actions = append(actions, tui.Action{Label: item.label, Args: args, HideTasks: item.label == "Logs"})
 	}
 	return actions, nil
+}
+
+// Child CLI processes must retain the dashboard's selected runtime store.
+func runtimeCLIArgs(cfg config.Config) []string {
+	args := []string{"--workspace", cfg.Workspace}
+	if cfg.RuntimeDir != "" && (cfg.StateDirExplicit || cfg.RuntimeDir != filepath.Join(cfg.Workspace, ".noops")) {
+		args = append(args, "--state-dir", cfg.RuntimeDir)
+	}
+	if cfg.Environment != "" {
+		args = append(args, "--environment", cfg.Environment)
+	}
+	return args
+}
+
+func uiCommandArgs(args []string) []string {
+	for len(args) >= 2 && (args[0] == "--workspace" || args[0] == "--state-dir" || args[0] == "--environment") {
+		args = args[2:]
+	}
+	return args
 }
 
 func runUIAction(ctx context.Context, action tui.Action) error {

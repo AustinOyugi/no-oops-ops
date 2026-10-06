@@ -69,3 +69,61 @@ func TestLoadRejectsDifferentAppsCatalogVersion(t *testing.T) {
 		t.Fatal("expected catalog version mismatch")
 	}
 }
+
+func TestEnvironmentStateSelectionAndOverride(t *testing.T) {
+	root := t.TempDir()
+	content := "version: " + Version + "\nsettings:\n  state:\n    directory: .noops-shared\n    environments:\n      dev: .noops-dev\n      prod: .noops-prod\napps: {}\n"
+	if err := os.WriteFile(filepath.Join(root, "apps.yml"), []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, directory := range []string{".noops-shared", ".noops-dev", ".noops-prod", ".manual"} {
+		if _, err := workspace.InitializeAt(root, directory, Version); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, test := range []struct {
+		options   Options
+		directory string
+	}{
+		{Options{}, ".noops-shared"},
+		{Options{Environment: "dev"}, ".noops-dev"},
+		{Options{Environment: "prod"}, ".noops-prod"},
+		{Options{Environment: "dev", StateDir: ".manual"}, ".manual"},
+	} {
+		cfg, err := LoadWithOptions(root, test.options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		store := filepath.Join(root, test.directory)
+		if cfg.RuntimeDir != store || cfg.StateDir != filepath.Join(store, "state") || cfg.DataDir != filepath.Join(store, "data") || cfg.ConfigPath != filepath.Join(store, "config.yml") {
+			t.Fatalf("incorrect runtime boundary: %+v", cfg)
+		}
+	}
+}
+
+func TestMissingSelectedStoreDoesNotFallBack(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Initialize(root, Version); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "apps.yml"), []byte("version: "+Version+"\nsettings:\n  state:\n    environments:\n      prod: .noops-prod\napps: {}\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadWithOptions(root, Options{Environment: "prod"}); err == nil {
+		t.Fatal("selected missing store fell back to initialized default")
+	}
+}
+
+func TestStateDirectoryTemplateRequiresSafeEnvironment(t *testing.T) {
+	root := t.TempDir()
+	if _, err := StateDirectory(root, Options{StateDir: ".noops-{environment}"}); err == nil {
+		t.Fatal("template accepted without environment")
+	}
+	if _, err := StateDirectory(root, Options{StateDir: ".noops-{environment}", Environment: "../prod"}); err == nil {
+		t.Fatal("environment escaped directory template")
+	}
+	got, err := StateDirectory(root, Options{StateDir: ".noops-{environment}", Environment: "dev"})
+	if err != nil || got != ".noops-dev" {
+		t.Fatalf("template: %q %v", got, err)
+	}
+}

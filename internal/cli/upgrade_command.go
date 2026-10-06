@@ -11,7 +11,6 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/catalog"
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/upgrade"
-	"github.com/AustinOyugi/no-oops-ops/internal/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -36,7 +35,7 @@ func newUpgradeCommand(ctx context.Context, rt *runtime) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			paths, err := workspace.Open(root)
+			paths, err := config.OpenWorkspace(root, rt.options())
 			if err != nil {
 				return err
 			}

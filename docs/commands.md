@@ -1,5 +1,11 @@
 # Command reference
 
+All commands accept `--state-dir <path>` to select the complete runtime store
+(`config.yml`, `state/`, and `data/`). `--environment <name>` selects the
+installation mapping from `settings.state.environments` for platform commands
+and the dashboard. Commands with a positional environment select that mapping
+automatically. See [Separate installation stores](reference/configuration.md#separate-installation-stores).
+
 ```text
 noops
 noops version
@@ -33,7 +39,7 @@ version without loading a workspace. Every other command runs in the current dir
 
 | Command                 | Behavior                                                                                                                                                                                                                                          |
 |-------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `init <workspace>`      | Creates the workspace-local `.noops/state` and `.noops/data` stores, plus an initial version-matched `apps.yml` when absent.                                                                                                                      |
+| `init <workspace>`      | Creates `state/`, `data/`, and `config.yml` in the selected runtime store (default `.noops/`), plus an initial version-matched `apps.yml` when absent.                                                                                                                      |
 | `upgrade --check`       | Fetches and displays the latest release tag from `settings.upgrade.repository` without changing the CLI or workspace.                                                                                                                             |
 | `upgrade --to <tag>`    | Shows the current and target versions, asks for confirmation, verifies the release checksum and binary, adopts the version in the current catalog, and atomically replaces the CLI executable. Use `--yes` only for explicitly pinned automation. |
 | `install`               | Initializes Swarm when required, creates the shared network, deploys the registry and nginx ingress, waits for both services to be ready, and records installation metadata.                                                                      |

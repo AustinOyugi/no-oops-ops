@@ -31,7 +31,13 @@ type Paths struct {
 // Initialize creates the No Oops-owned store below root. It seeds apps.yml
 // when absent but never replaces an existing application catalog.
 func Initialize(root, noopsVersion string) (Paths, error) {
-	paths, err := resolve(root)
+	return InitializeAt(root, "", noopsVersion)
+}
+
+// InitializeAt keeps source manifests in root and runtime files in store.
+// Relative store paths are resolved against root; an empty store uses .noops.
+func InitializeAt(root, store, noopsVersion string) (Paths, error) {
+	paths, err := resolveAt(root, store)
 	if err != nil {
 		return Paths{}, err
 	}
@@ -69,14 +75,18 @@ func Initialize(root, noopsVersion string) (Paths, error) {
 
 // Open validates a previously initialized workspace.
 func Open(root string) (Paths, error) {
-	paths, err := resolve(root)
+	return OpenAt(root, "")
+}
+
+func OpenAt(root, store string) (Paths, error) {
+	paths, err := resolveAt(root, store)
 	if err != nil {
 		return Paths{}, err
 	}
 	configPath := filepath.Join(paths.Store, ConfigName)
 	if _, err := os.Stat(configPath); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return Paths{}, fmt.Errorf("%q is not initialized; run noops init %q", paths.Root, paths.Root)
+			return Paths{}, fmt.Errorf("%q is not initialized; run noops --state-dir %q init %q", paths.Store, paths.Store, paths.Root)
 		}
 		return Paths{}, fmt.Errorf("inspect workspace config %q: %w", configPath, err)
 	}
@@ -84,6 +94,10 @@ func Open(root string) (Paths, error) {
 }
 
 func resolve(root string) (Paths, error) {
+	return resolveAt(root, "")
+}
+
+func resolveAt(root, store string) (Paths, error) {
 	if root == "" {
 		return Paths{}, errors.New("workspace is required")
 	}
@@ -99,7 +113,13 @@ func resolve(root string) (Paths, error) {
 	if !info.IsDir() {
 		return Paths{}, fmt.Errorf("workspace %q is not a directory", abs)
 	}
-	store := filepath.Join(abs, DirName)
+	if store == "" {
+		store = DirName
+	}
+	if !filepath.IsAbs(store) {
+		store = filepath.Join(abs, store)
+	}
+	store = filepath.Clean(store)
 	return Paths{Root: abs, Store: store, StateDir: filepath.Join(store, "state"), DataDir: filepath.Join(store, "data")}, nil
 }
 

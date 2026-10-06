@@ -22,6 +22,13 @@ type App struct {
 type Settings struct {
 	Platform Platform `yaml:"platform"`
 	Upgrade  Upgrade  `yaml:"upgrade"`
+	State    State    `yaml:"state"`
+}
+
+// State selects the runtime store without duplicating application manifests.
+type State struct {
+	Directory    string            `yaml:"directory"`
+	Environments map[string]string `yaml:"environments"`
 }
 
 type Upgrade struct {

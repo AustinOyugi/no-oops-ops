@@ -16,10 +16,10 @@ import (
 )
 
 func canStreamUIAction(cfg config.Config, action tui.Action) bool {
-	if len(action.Args) < 3 {
+	args := uiCommandArgs(action.Args)
+	if len(args) == 0 {
 		return false
 	}
-	args := action.Args[2:]
 	verb := args[0]
 	switch verb {
 	case "secret":
@@ -30,7 +30,19 @@ func canStreamUIAction(cfg config.Config, action tui.Action) bool {
 		if verb == "release" && !slices.Contains(args, "--deploy") {
 			return true
 		}
-		current, err := config.Load(cfg.Workspace)
+		options := config.Options{Environment: cfg.Environment}
+		for i := 0; i+1 < len(action.Args) && action.Args[i] != verb; i += 2 {
+			switch action.Args[i] {
+			case "--state-dir":
+				options.StateDir = action.Args[i+1]
+			case "--environment":
+				options.Environment = action.Args[i+1]
+			}
+		}
+		if options.Environment == "" && len(args) > 1 {
+			options.Environment = args[1]
+		}
+		current, err := config.LoadWithOptions(cfg.Workspace, options)
 		if err != nil {
 			return false
 		}

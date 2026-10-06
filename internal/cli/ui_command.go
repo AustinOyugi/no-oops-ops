@@ -5,7 +5,6 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/deploy"
 	"os"
 
-	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/tui"
 	"github.com/spf13/cobra"
 )
@@ -13,11 +12,7 @@ import (
 func newUICommand(ctx context.Context, rt *runtime) *cobra.Command {
 	return &cobra.Command{Use: "ui", Short: "Open the live service dashboard", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			root, err := rt.workspaceRoot()
-			if err != nil {
-				return err
-			}
-			cfg, err := config.Load(root)
+			cfg, err := rt.configuration()
 			if err != nil {
 				return err
 			}

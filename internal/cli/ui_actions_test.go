@@ -65,6 +65,55 @@ func TestPlatformActionsExcludeLifecycleCommands(t *testing.T) {
 	}
 }
 
+func TestDashboardChildrenRetainStateAndEnvironment(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "apps.yml"), []byte("apps:\n  shop:\n    manifest: app.yml\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "app.yml"), []byte("services:\n  api:\n    image: nginx:alpine\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Config{Workspace: root, RuntimeDir: filepath.Join(root, ".noops-prod"), Environment: "prod"}
+	actions, err := uiActions(cfg, tui.Row{Environment: "prod", App: "api"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, action := range actions {
+		prefix := strings.Join(action.Args[:6], "|")
+		want := "--workspace|" + root + "|--state-dir|" + cfg.RuntimeDir + "|--environment|prod"
+		if prefix != want {
+			t.Fatalf("lost installation selection: %v", action.Args)
+		}
+		if action.Label == "Release" && !canStreamUIAction(cfg, action) {
+			t.Fatal("global selection flags broke release streaming")
+		}
+	}
+	commands, err := uiPalette(cfg, &tui.Row{Environment: "prod", App: "api"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, command := range commands {
+		if command.Label != "Deploy" {
+			continue
+		}
+		values := map[string]string{}
+		for _, field := range command.Fields {
+			values[field.Key] = field.Default
+		}
+		action, err := command.Build(values)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Join(uiCommandArgs(action.Args), "|"); got != "deploy|prod|shop|--service|api" {
+			t.Fatalf("incorrect scoped target: %s", got)
+		}
+		values["environment"] = "dev"
+		if _, err := command.Build(values); err == nil {
+			t.Fatal("scoped dashboard accepted another environment")
+		}
+	}
+}
+
 func TestUntrackedServiceDoesNotOfferTargetedActions(t *testing.T) {
 	actions, err := uiActions(config.Config{Workspace: t.TempDir()}, tui.Row{Untracked: true, Environment: "prod", App: "api"})
 	if err != nil || len(actions) != 2 {

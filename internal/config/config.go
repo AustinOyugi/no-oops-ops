@@ -2,8 +2,11 @@ package config
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -13,11 +16,14 @@ import (
 )
 
 type Config struct {
-	AppName        string
-	Workspace      string
-	StateDir       string
-	DataDir        string
-	InstallVersion string
+	AppName          string
+	Workspace        string
+	StateDir         string
+	DataDir          string
+	InstallVersion   string
+	RuntimeDir       string
+	Environment      string
+	StateDirExplicit bool
 
 	NetworkName               string
 	EnvironmentNetworkDefault string
@@ -47,12 +53,53 @@ const defaultNginxHTTPSPort = "443"
 
 var Version = "dev"
 
+var environmentNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*$`)
+
 func Load(root string) (Config, error) {
-	paths, err := workspace.Open(root)
+	return LoadWithOptions(root, Options{})
+}
+
+type Options struct {
+	Environment string
+	StateDir    string
+}
+
+// StateDirectory resolves installation storage before initialization, too.
+func StateDirectory(root string, options Options) (string, error) {
+	if options.Environment != "" && !environmentNamePattern.MatchString(options.Environment) {
+		return "", fmt.Errorf("invalid environment %q", options.Environment)
+	}
+	directory := options.StateDir
+	if directory == "" {
+		apps, err := catalog.Load(root)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return "", err
+		}
+		directory = apps.Settings.State.Directory
+		if selected := apps.Settings.State.Environments[options.Environment]; options.Environment != "" && selected != "" {
+			directory = selected
+		}
+	}
+	if strings.Contains(directory, "{environment}") && options.Environment == "" {
+		return "", fmt.Errorf("state directory %q requires an environment; use --environment", directory)
+	}
+	return strings.ReplaceAll(directory, "{environment}", options.Environment), nil
+}
+
+func OpenWorkspace(root string, options Options) (workspace.Paths, error) {
+	directory, err := StateDirectory(root, options)
+	if err != nil {
+		return workspace.Paths{}, err
+	}
+	return workspace.OpenAt(root, directory)
+}
+
+func LoadWithOptions(root string, options Options) (Config, error) {
+	paths, err := OpenWorkspace(root, options)
 	if err != nil {
 		return Config{}, err
 	}
-	configPath := paths.Store + "/config.yml"
+	configPath := filepath.Join(paths.Store, workspace.ConfigName)
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return Config{}, fmt.Errorf("read workspace config %q: %w", configPath, err)
@@ -85,6 +132,9 @@ func Load(root string) (Config, error) {
 		StateDir:                  paths.StateDir,
 		DataDir:                   paths.DataDir,
 		InstallVersion:            Version,
+		RuntimeDir:                paths.Store,
+		Environment:               options.Environment,
+		StateDirExplicit:          options.StateDir != "",
 		NetworkName:               networkName,
 		EnvironmentNetworkDefault: environmentNetworkDefault,
 		EnvironmentNetworks:       platform.Networks.Environments,

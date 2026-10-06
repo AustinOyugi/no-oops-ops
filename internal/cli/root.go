@@ -15,14 +15,37 @@ func NewRootCommand(ctx context.Context) *cobra.Command {
 		Use:          "noops",
 		Short:        "No Oops Ops deployment CLI",
 		SilenceUsage: true,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			rt.selectedEnvironment = rt.environment
+			if len(args) == 0 {
+				return nil
+			}
+			positional := false
+			switch cmd.Name() {
+			case "release", "deploy", "rollback", "remove", "logs":
+				positional = true
+			}
+			if parent := cmd.Parent(); parent != nil && (parent.Name() == "secret" || parent.Name() == "release") {
+				positional = true
+			}
+			if positional {
+				if rt.environment != "" && rt.environment != args[0] {
+					return fmt.Errorf("--environment %q conflicts with command environment %q", rt.environment, args[0])
+				}
+				rt.selectedEnvironment = args[0]
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return printVersion(cmd)
 		},
 	}
 	root.Flags().BoolP("version", "v", false, "Print version information")
 	root.PersistentFlags().StringVar(&rt.workspace, "workspace", "", "Workspace directory")
+	root.PersistentFlags().StringVar(&rt.stateDir, "state-dir", "", "Runtime store directory (config, state and data); relative to the workspace")
+	root.PersistentFlags().StringVar(&rt.environment, "environment", "", "Environment installation to use for platform commands and the dashboard")
 	root.AddCommand(
-		newVersionCommand(), newInitCommand(), newUpgradeCommand(ctx, &rt), newInstallCommand(ctx, &rt),
+		newVersionCommand(), newInitCommand(&rt), newUpgradeCommand(ctx, &rt), newInstallCommand(ctx, &rt),
 		newUninstallCommand(ctx, &rt), newDoctorCommand(ctx, &rt), newStatusCommand(ctx, &rt),
 		newReleaseCommand(ctx, &rt), newDeployCommand(ctx, &rt), newRollbackCommand(ctx, &rt),
 		newRemoveCommand(ctx, &rt), newSecretCommand(ctx, &rt), newCertificateCommand(ctx, &rt),
@@ -42,13 +65,17 @@ func printVersion(cmd *cobra.Command) error {
 	return err
 }
 
-func newInitCommand() *cobra.Command {
+func newInitCommand(rt *runtime) *cobra.Command {
 	return &cobra.Command{Use: "init <workspace>", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		paths, err := workspace.Initialize(args[0], config.Version)
+		directory, err := config.StateDirectory(args[0], rt.options())
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(cmd.OutOrStdout(), "initialized No Oops workspace at %s\n", paths.Root)
+		paths, err := workspace.InitializeAt(args[0], directory, config.Version)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(cmd.OutOrStdout(), "initialized No Oops workspace at %s (runtime store: %s)\n", paths.Root, paths.Store)
 		return err
 	}}
 }

@@ -36,14 +36,15 @@ func uiPalette(cfg config.Config, row *tui.Row) ([]tui.Command, error) {
 		}
 	}
 	sort.Strings(names)
-	defaults := map[string]string{"environment": "", "app": "", "service": ""}
+	defaults := map[string]string{"environment": cfg.Environment, "app": "", "service": ""}
 	if row != nil && !row.Untracked && row.Environment != "platform" {
 		defaults["environment"] = row.Environment
 		if actions, err := uiActions(cfg, *row); err == nil {
 			for _, action := range actions {
 				if action.Label == "Release" {
-					defaults["app"] = action.Args[4]
-					defaults["service"] = action.Args[6]
+					args := uiCommandArgs(action.Args)
+					defaults["app"] = args[2]
+					defaults["service"] = args[4]
 				}
 			}
 		}
@@ -91,7 +92,17 @@ func uiPalette(cfg config.Config, row *tui.Row) ([]tui.Command, error) {
 	for _, spec := range specs {
 		spec := spec
 		commands = append(commands, tui.Command{Label: spec.label, Description: spec.description, Fields: spec.fields, Build: func(values map[string]string) (tui.Action, error) {
-			args := []string{"--workspace", cfg.Workspace}
+			args := runtimeCLIArgs(cfg)
+			if spec.command[0] == "init" {
+				// A new source workspace must not reuse this dashboard's absolute store.
+				args = []string{"--workspace", cfg.Workspace}
+				if cfg.Environment != "" {
+					args = append(args, "--environment", cfg.Environment)
+				}
+			}
+			if cfg.Environment != "" && values["environment"] != "" && values["environment"] != cfg.Environment {
+				return tui.Action{}, fmt.Errorf("this dashboard uses environment %q", cfg.Environment)
+			}
 			args = append(args, spec.command...)
 			for _, key := range spec.required {
 				value := strings.TrimSpace(values[key])

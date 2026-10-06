@@ -11,6 +11,54 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/workspace"
 )
 
+func TestInitSelectsEnvironmentStoreAndExplicitOverride(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	if err := os.WriteFile(filepath.Join(workspaceRoot, "apps.yml"), []byte("version: "+config.Version+"\nsettings:\n  state:\n    environments:\n      dev: .noops-dev\n      prod: .noops-prod\napps: {}\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"--environment", "dev", "init", workspaceRoot},
+		{"--environment", "prod", "init", workspaceRoot},
+		{"--state-dir", ".manual", "init", workspaceRoot},
+	} {
+		cmd := NewRootCommand(context.Background())
+		cmd.SetArgs(args)
+		if err := cmd.Execute(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, dir := range []string{".noops-dev", ".noops-prod", ".manual"} {
+		if _, err := os.Stat(filepath.Join(workspaceRoot, dir, "config.yml")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(workspaceRoot, ".noops")); !os.IsNotExist(err) {
+		t.Fatalf("default state created: %v", err)
+	}
+}
+
+func TestLifecycleInfersStoreAndRejectsConflictingEnvironment(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	if _, err := workspace.Initialize(workspaceRoot, config.Version); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workspaceRoot, "apps.yml"), []byte("version: "+config.Version+"\nsettings:\n  state:\n    environments:\n      prod: .noops-prod\napps: {}\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, command := range [][]string{{"secret", "list", "prod"}, {"release", "list", "prod", "api"}, {"logs", "prod"}} {
+		cmd := NewRootCommand(context.Background())
+		cmd.SetArgs(append([]string{"--workspace", workspaceRoot}, command...))
+		if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), ".noops-prod") {
+			t.Fatalf("incorrect selected store: %v", err)
+		}
+	}
+	cmd := NewRootCommand(context.Background())
+	cmd.SetArgs([]string{"--environment", "dev", "deploy", "prod", "api"})
+	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "conflicts") {
+		t.Fatalf("cross-environment action accepted: %v", err)
+	}
+}
+
 func TestVersionForms(t *testing.T) {
 	for _, args := range [][]string{{}, {"version"}, {"--version"}, {"-v"}} {
 		t.Run(strings.Join(args, "_"), func(t *testing.T) {
