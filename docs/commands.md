@@ -1,7 +1,7 @@
 # Command reference
 
 All commands accept `--state-dir <path>` to select the complete runtime store
-(`config.yml`, `state/`, and `data/`). `--environment <name>` selects the
+(`config.yml`, `state/`, and `data/`). `--environment <name>` (or `-e <name>`) selects the
 installation mapping from `settings.state.environments` for platform commands
 and the dashboard. Commands with a positional environment select that mapping
 automatically. See [Separate installation stores](reference/configuration.md#separate-installation-stores).

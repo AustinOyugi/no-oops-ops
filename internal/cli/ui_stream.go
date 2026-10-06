@@ -35,7 +35,7 @@ func canStreamUIAction(cfg config.Config, action tui.Action) bool {
 			switch action.Args[i] {
 			case "--state-dir":
 				options.StateDir = action.Args[i+1]
-			case "--environment":
+			case "--environment", "-e":
 				options.Environment = action.Args[i+1]
 			}
 		}

@@ -42,11 +42,13 @@ part of the source checkout.
 
 Select the environment for initialization, platform commands, and the dashboard:
 
+`-e` is the shorthand for `--environment`.
+
 ```sh
-noops --environment dev init .
-noops --environment prod init .
-noops --environment dev install
-noops --environment prod ui
+noops -e dev init .
+noops -e prod init .
+noops -e dev install
+noops -e prod ui
 ```
 
 Lifecycle and secret commands already name their environment and automatically

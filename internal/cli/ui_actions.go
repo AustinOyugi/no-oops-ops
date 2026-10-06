@@ -88,7 +88,7 @@ func runtimeCLIArgs(cfg config.Config) []string {
 }
 
 func uiCommandArgs(args []string) []string {
-	for len(args) >= 2 && (args[0] == "--workspace" || args[0] == "--state-dir" || args[0] == "--environment") {
+	for len(args) >= 2 && (args[0] == "--workspace" || args[0] == "--state-dir" || args[0] == "--environment" || args[0] == "-e") {
 		args = args[2:]
 	}
 	return args

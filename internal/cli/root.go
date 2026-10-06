@@ -43,7 +43,7 @@ func NewRootCommand(ctx context.Context) *cobra.Command {
 	root.Flags().BoolP("version", "v", false, "Print version information")
 	root.PersistentFlags().StringVar(&rt.workspace, "workspace", "", "Workspace directory")
 	root.PersistentFlags().StringVar(&rt.stateDir, "state-dir", "", "Runtime store directory (config, state and data); relative to the workspace")
-	root.PersistentFlags().StringVar(&rt.environment, "environment", "", "Environment installation to use for platform commands and the dashboard")
+	root.PersistentFlags().StringVarP(&rt.environment, "environment", "e", "", "Environment installation to use for platform commands and the dashboard")
 	root.AddCommand(
 		newVersionCommand(), newInitCommand(&rt), newUpgradeCommand(ctx, &rt), newInstallCommand(ctx, &rt),
 		newUninstallCommand(ctx, &rt), newDoctorCommand(ctx, &rt), newStatusCommand(ctx, &rt),

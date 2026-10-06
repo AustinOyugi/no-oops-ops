@@ -18,7 +18,8 @@ func TestInitSelectsEnvironmentStoreAndExplicitOverride(t *testing.T) {
 	}
 	for _, args := range [][]string{
 		{"--environment", "dev", "init", workspaceRoot},
-		{"--environment", "prod", "init", workspaceRoot},
+		{"-e", "dev", "init", workspaceRoot},
+		{"init", workspaceRoot, "-e", "prod"},
 		{"--state-dir", ".manual", "init", workspaceRoot},
 	} {
 		cmd := NewRootCommand(context.Background())
