@@ -60,6 +60,44 @@ func TestLifecycleInfersStoreAndRejectsConflictingEnvironment(t *testing.T) {
 	}
 }
 
+func TestDefaultEnvironmentAndExplicitOverride(t *testing.T) {
+	t.Setenv("NOOPS_DEFAULT_ENV", " dev ")
+	workspaceRoot := t.TempDir()
+	if err := os.WriteFile(filepath.Join(workspaceRoot, "apps.yml"), []byte("version: "+config.Version+"\nsettings:\n  state:\n    environments:\n      dev: .noops-dev\n      prod: .noops-prod\napps: {}\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		args      []string
+		directory string
+	}{
+		{[]string{"init", workspaceRoot}, ".noops-dev"},
+		{[]string{"-e", "prod", "init", workspaceRoot}, ".noops-prod"},
+		{[]string{"-e", "", "init", workspaceRoot}, ".noops"},
+	} {
+		cmd := NewRootCommand(context.Background())
+		cmd.SetArgs(test.args)
+		if err := cmd.Execute(); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(filepath.Join(workspaceRoot, test.directory, "config.yml")); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestPositionalEnvironmentOverridesDefault(t *testing.T) {
+	t.Setenv("NOOPS_DEFAULT_ENV", "dev")
+	workspaceRoot := t.TempDir()
+	if err := os.WriteFile(filepath.Join(workspaceRoot, "apps.yml"), []byte("version: "+config.Version+"\nsettings:\n  state:\n    environments:\n      prod: .noops-prod\napps: {}\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cmd := NewRootCommand(context.Background())
+	cmd.SetArgs([]string{"--workspace", workspaceRoot, "secret", "list", "prod"})
+	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), ".noops-prod") {
+		t.Fatalf("default overrode explicit command environment: %v", err)
+	}
+}
+
 func TestVersionForms(t *testing.T) {
 	for _, args := range [][]string{{}, {"version"}, {"--version"}, {"-v"}} {
 		t.Run(strings.Join(args, "_"), func(t *testing.T) {

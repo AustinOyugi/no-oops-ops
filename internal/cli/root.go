@@ -3,6 +3,8 @@ package cli
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/workspace"
@@ -17,6 +19,9 @@ func NewRootCommand(ctx context.Context) *cobra.Command {
 		SilenceUsage: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			rt.selectedEnvironment = rt.environment
+			if !cmd.Flags().Changed("environment") {
+				rt.selectedEnvironment = strings.TrimSpace(os.Getenv("NOOPS_DEFAULT_ENV"))
+			}
 			if len(args) == 0 {
 				return nil
 			}
@@ -43,7 +48,7 @@ func NewRootCommand(ctx context.Context) *cobra.Command {
 	root.Flags().BoolP("version", "v", false, "Print version information")
 	root.PersistentFlags().StringVar(&rt.workspace, "workspace", "", "Workspace directory")
 	root.PersistentFlags().StringVar(&rt.stateDir, "state-dir", "", "Runtime store directory (config, state and data); relative to the workspace")
-	root.PersistentFlags().StringVarP(&rt.environment, "environment", "e", "", "Environment installation to use for platform commands and the dashboard")
+	root.PersistentFlags().StringVarP(&rt.environment, "environment", "e", "", "Environment installation to use (defaults to NOOPS_DEFAULT_ENV)")
 	root.AddCommand(
 		newVersionCommand(), newInitCommand(&rt), newUpgradeCommand(ctx, &rt), newInstallCommand(ctx, &rt),
 		newUninstallCommand(ctx, &rt), newDoctorCommand(ctx, &rt), newStatusCommand(ctx, &rt),

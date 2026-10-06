@@ -6,6 +6,10 @@ installation mapping from `settings.state.environments` for platform commands
 and the dashboard. Commands with a positional environment select that mapping
 automatically. See [Separate installation stores](reference/configuration.md#separate-installation-stores).
 
+`NOOPS_DEFAULT_ENV` supplies an optional default for `-e`/`--environment`, so
+`export NOOPS_DEFAULT_ENV=dev` lets you run `noops install` and `noops ui` directly.
+Explicit flags and positional environments override it.
+
 ```text
 noops
 noops version

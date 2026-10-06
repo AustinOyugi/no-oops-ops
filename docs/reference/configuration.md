@@ -44,6 +44,19 @@ Select the environment for initialization, platform commands, and the dashboard:
 
 `-e` is the shorthand for `--environment`.
 
+Set `NOOPS_DEFAULT_ENV` to avoid repeating the flag for platform commands and
+the dashboard:
+
+```sh
+export NOOPS_DEFAULT_ENV=dev
+noops install
+noops ui
+```
+
+An explicit `-e`/`--environment` or a positional command environment overrides
+this default. An explicitly empty `-e ""` disables the environment default for
+that command. Lifecycle commands retain their existing positional arguments.
+
 ```sh
 noops -e dev init .
 noops -e prod init .
