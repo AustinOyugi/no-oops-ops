@@ -27,7 +27,7 @@ func paletteFixture(t *testing.T) []tui.Command {
 }
 func TestPaletteCommandsMatchCLI(t *testing.T) {
 	commands := paletteFixture(t)
-	if len(commands) != 19 {
+	if len(commands) != 20 {
 		t.Fatalf("command count: %d", len(commands))
 	}
 	for _, command := range commands {
@@ -136,4 +136,24 @@ func TestReleaseCanTargetUndeployedCatalogService(t *testing.T) {
 		}
 	}
 	t.Fatal("missing release form")
+}
+
+func TestEnvironmentLogsPalette(t *testing.T) {
+	for _, command := range paletteFixture(t) {
+		if command.Label != "Environment logs" {
+			continue
+		}
+		if len(command.Fields) != 1 || command.Fields[0].Default != "prod" {
+			t.Fatalf("environment fields: %+v", command.Fields)
+		}
+		action, err := command.Build(map[string]string{"environment": "prod"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !action.HideTasks || !strings.HasSuffix(strings.Join(action.Args, " "), "logs prod") {
+			t.Fatalf("action: %+v", action)
+		}
+		return
+	}
+	t.Fatal("environment logs absent from palette")
 }

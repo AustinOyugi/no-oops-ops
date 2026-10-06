@@ -37,7 +37,7 @@ func TestStreamingRouting(t *testing.T) {
 		args []string
 		want bool
 	}{
-		{[]string{"logs", "prod", "shop", "--service", "api"}, true}, {[]string{"status"}, true}, {[]string{"release", "prod", "shop"}, true},
+		{[]string{"logs", "prod"}, true}, {[]string{"logs", "prod", "shop", "--service", "api"}, true}, {[]string{"status"}, true}, {[]string{"release", "prod", "shop"}, true},
 		{[]string{"secret", "set", "prod", "TOKEN"}, false}, {[]string{"secret", "list", "prod"}, true},
 		{[]string{"upgrade", "--to", "latest"}, false}, {[]string{"upgrade", "--check"}, true},
 		{[]string{"install"}, false}, {[]string{"deploy", "prod", "shop"}, false},

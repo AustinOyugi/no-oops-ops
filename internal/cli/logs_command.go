@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/deploy"
 	"github.com/spf13/cobra"
@@ -11,16 +12,22 @@ func newLogsCommand(ctx context.Context, rt *runtime) *cobra.Command {
 	var service string
 	options := deploy.LogOptions{}
 	cmd := &cobra.Command{
-		Use:   "logs <environment> <app>",
-		Short: "Stream a deployed service's logs (Ctrl+C to stop)",
-		Args:  cobra.ExactArgs(2),
+		Use:   "logs <environment> [app]",
+		Short: "Stream an environment or deployed service's logs (Ctrl+C to stop)",
+		Args:  cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 1 && service != "" {
+				return fmt.Errorf("--service requires an app; omit it to stream the environment")
+			}
 			if err := options.Validate(); err != nil {
 				return err
 			}
 			application, err := rt.application()
 			if err != nil {
 				return err
+			}
+			if len(args) == 1 {
+				return application.EnvironmentLogs(ctx, args[0], options, cmd.OutOrStdout(), cmd.ErrOrStderr())
 			}
 			return application.Logs(ctx, target(args, targetFlags{service: service}), options, cmd.OutOrStdout(), cmd.ErrOrStderr())
 		},

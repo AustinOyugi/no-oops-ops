@@ -51,6 +51,7 @@ noops release --deploy prod redis --service redis
 noops release list prod redis --service redis
 noops status
 noops logs prod redis --service redis
+noops logs prod # Stream all deployed services in prod
 ```
 
 ## Documentation

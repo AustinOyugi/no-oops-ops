@@ -20,3 +20,8 @@ func (a *App) Logs(ctx context.Context, target Target, options deploy.LogOptions
 	}
 	return deploy.NewService(a.logger, a.config).Logs(ctx, environment, manifest.WithService(path, services[0]), options, stdout, stderr)
 }
+
+// EnvironmentLogs merges logs from all deployed services owned by an environment.
+func (a *App) EnvironmentLogs(ctx context.Context, environment string, options deploy.LogOptions, stdout, stderr io.Writer) error {
+	return deploy.NewService(a.logger, a.config).EnvironmentLogs(ctx, environment, options, stdout, stderr)
+}

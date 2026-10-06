@@ -22,14 +22,20 @@ func TestUIActionsResolveCatalogAlias(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var deploy, logs tui.Action
+	var deploy, logs, environmentLogs tui.Action
 	for _, action := range actions {
+		if action.Label == "Environment logs" {
+			environmentLogs = action
+		}
 		if action.Label == "Logs" {
 			logs = action
 		}
 		if action.Label == "Deploy" {
 			deploy = action
 		}
+	}
+	if !environmentLogs.HideTasks || strings.Join(environmentLogs.Args, "|") != "--workspace|"+root+"|logs|prod" {
+		t.Fatalf("wrong environment logs action: %+v", environmentLogs)
 	}
 	if !logs.HideTasks || strings.Join(logs.Args, "|") != "--workspace|"+root+"|logs|prod|shop|--service|api" {
 		t.Fatalf("wrong logs action: %+v", logs)

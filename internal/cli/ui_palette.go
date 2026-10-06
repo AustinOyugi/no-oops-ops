@@ -86,6 +86,7 @@ func uiPalette(cfg config.Config, row *tui.Row) ([]tui.Command, error) {
 		specs = append(specs, paletteSpec{label: item.label, description: "Run " + strings.Join(item.command, " ") + " for the selected app target", command: item.command, required: []string{"environment", "app"}, fields: fields, flags: flags})
 	}
 	specs = append(specs, paletteSpec{label: "Logs", description: "Stream service logs in the dashboard", command: []string{"logs"}, required: []string{"environment", "app"}, fields: []tui.Field{targetFields[0], targetFields[1], targetFields[3]}})
+	specs = append(specs, paletteSpec{label: "Environment logs", description: "Stream logs from every deployed service in an environment", command: []string{"logs"}, required: []string{"environment"}, fields: []tui.Field{targetFields[0]}})
 	var commands []tui.Command
 	for _, spec := range specs {
 		spec := spec
@@ -145,7 +146,7 @@ func uiPalette(cfg config.Config, row *tui.Row) ([]tui.Command, error) {
 					args = append(args, "--"+flag)
 				}
 			}
-			return tui.Action{Label: spec.label, Args: args, HideTasks: spec.label == "Logs"}, nil
+			return tui.Action{Label: spec.label, Args: args, HideTasks: spec.label == "Logs" || spec.label == "Environment logs"}, nil
 		}})
 	}
 	return commands, nil

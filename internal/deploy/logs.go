@@ -42,6 +42,10 @@ func (s *Service) Logs(ctx context.Context, environment, path string, options Lo
 		return err
 	}
 	name := logServiceName(environment, m.Name, active)
+	return streamServiceLogs(ctx, name, options, stdout, stderr)
+}
+
+func streamServiceLogs(ctx context.Context, name string, options LogOptions, stdout, stderr io.Writer) error {
 	args := []string{"service", "logs", "--tail", options.Tail}
 	if options.Follow {
 		args = append(args, "--follow")

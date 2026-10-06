@@ -21,6 +21,7 @@ func uiActions(cfg config.Config, row tui.Row) ([]tui.Action, error) {
 	if row.Untracked || row.Environment == "platform" {
 		return actions, nil
 	}
+	actions = append(actions, tui.Action{Label: "Environment logs", Args: append(append([]string{}, base...), "logs", row.Environment), HideTasks: true})
 	apps, err := catalog.Load(cfg.Workspace)
 	if err != nil {
 		return nil, err

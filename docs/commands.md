@@ -12,7 +12,7 @@ noops [--workspace <workspace>] uninstall [--purge]
 noops [--workspace <workspace>] doctor [--deploy-ready]
 noops [--workspace <workspace>] status
 noops [--workspace <workspace>] ui
-noops [--workspace <workspace>] logs <environment> <app> [--service <name>] [--tail <count|all>] [--since <timestamp|duration>] [--timestamps] [--follow=false]
+noops [--workspace <workspace>] logs <environment> [app] [--service <name>] [--tail <count|all>] [--since <timestamp|duration>] [--timestamps] [--follow=false]
 noops [--workspace <workspace>] release [--deploy] <environment> <app> [--service <name> | --all]
 noops [--workspace <workspace>] release list <environment> <app> [--service <name> | --all]
 noops [--workspace <workspace>] deploy [--quick] <environment> <app> [--service <name> | --all]
@@ -140,3 +140,24 @@ available from the `:` command palette. The live stream appears in the output
 pane while the tasks section and task details are hidden. Tab switches between
 services and logs. Press `p` to pause/follow scrolling, `x` to stop and keep the
 logs, or `X` to stop and close the output pane. Tasks return when streaming ends.
+
+## Environment logs
+
+`noops logs prod` streams logs from every currently deployed Noops service in
+`prod`, across all apps. Each Docker log line keeps its service/task prefix.
+Services are discovered from the workspace catalog and deployment history,
+including blue/green names; other environments and untracked services are excluded.
+Streams run concurrently, and a failure in one service is reported while the
+remaining services continue. Ctrl+C stops all streams.
+
+```bash
+noops logs prod
+noops logs prod --since 10m --tail 200 --timestamps
+noops logs prod --follow=false --tail all
+```
+
+In `noops ui`, choose **Environment logs** from the `:` palette, or from `e`
+on a managed service. The selected row supplies the environment. Tasks and task
+details stay hidden while logs stream, with the same pause and stop controls as
+service logs. Membership is discovered when streaming starts; restart the stream
+after deploying new services or switching blue/green stacks to include them.
