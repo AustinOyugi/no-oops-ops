@@ -116,12 +116,9 @@ func cleanLines(text string) string {
 }
 func (d *dashboard) updateRolloutPane() {
 	if len(d.rollouts) == 0 {
-		if d.rolloutPane != nil {
-			d.layout.RemoveItem(d.rolloutPane)
+		if d.rolloutVisible {
 			d.rolloutVisible = false
-			if !d.outputVisible {
-				d.layout.ResizeItem(d.services, 0, 1).ResizeItem(d.tasks, 0, 1).ResizeItem(d.detail, 3, 0)
-			}
+			d.rebuildLayout()
 		}
 		return
 	}
@@ -130,13 +127,8 @@ func (d *dashboard) updateRolloutPane() {
 		d.rolloutPane.SetBorder(true).SetTitle(" Blue / green rollout ")
 	}
 	if !d.rolloutVisible {
-		// Insert beneath the health strip without stealing keyboard focus.
-		d.layout.Clear().AddItem(d.health, 3, 0, false).AddItem(d.status, 2, 0, false).AddItem(d.services, 0, 2, true).AddItem(d.rolloutPane, 8, 0, false).AddItem(d.tasks, 0, 1, false).AddItem(d.detail, 2, 0, false)
-		if d.outputVisible {
-			d.layout.AddItem(d.output, 0, 3, false)
-		}
-		d.layout.AddItem(d.footer, 1, 0, false)
 		d.rolloutVisible = true
+		d.rebuildLayout()
 	}
 	selected := d.rollouts[0]
 	for _, p := range d.rollouts {

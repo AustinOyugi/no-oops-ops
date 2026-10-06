@@ -61,14 +61,14 @@ func uiActions(cfg config.Config, row tui.Row) ([]tui.Action, error) {
 	for _, item := range []struct {
 		label   string
 		command []string
-	}{{"List releases", []string{"release", "list"}}, {"Release", []string{"release"}}, {"Deploy", []string{"deploy"}}, {"Rollback", []string{"rollback"}}, {"Remove", []string{"remove"}}} {
-		if !target.deployable && (item.label == "Deploy" || item.label == "Rollback" || item.label == "Remove") {
+	}{{"Logs", []string{"logs"}}, {"List releases", []string{"release", "list"}}, {"Release", []string{"release"}}, {"Deploy", []string{"deploy"}}, {"Rollback", []string{"rollback"}}, {"Remove", []string{"remove"}}} {
+		if !target.deployable && (item.label == "Deploy" || item.label == "Rollback" || item.label == "Remove" || item.label == "Logs") {
 			continue
 		}
 		args := append([]string{}, base...)
 		args = append(args, item.command...)
 		args = append(args, row.Environment, target.app, "--service", target.service)
-		actions = append(actions, tui.Action{Label: item.label, Args: args})
+		actions = append(actions, tui.Action{Label: item.label, Args: args, HideTasks: item.label == "Logs"})
 	}
 	return actions, nil
 }

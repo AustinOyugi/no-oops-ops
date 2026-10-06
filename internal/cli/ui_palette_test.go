@@ -27,7 +27,7 @@ func paletteFixture(t *testing.T) []tui.Command {
 }
 func TestPaletteCommandsMatchCLI(t *testing.T) {
 	commands := paletteFixture(t)
-	if len(commands) != 18 {
+	if len(commands) != 19 {
 		t.Fatalf("command count: %d", len(commands))
 	}
 	for _, command := range commands {

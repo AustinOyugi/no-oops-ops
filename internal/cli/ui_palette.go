@@ -85,6 +85,7 @@ func uiPalette(cfg config.Config, row *tui.Row) ([]tui.Command, error) {
 		}
 		specs = append(specs, paletteSpec{label: item.label, description: "Run " + strings.Join(item.command, " ") + " for the selected app target", command: item.command, required: []string{"environment", "app"}, fields: fields, flags: flags})
 	}
+	specs = append(specs, paletteSpec{label: "Logs", description: "Stream service logs in the dashboard", command: []string{"logs"}, required: []string{"environment", "app"}, fields: []tui.Field{targetFields[0], targetFields[1], targetFields[3]}})
 	var commands []tui.Command
 	for _, spec := range specs {
 		spec := spec
@@ -105,7 +106,7 @@ func uiPalette(cfg config.Config, row *tui.Row) ([]tui.Command, error) {
 				if _, ok := apps.Apps[values["app"]]; !ok {
 					return tui.Action{}, fmt.Errorf("select a catalog app")
 				}
-				if values["all"] == "true" {
+				if values["all"] == "true" && spec.label != "Logs" {
 					args = append(args, "--all")
 				} else {
 					valid := false
@@ -144,7 +145,7 @@ func uiPalette(cfg config.Config, row *tui.Row) ([]tui.Command, error) {
 					args = append(args, "--"+flag)
 				}
 			}
-			return tui.Action{Label: spec.label, Args: args}, nil
+			return tui.Action{Label: spec.label, Args: args, HideTasks: spec.label == "Logs"}, nil
 		}})
 	}
 	return commands, nil

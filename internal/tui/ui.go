@@ -26,6 +26,7 @@ type dashboard struct {
 	output                   *tview.TextView
 	outputFollow, jobRunning bool
 	outputVisible            bool
+	tasksHidden              bool
 	jobCancel                context.CancelFunc
 	execution                *Execution
 	modal                    bool
@@ -91,7 +92,11 @@ func newDashboard(ctx context.Context, query func(context.Context) ([]Row, error
 			return nil
 		case event.Key() == tcell.KeyTab:
 			if d.app.GetFocus() == d.services {
-				d.app.SetFocus(d.tasks)
+				if d.tasksHidden && d.outputVisible {
+					d.app.SetFocus(d.output)
+				} else {
+					d.app.SetFocus(d.tasks)
+				}
 			} else {
 				if d.app.GetFocus() == d.tasks && d.outputVisible {
 					d.app.SetFocus(d.output)

@@ -134,3 +134,9 @@ Logs come from `docker service logs` on the configured Docker Swarm manager.
 The service must use a logging driver supported by Docker service logs, such as
 `json-file` or `journald`. A running stream stays attached to the service selected
 when the command starts; restart it after a blue/green switch to follow the new service.
+
+In `noops ui`, select a service and press `e`, then choose **Logs**. Logs are also
+available from the `:` command palette. The live stream appears in the output
+pane while the tasks section and task details are hidden. Tab switches between
+services and logs. Press `p` to pause/follow scrolling, `x` to stop and keep the
+logs, or `X` to stop and close the output pane. Tasks return when streaming ends.

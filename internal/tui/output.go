@@ -84,7 +84,9 @@ func (d *dashboard) startStream(action Action) {
 		})
 
 	}
+	d.tasksHidden = action.HideTasks
 	d.showOutput()
+	d.rebuildLayout()
 	d.keepKilledOutput = false
 	d.jobRunning = true
 	d.outputFollow = true
@@ -127,6 +129,8 @@ func (d *dashboard) startStream(action Action) {
 					d.output.ScrollTo(row, col)
 				}
 				if final {
+					d.tasksHidden = false
+					d.rebuildLayout()
 					d.jobRunning = false
 					d.jobCancel = nil
 					state := "completed"
@@ -163,17 +167,14 @@ func (d *dashboard) showOutput() {
 		return
 	}
 	d.outputVisible = true
-	d.layout.RemoveItem(d.footer)
-	d.layout.ResizeItem(d.services, 0, 2).ResizeItem(d.tasks, 0, 1).ResizeItem(d.detail, 2, 0)
-	d.layout.AddItem(d.output, 0, 3, false).AddItem(d.footer, 1, 0, false)
+	d.rebuildLayout()
 }
 func (d *dashboard) hideOutput() {
 	if !d.outputVisible {
 		return
 	}
 	d.outputVisible = false
-	d.layout.RemoveItem(d.output)
-	d.layout.ResizeItem(d.services, 0, 1).ResizeItem(d.tasks, 0, 1).ResizeItem(d.detail, 3, 0)
+	d.rebuildLayout()
 	if d.app.GetFocus() == d.output {
 		d.app.SetFocus(d.services)
 	}
@@ -188,4 +189,23 @@ func (d *dashboard) cancelStream(closeView bool) {
 	if closeView {
 		d.hideOutput()
 	}
+}
+
+// rebuildLayout keeps pane order consistent as output, logs, and rollouts change.
+func (d *dashboard) rebuildLayout() {
+	serviceWeight, detailHeight := 1, 3
+	if d.outputVisible || d.rolloutVisible {
+		serviceWeight, detailHeight = 2, 2
+	}
+	d.layout.Clear().AddItem(d.health, 3, 0, false).AddItem(d.status, 2, 0, false).AddItem(d.services, 0, serviceWeight, true)
+	if d.rolloutVisible {
+		d.layout.AddItem(d.rolloutPane, 8, 0, false)
+	}
+	if !d.tasksHidden || !d.outputVisible {
+		d.layout.AddItem(d.tasks, 0, 1, false).AddItem(d.detail, detailHeight, 0, false)
+	}
+	if d.outputVisible {
+		d.layout.AddItem(d.output, 0, 3, false)
+	}
+	d.layout.AddItem(d.footer, 1, 0, false)
 }

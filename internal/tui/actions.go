@@ -13,8 +13,9 @@ import (
 )
 
 type Action struct {
-	Label string
-	Args  []string
+	Label     string
+	Args      []string
+	HideTasks bool
 }
 type Execution struct {
 	Rollouts  func(context.Context) ([]deploy.RolloutProgress, error)
