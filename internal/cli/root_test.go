@@ -114,3 +114,26 @@ func TestTargetFlagsAreMutuallyExclusive(t *testing.T) {
 		t.Fatal("release with both selectors returned nil error")
 	}
 }
+
+func TestLogsHelp(t *testing.T) {
+	root := NewRootCommand(context.Background())
+	var output strings.Builder
+	root.SetOut(&output)
+	root.SetArgs([]string{"logs", "--help"})
+	if err := root.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"<environment> <app>", "--service", "--follow", "--tail", "--since", "--timestamps"} {
+		if !strings.Contains(output.String(), want) {
+			t.Errorf("help missing %q", want)
+		}
+	}
+}
+
+func TestLogsRejectsInvalidTailBeforeLoadingWorkspace(t *testing.T) {
+	root := NewRootCommand(context.Background())
+	root.SetArgs([]string{"logs", "prod", "api", "--tail", "-1"})
+	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "--tail must") {
+		t.Fatalf("error = %v", err)
+	}
+}

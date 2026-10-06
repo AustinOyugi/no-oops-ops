@@ -50,6 +50,7 @@ Use the CLI for automation or as a fallback:
 noops release --deploy prod redis --service redis
 noops release list prod redis --service redis
 noops status
+noops logs prod redis --service redis
 ```
 
 ## Documentation

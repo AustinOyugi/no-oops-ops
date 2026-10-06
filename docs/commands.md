@@ -12,6 +12,7 @@ noops [--workspace <workspace>] uninstall [--purge]
 noops [--workspace <workspace>] doctor [--deploy-ready]
 noops [--workspace <workspace>] status
 noops [--workspace <workspace>] ui
+noops [--workspace <workspace>] logs <environment> <app> [--service <name>] [--tail <count|all>] [--since <timestamp|duration>] [--timestamps] [--follow=false]
 noops [--workspace <workspace>] release [--deploy] <environment> <app> [--service <name> | --all]
 noops [--workspace <workspace>] release list <environment> <app> [--service <name> | --all]
 noops [--workspace <workspace>] deploy [--quick] <environment> <app> [--service <name> | --all]
@@ -114,3 +115,22 @@ Run `noops ui` for daily service inspection, releases, deployment actions, strea
 command output, host metrics, and blue/green progress. See the [TUI guide](tui.md)
 for navigation, forms, cancellation, and CLI fallback. The command reference above
 also applies to the operations launched from the dashboard.
+
+## Service logs
+
+`noops logs prod redis` streams the deployed service's stdout and stderr, starting
+with the last 100 lines per task. Press Ctrl+C to stop. For multi-service apps,
+select a service with `--service`; single-service apps select it automatically.
+The command resolves the active service from successful deployment history, including
+blue/green stack names, and falls back to the standard stack name when no history exists.
+
+```bash
+noops logs prod backend --service api
+noops logs prod backend --service api --tail 200 --since 10m --timestamps
+noops logs prod redis --follow=false --tail all
+```
+
+Logs come from `docker service logs` on the configured Docker Swarm manager.
+The service must use a logging driver supported by Docker service logs, such as
+`json-file` or `journald`. A running stream stays attached to the service selected
+when the command starts; restart it after a blue/green switch to follow the new service.
