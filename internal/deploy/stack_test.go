@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
+	"gopkg.in/yaml.v3"
 )
 
 func TestRenderComposeStackPreservesUnknownComposeFields(t *testing.T) {
@@ -59,7 +60,6 @@ secrets: {existing-secret: {external: true}}
 		"entrypoint: ./entrypoint.sh", "command: [serve]", "owner: platform", "x-future-compose-field: retained",
 		"constraints: [node.role == worker]", "memory: 256M", "condition: any", "parallelism: 2",
 		"image: secure.registry/api@sha256:abc", "source: noops_dev_DB_PASSWORD_v1", "external: true",
-		"- noops-dev",
 		filepath.Join(filepath.Dir(path), ".env"), filepath.Join(filepath.Dir(path), "data") + ":/data", filepath.Join(filepath.Dir(path), "config.yml"),
 	} {
 		if !strings.Contains(output, want) {
@@ -68,6 +68,88 @@ secrets: {existing-secret: {external: true}}
 	}
 	if strings.Contains(output, "x-noops") {
 		t.Errorf("generated stack must not contain x-noops:\n%s", output)
+	}
+	var generated yaml.Node
+	if err := yaml.Unmarshal(rendered, &generated); err != nil {
+		t.Fatal(err)
+	}
+	root := documentRoot(&generated)
+	attachments := mappingValue(mappingValue(mappingValue(root, "services"), "dev-api"), "networks")
+	if attachments == nil || len(attachments.Content) != 2 || attachments.Content[0].Value != "platform" || attachments.Content[1].Value != "noops-dev" {
+		t.Fatal("expected original and environment network attachments")
+	}
+	if mappingValue(mappingValue(root, "networks"), "platform") == nil {
+		t.Fatal("original network definition was removed")
+	}
+}
+
+func TestEnvironmentNetworkMergesComposeNetworks(t *testing.T) {
+	for _, tc := range []struct {
+		name, attachments, definitions string
+		mapping, conflict              bool
+	}{
+		{name: "list", attachments: "[shared-data]", definitions: "{shared-data: {external: true, name: shared-data}}"},
+		{name: "mapping and aliases", attachments: "{shared-data: {aliases: [shared-postgres], ipv4_address: 10.1.0.5}}", definitions: "{shared-data: {driver: overlay, attachable: true, ipam: {config: [{subnet: 10.1.0.0/24}]}}}", mapping: true},
+		{name: "existing environment attachment", attachments: "[shared-data, noops-prod]", definitions: "{shared-data: {external: true}, noops-prod: {external: true, name: noops-prod}}"},
+		{name: "environment aliases", attachments: "{noops-prod: {aliases: [database]}, shared-data: null}", definitions: "{shared-data: {external: true}}", mapping: true},
+		{name: "empty", attachments: "null", definitions: "null"},
+		{name: "conflicting managed network", attachments: "[noops-prod]", definitions: "{noops-prod: {name: another-network, external: true}}", conflict: true},
+		{name: "invalid attachments", attachments: "shared-data", definitions: "{}", conflict: true},
+		{name: "invalid definitions", attachments: "[]", definitions: "[shared-data]", conflict: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var doc yaml.Node
+			if err := yaml.Unmarshal([]byte("services:\n  db:\n    networks: "+tc.attachments+"\nnetworks: "+tc.definitions+"\n"), &doc); err != nil {
+				t.Fatal(err)
+			}
+			root := documentRoot(&doc)
+			service := mappingValue(mappingValue(root, "services"), "db")
+			beforeShared, _ := yaml.Marshal(mappingValue(mappingValue(root, "networks"), "shared-data"))
+			beforeAliases, _ := yaml.Marshal(mappingValue(mappingValue(service, "networks"), "shared-data"))
+			if err := setEnvironmentNetwork(root, service, "noops-prod"); err != nil {
+				if !tc.conflict {
+					t.Fatal(err)
+				}
+				return
+			} else if tc.conflict {
+				t.Fatal("expected conflicting network error")
+			}
+			// Applying the merge twice must neither duplicate nor alter declarations.
+			once, _ := yaml.Marshal(root)
+			if err := setEnvironmentNetwork(root, service, "noops-prod"); err != nil {
+				t.Fatal(err)
+			}
+			twice, _ := yaml.Marshal(root)
+			if string(once) != string(twice) {
+				t.Fatal("merge is not idempotent")
+			}
+			attachments := mappingValue(service, "networks")
+			count := 0
+			if tc.mapping {
+				for i := 0; i < len(attachments.Content); i += 2 {
+					if attachments.Content[i].Value == "noops-prod" {
+						count++
+					}
+				}
+			} else {
+				for _, entry := range attachments.Content {
+					if entry.Value == "noops-prod" {
+						count++
+					}
+				}
+			}
+			if count != 1 {
+				t.Fatalf("environment attachments=%d", count)
+			}
+			afterShared, _ := yaml.Marshal(mappingValue(mappingValue(root, "networks"), "shared-data"))
+			afterAliases, _ := yaml.Marshal(mappingValue(attachments, "shared-data"))
+			if string(beforeShared) != string(afterShared) || string(beforeAliases) != string(afterAliases) {
+				t.Fatal("shared network definition or options changed")
+			}
+			if mappingValue(mappingValue(mappingValue(root, "networks"), "noops-prod"), "external").Value != "true" {
+				t.Fatal("environment network must be external")
+			}
+		})
 	}
 }
 

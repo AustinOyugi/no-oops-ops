@@ -249,7 +249,9 @@ func renderComposeStack(m manifest.Manifest, image string, bindings []SecretBind
 	serviceKey.Value = serviceName
 	removeNoOpsMetadata(root)
 	setMapping(selected, "image", scalar(image))
-	setEnvironmentNetwork(root, selected, network)
+	if err := setEnvironmentNetwork(root, selected, network); err != nil {
+		return nil, err
+	}
 	normalizeServicePaths(selected, filepath.Dir(m.Path))
 	appendEnvFile(selected, generatedEnv)
 	if wrapper.UseWrapper {
@@ -261,27 +263,58 @@ func renderComposeStack(m manifest.Manifest, image string, bindings []SecretBind
 	return yaml.Marshal(&doc)
 }
 
-func setEnvironmentNetwork(root, service *yaml.Node, network string) {
-	setMapping(service, "networks", &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq", Content: []*yaml.Node{scalar(network)}})
+func setEnvironmentNetwork(root, service *yaml.Node, network string) error {
+	attachments := mappingValue(service, "networks")
+	if attachments == nil || attachments.Tag == "!!null" {
+		attachments = &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+		setMapping(service, "networks", attachments)
+	}
+	switch attachments.Kind {
+	case yaml.SequenceNode:
+		found := false
+		for _, item := range attachments.Content {
+			if item.Kind != yaml.ScalarNode {
+				return fmt.Errorf("service networks must contain network names")
+			}
+			if item.Value == network {
+				found = true
+			}
+		}
+		if !found {
+			attachments.Content = append(attachments.Content, scalar(network))
+		}
+	case yaml.MappingNode:
+		if mappingValue(attachments, network) == nil {
+			setMapping(attachments, network, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!null", Value: ""})
+		}
+	default:
+		return fmt.Errorf("service networks must be a list or mapping")
+	}
 	networks := mappingValue(root, "networks")
-	if networks == nil {
+	if networks == nil || networks.Tag == "!!null" {
 		networks = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
 		setMapping(root, "networks", networks)
 	}
 	if networks.Kind != yaml.MappingNode {
-		return
+		return fmt.Errorf("top-level networks must be a mapping")
 	}
-	networks.Content = []*yaml.Node{
-		scalar(network),
-		{
-			Kind: yaml.MappingNode,
-			Tag:  "!!map",
-			Content: []*yaml.Node{
-				scalar("external"),
-				{Kind: yaml.ScalarNode, Tag: "!!bool", Value: "true"},
-			},
-		},
+	definition := mappingValue(networks, network)
+	if definition == nil || definition.Tag == "!!null" {
+		definition = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+		setMapping(networks, network, definition)
 	}
+	if definition.Kind != yaml.MappingNode {
+		return fmt.Errorf("environment network %q must be a mapping", network)
+	}
+	for i := 0; i < len(definition.Content); i += 2 {
+		key, value := definition.Content[i].Value, definition.Content[i+1]
+		if (key == "name" && value.Value == network) || (key == "external" && value.Tag == "!!bool" && value.Value == "true") {
+			continue
+		}
+		return fmt.Errorf("environment network %q is managed by noops; conflicting option %q", network, key)
+	}
+	setMapping(definition, "external", &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: "true"})
+	return nil
 }
 
 func removeNoOpsMetadata(node *yaml.Node) {

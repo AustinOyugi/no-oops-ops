@@ -172,6 +172,57 @@ For development feedback loops, `noops deploy --quick <environment> <app>` tempo
 as the monitor window while retaining the manifest's `rollout.convergence_timeout`. It does not change the manifest; a
 later normal deploy uses the configured monitor again.
 
+## Additional and shared networks
+
+Noops adds the environment network alongside the selected service's declared Compose networks. Both list
+and mapping syntax are supported. Network aliases and attachment options are preserved, as are top-level
+network definitions (including external names, driver options, and IPAM). The environment network remains
+external and managed by Noops; declaring incompatible options for its name is an error.
+
+To let a canary application use a Postgres instance deployed in prod, declare a shared external network in
+both manifests. Deploy automatically creates missing external networks attached to the selected service as
+Swarm overlay networks. Existing networks are reused after checking their driver and scope; incompatible
+networks produce an error. Unused declarations are not provisioned. Compose-owned networks without
+`external: true` remain Docker's responsibility, preserving their driver and IPAM options.
+
+Add this attachment to the existing prod Postgres service, retaining its other configuration:
+
+```yaml
+services:
+  postgres:
+    networks:
+      shared-data:
+        aliases: [shared-postgres]
+
+networks:
+  shared-data:
+    external: true
+    name: shared-data
+```
+
+Add the shared network to each intended consumer, retaining its other configuration:
+
+```yaml
+services:
+  vybe-builder-service:
+    networks: [shared-data]
+
+networks:
+  shared-data:
+    external: true
+    name: shared-data
+```
+
+Redeploy the prod Postgres service and the canary consumer. The generated stacks attach Postgres to both
+its prod network and `shared-data`, and the consumer to both its canary network and `shared-data`.
+The consumer connects to `shared-postgres:5432`; no published host port is required. Use the alias only for
+this Postgres service on the shared network. No manual network-create command is needed. Shared external
+networks persist independently of these stacks and are not removed when a candidate is cleaned up.
+
+Use separate databases and database roles for prod and canary when sharing the same instance, and store
+each environment's credentials in its own Noops secret store. Only services explicitly attached to
+`shared-data` gain access to that shared network; other services keep their environment network attachments.
+
 ## Public routing
 
 After the application successfully converges, `noops deploy` writes its enabled route to the platform-managed nginx

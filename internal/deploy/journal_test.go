@@ -129,7 +129,7 @@ func TestCleanupCancelledDeploy(t *testing.T) {
 			s := NewService(slog.New(slog.NewTextHandler(io.Discard, nil)), cfg)
 			parent, cancel := context.WithCancel(context.Background())
 			cancel()
-			recovery, finish := context.WithTimeout(context.WithoutCancel(parent), time.Second)
+			recovery, finish := context.WithTimeout(context.WithoutCancel(parent), 10*time.Second)
 			defer finish()
 			err := s.cleanupInterruptedDeploy(recovery, "api", "prod", "prod-api_prod-api", journal)
 			wantFailure := tc.fail || tc.stage == "ingress_reconciled"

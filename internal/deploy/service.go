@@ -240,11 +240,11 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 	}
 
 	network := s.config.EnvironmentNetwork(environment)
-	if err := s.ensureNetwork(ctx, network); err != nil {
-		return Result{}, err
-	}
 	stackPath, err := writeStackForService(s.config, environment, m, immutableImage, secretBindings, wrapperCfg, network, deploymentService, deploymentStackPath)
 	if err != nil {
+		return Result{}, err
+	}
+	if err := s.ensureStackNetworks(ctx, stackPath); err != nil {
 		return Result{}, err
 	}
 
