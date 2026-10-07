@@ -288,6 +288,11 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		monitor,
 	)
 	if err != nil {
+		if outcome == SwarmOutcomeTimedOut && !blueGreen {
+			if recoveryErr := s.stopTimedOutRollout(ctx, deploymentSwarmService); recoveryErr != nil {
+				err = fmt.Errorf("%w; stop timed-out rollout: %v", err, recoveryErr)
+			}
+		}
 		if outcome == "" {
 			outcome = SwarmOutcomeFailed
 		}

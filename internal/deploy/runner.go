@@ -32,13 +32,13 @@ const (
 const swarmObservationInterval = 2 * time.Second
 
 // rolloutMonitorState separates the time allowed to first converge from the
-// time a converged service must remain stable. Once convergence has been
+// configured observation window and its final readiness check. Once convergence has been
 // reached, the convergence deadline must no longer cancel the monitor window.
 type rolloutMonitorState struct {
 	convergenceDeadline time.Time
 	monitor             time.Duration
 	converged           bool
-	stableSince         time.Time
+	monitorDeadline     time.Time
 }
 
 func newRolloutMonitorState(now time.Time, convergenceTimeout, monitor time.Duration) rolloutMonitorState {
@@ -53,25 +53,26 @@ func newRolloutMonitorState(now time.Time, convergenceTimeout, monitor time.Dura
 // monitor window completed, and whether this observation first converged.
 func (r *rolloutMonitorState) observe(now time.Time, converged bool) (timedOut, monitoring, completed, justConverged bool) {
 	if !r.converged {
-		if now.After(r.convergenceDeadline) {
+		if !now.Before(r.convergenceDeadline) {
 			return true, false, false, false
 		}
 		if !converged {
 			return false, false, false, false
 		}
 		r.converged = true
-		r.stableSince = now
+		r.monitorDeadline = now.Add(r.monitor)
 		justConverged = true
-	} else if !converged {
-		r.stableSince = time.Time{}
-		return false, false, false, false
-	} else if r.stableSince.IsZero() {
-		r.stableSince = now
 	}
 
-	if now.Sub(r.stableSince) >= r.monitor {
+	// The configured monitor is a single observation window. At its end,
+	// missing tasks or an unfinished update fail instead of extending the wait.
+	if !now.Before(r.monitorDeadline) {
+		if !converged {
+			return true, false, false, false
+		}
 		return false, true, true, justConverged
 	}
+
 	return false, true, false, justConverged
 }
 
@@ -197,32 +198,45 @@ func (s *Service) waitForSwarmConvergence(
 	defer progressIndicator.Stop()
 
 	for {
-		state, message, image, err := s.serviceUpdateStatus(ctx, serviceName)
+		// Allow one bounded final observation at the phase boundary so a
+		// stable monitor can complete rather than cancelling its last probe.
+		observationCtx, cancel := context.WithDeadline(ctx, monitorState.deadline().Add(5*time.Second))
+		state, message, image, err := s.serviceUpdateStatus(observationCtx, serviceName)
 		if err != nil {
+			cancel()
+			if ctx.Err() == nil && !time.Now().Before(monitorState.deadline()) {
+				return SwarmOutcomeTimedOut, 0, s.convergenceError(ctx, serviceName, SwarmOutcomeTimedOut, "rollout observation deadline exceeded")
+			}
 			return "", 0, err
 		}
 
 		switch state {
 		case "rollback_completed":
+			cancel()
 			progressIndicator.Stop()
 			s.logger.WarnContext(ctx, "Swarm rollout rolled back", "service", serviceName, "reason", message)
 			return SwarmOutcomeRolledBack, 0, s.convergenceError(ctx, serviceName, SwarmOutcomeRolledBack, message)
 		case "paused":
+			cancel()
 			progressIndicator.Stop()
 			s.logger.WarnContext(ctx, "Swarm rollout paused", "service", serviceName, "reason", message)
 			return SwarmOutcomePaused, 0, s.convergenceError(ctx, serviceName, SwarmOutcomePaused, message)
 		case "rollback_paused":
+			cancel()
 			progressIndicator.Stop()
 			s.logger.WarnContext(ctx, "Swarm rollback paused", "service", serviceName, "reason", message)
 			return SwarmOutcomeRollbackPaused, 0, s.convergenceError(ctx, serviceName, SwarmOutcomeRollbackPaused, message)
 		}
 
-		runningTasks, err := s.runningTaskCount(ctx, serviceName)
+		runningTasks, err := s.runningTaskCount(observationCtx, serviceName)
+		cancel()
 		if err != nil {
+			if ctx.Err() == nil && !time.Now().Before(monitorState.deadline()) {
+				return SwarmOutcomeTimedOut, 0, s.convergenceError(ctx, serviceName, SwarmOutcomeTimedOut, "rollout observation deadline exceeded")
+			}
 			return "", 0, err
 		}
-		converged := (state == "completed" && strings.HasPrefix(image, expectedImage)) ||
-			(state == "" && allDesiredTasksRunning(runningTasks, desiredTasks))
+		converged := swarmConverged(state, image, expectedImage, runningTasks, desiredTasks)
 		timedOut, monitoring, completed, justConverged := monitorState.observe(time.Now(), converged)
 		progressIndicator.Update(state, runningTasks, desiredTasks, monitoring)
 
@@ -246,7 +260,7 @@ func (s *Service) waitForSwarmConvergence(
 		if timedOut {
 			progressIndicator.Stop()
 			s.logger.WarnContext(ctx, "Swarm convergence timed out", "service", serviceName, "running_tasks", runningTasks, "desired_tasks", desiredTasks, "timeout", timeout.String())
-			return SwarmOutcomeTimedOut, runningTasks, s.convergenceError(ctx, serviceName, SwarmOutcomeTimedOut, fmt.Sprintf("service did not converge within %s", timeout))
+			return SwarmOutcomeTimedOut, runningTasks, s.convergenceError(ctx, serviceName, SwarmOutcomeTimedOut, fmt.Sprintf("service did not converge within %s or remain stable for %s", timeout, initialMonitor))
 		}
 
 		select {
@@ -276,6 +290,8 @@ func parseServiceUpdateStatus(output string) (string, string, string) {
 }
 
 func (s *Service) convergenceError(ctx context.Context, serviceName string, outcome SwarmOutcome, reason string) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
 	diagnostics, err := s.taskDiagnostics(ctx, serviceName)
 	if err != nil {
 		return fmt.Errorf("inspect diagnostics after Swarm outcome %q: %w", outcome, err)
@@ -340,4 +356,35 @@ func formatTaskDiagnostics(diagnostics []TaskDiagnostic) string {
 	}
 
 	return strings.Join(parts, "; ")
+}
+
+func (r *rolloutMonitorState) deadline() time.Time {
+	if r.converged {
+		return r.monitorDeadline
+	}
+	return r.convergenceDeadline
+}
+
+func swarmConverged(state, image, expectedImage string, running, desired int) bool {
+	return (state == "" || state == "completed") && (image == expectedImage || strings.HasPrefix(image, expectedImage+"@")) && allDesiredTasksRunning(running, desired)
+}
+
+// stopTimedOutRollout bounds recovery commands independently of observation.
+func (s *Service) stopTimedOutRollout(ctx context.Context, service string) error {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	result, err := s.runner.Run(ctx, "docker", []string{"service", "inspect", "--format", "{{if .PreviousSpec}}true{{else}}false{{end}}", service}, command.RunOptions{})
+	if err != nil {
+		return fmt.Errorf("inspect previous service spec: %w", err)
+	}
+	args := []string{"service", "scale", service + "=0"}
+	switch strings.TrimSpace(string(result.Output)) {
+	case "true":
+		args = []string{"service", "update", "--detach", "--rollback", service}
+	case "false":
+	default:
+		return fmt.Errorf("unexpected previous service spec response %q", strings.TrimSpace(string(result.Output)))
+	}
+	_, err = s.runner.Run(ctx, "docker", args, command.RunOptions{LogCommand: true})
+	return err
 }
