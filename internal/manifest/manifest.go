@@ -34,19 +34,46 @@ type ComposeFile struct {
 }
 
 type ComposeService struct {
-	Image       string        `yaml:"image"`
-	Build       ComposeBuild  `yaml:"build"`
-	Command     []string      `yaml:"command"`
-	Healthcheck Healthcheck   `yaml:"healthcheck"`
-	Deploy      ComposeDeploy `yaml:"deploy"`
-	Networks    []string      `yaml:"networks"`
-	Volumes     []string      `yaml:"volumes"`
-	NoOps       ComposeNoOps  `yaml:"x-noops"`
+	Image       string          `yaml:"image"`
+	Build       ComposeBuild    `yaml:"build"`
+	Command     []string        `yaml:"command"`
+	Healthcheck Healthcheck     `yaml:"healthcheck"`
+	Deploy      ComposeDeploy   `yaml:"deploy"`
+	Networks    ComposeNetworks `yaml:"networks"`
+	Volumes     []string        `yaml:"volumes"`
+	NoOps       ComposeNoOps    `yaml:"x-noops"`
 }
 
 type ComposeBuild struct {
 	Context    string `yaml:"context"`
 	Dockerfile string `yaml:"dockerfile"`
+}
+
+// ComposeNetworks projects network names for Noops configuration. Full
+// attachment options remain in the preserved Compose document.
+type ComposeNetworks []string
+
+func (n *ComposeNetworks) UnmarshalYAML(value *yaml.Node) error {
+	if value.Tag == "!!null" {
+		*n = nil
+		return nil
+	}
+	switch value.Kind {
+	case yaml.SequenceNode:
+		var names []string
+		if err := value.Decode(&names); err != nil {
+			return err
+		}
+		*n = names
+	case yaml.MappingNode:
+		*n = nil
+		for i := 0; i < len(value.Content); i += 2 {
+			*n = append(*n, value.Content[i].Value)
+		}
+	default:
+		return fmt.Errorf("service networks must be a list or mapping")
+	}
+	return nil
 }
 
 func (b *ComposeBuild) UnmarshalYAML(value *yaml.Node) error {

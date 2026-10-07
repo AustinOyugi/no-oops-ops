@@ -153,6 +153,43 @@ func TestEnvironmentNetworkMergesComposeNetworks(t *testing.T) {
 	}
 }
 
+func TestUndeclaredNetworksDefaultToSharedExternalOverlays(t *testing.T) {
+	for _, attachments := range []string{"[shared-data]", "{shared-data: {aliases: [shared-postgres]}}"} {
+		path := filepath.Join(t.TempDir(), "app.yml")
+		if err := os.WriteFile(path, []byte("services:\n  postgres:\n    image: postgres:17\n    networks: "+attachments+"\n"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		m, err := manifest.Load(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rendered, err := renderComposeStack(m, "postgres:17", nil, WrapperConfig{}, "noops-prod", "prod-postgres", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var doc yaml.Node
+		if err := yaml.Unmarshal(rendered, &doc); err != nil {
+			t.Fatal(err)
+		}
+		definition := mappingValue(mappingValue(documentRoot(&doc), "networks"), "shared-data")
+		if definition == nil || mappingValue(definition, "external").Value != "true" || mappingValue(definition, "name").Value != "shared-data" {
+			t.Fatalf("missing generated shared definition: %s", rendered)
+		}
+	}
+	// An explicitly empty definition still means Compose owns the network.
+	var doc yaml.Node
+	if err := yaml.Unmarshal([]byte("services: {api: {networks: [shared-data]}}\nnetworks: {shared-data: {}}\n"), &doc); err != nil {
+		t.Fatal(err)
+	}
+	root := documentRoot(&doc)
+	if err := setEnvironmentNetwork(root, mappingValue(mappingValue(root, "services"), "api"), "noops-canary"); err != nil {
+		t.Fatal(err)
+	}
+	if len(mappingValue(mappingValue(root, "networks"), "shared-data").Content) != 0 {
+		t.Fatal("explicit definition was overridden")
+	}
+}
+
 func TestRenderComposeStackEnvSecretDoesNotInjectFileVariable(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "app.yml")
 	data := []byte(`services:

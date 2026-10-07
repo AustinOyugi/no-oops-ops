@@ -298,6 +298,22 @@ func setEnvironmentNetwork(root, service *yaml.Node, network string) error {
 	if networks.Kind != yaml.MappingNode {
 		return fmt.Errorf("top-level networks must be a mapping")
 	}
+	// Undeclared service networks are shared overlays by default. Explicit
+	// Compose definitions retain their ownership, names and other options.
+	step := 1
+	if attachments.Kind == yaml.MappingNode {
+		step = 2
+	}
+	for i := 0; i < len(attachments.Content); i += step {
+		name := attachments.Content[i].Value
+		if name == network || mappingValue(networks, name) != nil {
+			continue
+		}
+		setMapping(networks, name, &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{
+			scalar("external"), {Kind: yaml.ScalarNode, Tag: "!!bool", Value: "true"},
+			scalar("name"), scalar(name),
+		}})
+	}
 	definition := mappingValue(networks, network)
 	if definition == nil || definition.Tag == "!!null" {
 		definition = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}

@@ -179,7 +179,11 @@ and mapping syntax are supported. Network aliases and attachment options are pre
 network definitions (including external names, driver options, and IPAM). The environment network remains
 external and managed by Noops; declaring incompatible options for its name is an error.
 
-To let a canary application use a Postgres instance deployed in prod, declare a shared external network in
+If a service references a network without a top-level definition, Noops generates
+`external: true` and `name: <network-key>` for it. Explicit definitions, including empty definitions, take
+precedence and keep their declared Compose behavior.
+
+To let a canary application use a Postgres instance deployed in prod, attach a shared network in
 both manifests. Deploy automatically creates missing external networks attached to the selected service as
 Swarm overlay networks. Existing networks are reused after checking their driver and scope; incompatible
 networks produce an error. Unused declarations are not provisioned. Compose-owned networks without
@@ -193,11 +197,6 @@ services:
     networks:
       shared-data:
         aliases: [shared-postgres]
-
-networks:
-  shared-data:
-    external: true
-    name: shared-data
 ```
 
 Add the shared network to each intended consumer, retaining its other configuration:
@@ -206,12 +205,10 @@ Add the shared network to each intended consumer, retaining its other configurat
 services:
   vybe-builder-service:
     networks: [shared-data]
-
-networks:
-  shared-data:
-    external: true
-    name: shared-data
 ```
+
+No top-level `networks` block is required for this default. To use a different physical network name, or
+declare a Compose-owned network with custom options, supply an explicit top-level definition.
 
 Redeploy the prod Postgres service and the canary consumer. The generated stacks attach Postgres to both
 its prod network and `shared-data`, and the consumer to both its canary network and `shared-data`.
