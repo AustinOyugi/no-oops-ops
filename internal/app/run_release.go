@@ -9,14 +9,14 @@ import (
 )
 
 // Release builds selected services and optionally deploys those exact releases.
-func (a *App) Release(ctx context.Context, target Target, deployAfterRelease bool) error {
+func (a *App) Release(ctx context.Context, target Target, deployAfterRelease bool, force bool) error {
 	environment, manifestPath, services, err := a.resolveTarget(target, true, false)
 	if err != nil {
 		return err
 	}
 	releaseTags := make(map[string]string, len(services))
 	for _, service := range services {
-		result, err := a.runReleaseService(ctx, environment, manifest.WithService(manifestPath, service))
+		result, err := a.runReleaseService(ctx, environment, manifest.WithService(manifestPath, service), force)
 		if err != nil {
 			return err
 		}
@@ -84,9 +84,9 @@ func gitCommit(metadata release.Metadata) string {
 	return metadata.Git.Commit
 }
 
-func (a *App) runReleaseService(ctx context.Context, environment, manifestPath string) (release.Result, error) {
+func (a *App) runReleaseService(ctx context.Context, environment, manifestPath string, force bool) (release.Result, error) {
 
-	result, err := a.releaser.Run(ctx, environment, manifestPath)
+	result, err := a.releaser.RunWithOptions(ctx, environment, manifestPath, release.Options{Force: force})
 	if err != nil {
 		a.logger.ErrorContext(
 			ctx,

@@ -48,6 +48,7 @@ Use the CLI for automation or as a fallback:
 
 ```bash
 noops release --deploy prod redis --service redis
+noops release --deploy --force prod redis --service redis # Overwrite an existing release tag
 noops release list prod redis --service redis
 noops status
 noops logs prod redis --service redis

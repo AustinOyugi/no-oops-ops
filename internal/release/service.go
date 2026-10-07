@@ -38,8 +38,18 @@ func NewService(logger *slog.Logger, cfg config.Config) *Service {
 // locks are released and only once the image and metadata were saved.
 func (s *Service) SetAfterRelease(job func(context.Context, Result) error) { s.afterRelease = job }
 
+// Options controls explicit release overrides.
+type Options struct {
+	Force bool
+}
+
 func (s *Service) Run(ctx context.Context, environment, path string) (Result, error) {
-	result, err := s.runLocked(ctx, environment, path)
+	return s.RunWithOptions(ctx, environment, path, Options{})
+}
+
+// RunWithOptions creates a release, optionally replacing an existing tag.
+func (s *Service) RunWithOptions(ctx context.Context, environment, path string, options Options) (Result, error) {
+	result, err := s.runLocked(ctx, environment, path, options)
 	if err != nil {
 		return result, err
 	}
@@ -56,7 +66,7 @@ func (s *Service) completeRelease(ctx context.Context, result Result) {
 	}
 }
 
-func (s *Service) runLocked(ctx context.Context, environment string, path string) (Result, error) {
+func (s *Service) runLocked(ctx context.Context, environment string, path string, options Options) (Result, error) {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return Result{}, fmt.Errorf("resolve manifest path %q: %w", path, err)
@@ -76,10 +86,10 @@ func (s *Service) runLocked(ctx context.Context, environment string, path string
 	defer unlock()
 
 	if m.Image.ShouldBuild() {
-		return s.releaseBuild(ctx, environment, absPath, m)
+		return s.releaseBuild(ctx, environment, absPath, m, options)
 	}
 
-	return s.releaseExternalImage(ctx, environment, absPath, m)
+	return s.releaseExternalImage(ctx, environment, absPath, m, options)
 }
 
 func (s *Service) buildPulledImage(ctx context.Context, targetImage, sourceImage string) error {
@@ -169,7 +179,7 @@ func (s *Service) resolvePushedDigest(ctx context.Context, image string) (string
 	return "", fmt.Errorf("inspect pushed image %q: registry digest is unavailable", image)
 }
 
-func (s *Service) ensureTagUnused(app, environment, tag string) error {
+func (s *Service) ensureTagUnused(ctx context.Context, app, environment, tag string, options Options) error {
 	_, err := NewFilesystemStore().Find(s.config, app, environment, tag)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
@@ -177,7 +187,11 @@ func (s *Service) ensureTagUnused(app, environment, tag string) error {
 	if err != nil {
 		return fmt.Errorf("inspect release tag %q: %w", tag, err)
 	}
-	return fmt.Errorf("deterministic release tag %q already exists; refusing to overwrite it", tag)
+	if options.Force {
+		s.logger.WarnContext(ctx, "overwriting existing release tag", "app", app, "environment", environment, "tag", tag)
+		return nil
+	}
+	return fmt.Errorf("deterministic release tag %q already exists; refusing to overwrite it (use --force or -f to overwrite)", tag)
 }
 
 // sourceTag records the mutable upstream tag that was snapshotted when an

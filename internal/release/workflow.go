@@ -32,7 +32,7 @@ func (s *Service) acquireReleaseLocks(ctx context.Context, app, environment stri
 	return func() { build(); registry(); operation() }, nil
 }
 
-func (s *Service) releaseBuild(ctx context.Context, environment, manifestPath string, m manifest.Manifest) (Result, error) {
+func (s *Service) releaseBuild(ctx context.Context, environment, manifestPath string, m manifest.Manifest, options Options) (Result, error) {
 	contextDir, dockerfile, git, cleanup, err := s.resolveBuildSource(ctx, environment, manifestPath, m)
 	if err != nil {
 		return Result{}, err
@@ -44,7 +44,7 @@ func (s *Service) releaseBuild(ctx context.Context, environment, manifestPath st
 		return Result{}, err
 	}
 
-	if err := s.ensureTagUnused(m.Name, environment, tag); err != nil {
+	if err := s.ensureTagUnused(ctx, m.Name, environment, tag, options); err != nil {
 		return Result{}, err
 	}
 
@@ -75,7 +75,7 @@ func (s *Service) releaseBuild(ctx context.Context, environment, manifestPath st
 	return s.publish(ctx, manifestPath, environment, m, image, registry, tag, git)
 }
 
-func (s *Service) releaseExternalImage(ctx context.Context, environment, manifestPath string, m manifest.Manifest) (Result, error) {
+func (s *Service) releaseExternalImage(ctx context.Context, environment, manifestPath string, m manifest.Manifest, options Options) (Result, error) {
 	source := m.Image.SourceReference
 	if source == "" {
 		source = fmt.Sprintf("%s:%s", m.Image.Repository, m.Image.Tag)
@@ -86,7 +86,7 @@ func (s *Service) releaseExternalImage(ctx context.Context, environment, manifes
 		return Result{}, err
 	}
 
-	if err := s.ensureTagUnused(m.Name, environment, tag); err != nil {
+	if err := s.ensureTagUnused(ctx, m.Name, environment, tag, options); err != nil {
 		return Result{}, err
 	}
 
