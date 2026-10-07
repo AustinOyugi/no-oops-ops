@@ -91,8 +91,8 @@ func TestRolloutMonitorRecoveryDoesNotExtendWindow(t *testing.T) {
 	if timedOut, monitoring, completed, _ := state.observe(start.Add(60*time.Second), true); timedOut || !monitoring || completed {
 		t.Fatal("monitor must continue until configured end")
 	}
-	if timedOut, _, completed, _ := state.observe(start.Add(70*time.Second), true); timedOut || !completed {
-		t.Fatal("recovered service should pass at original monitor end")
+	if timedOut, _, completed, _ := state.observe(start.Add(70*time.Second), true); !timedOut || completed {
+		t.Fatal("recovered service must not erase instability during monitoring")
 	}
 }
 
@@ -174,9 +174,9 @@ func TestWaitForSwarmConvergence(t *testing.T) {
 			dir := t.TempDir()
 			script := "#!/bin/sh\ncase \"$2\" in\ninspect) echo 'completed||app:v1';;\nps) "
 			if running {
-				script += "echo 'Running 1 second ago'"
+				script += "echo 'task1|Running|Running 1 second ago|app:v1'"
 			} else {
-				script += "echo 'Starting 1 second ago'"
+				script += "echo 'task1|Running|Starting 1 second ago|app:v1'"
 			}
 			script += ";;\nesac\n"
 			if err := os.WriteFile(filepath.Join(dir, "docker"), []byte(script), 0700); err != nil {
@@ -194,5 +194,45 @@ func TestWaitForSwarmConvergence(t *testing.T) {
 				t.Fatalf("outcome=%s err=%v", outcome, err)
 			}
 		})
+	}
+}
+
+func TestTaskMonitorDetectsChurnWithoutCountingOldFailures(t *testing.T) {
+	initial := rolloutTasks{{"live", "Running", "Running 1 second ago", "app:v1"}, {"old", "Shutdown", "Failed yesterday", "app:v1"}}
+	for _, tc := range []struct {
+		name   string
+		tasks  rolloutTasks
+		failed bool
+	}{
+		{"stable with old failure", initial, false},
+		{"replacement with same count", rolloutTasks{{"new", "Running", "Running 1 second ago", "app:v1"}}, true},
+		{"task lost", nil, true},
+		{"task starting again", rolloutTasks{{"live", "Running", "Starting 1 second ago", "app:v1"}}, true},
+		{"failure between polls", append(append(rolloutTasks{}, initial...), rolloutTask{"failed-between-polls", "Shutdown", "Failed 1 second ago", "app:v1"}), true},
+		{"wrong task image", rolloutTasks{{"live", "Running", "Running 1 second ago", "app:v2"}}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			monitor := newTaskMonitor(initial, initial.runningIDs("app:v1"))
+			if reason := monitor.observe(tc.tasks, tc.tasks.runningIDs("app:v1")); (reason != "") != tc.failed {
+				t.Fatalf("reason=%q expected failure=%t", reason, tc.failed)
+			}
+		})
+	}
+}
+
+func TestWaitForSwarmConvergenceRejectsReplacementAtMonitorEnd(t *testing.T) {
+	dir := t.TempDir()
+	// Both observations report completed and 1/1 running, but task identity changes.
+	script := "#!/bin/sh\ncase \"$2\" in\ninspect) echo 'completed||app:v1';;\nps) if [ -f \"$TASK_MARKER\" ]; then echo 'replacement|Running|Running 1 second ago|app:v1'; else touch \"$TASK_MARKER\"; echo 'original|Running|Running 1 second ago|app:v1'; fi;;\nesac\n"
+	if err := os.WriteFile(filepath.Join(dir, "docker"), []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("TASK_MARKER", filepath.Join(dir, "observed"))
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	s := &Service{runner: command.NewRunner(logger), logger: logger}
+	outcome, count, err := s.waitForSwarmConvergence(context.Background(), "sample", "app:v1", 1, time.Second, time.Millisecond)
+	if outcome != SwarmOutcomeFailed || count != 1 || err == nil || !strings.Contains(err.Error(), "replaced") {
+		t.Fatalf("outcome=%s count=%d error=%v", outcome, count, err)
 	}
 }

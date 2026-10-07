@@ -131,7 +131,7 @@ func TestCleanupCancelledDeploy(t *testing.T) {
 			cancel()
 			recovery, finish := context.WithTimeout(context.WithoutCancel(parent), time.Second)
 			defer finish()
-			err := s.cleanupCancelledDeploy(recovery, "api", "prod", "prod-api_prod-api", journal)
+			err := s.cleanupInterruptedDeploy(recovery, "api", "prod", "prod-api_prod-api", journal)
 			wantFailure := tc.fail || tc.stage == "ingress_reconciled"
 			if (err != nil) != wantFailure {
 				t.Fatalf("cleanup error=%v", err)
@@ -140,7 +140,7 @@ func TestCleanupCancelledDeploy(t *testing.T) {
 			if loadErr != nil || exists != wantFailure {
 				t.Fatalf("journal exists=%t err=%v", exists, loadErr)
 			}
-			archives, _ := filepath.Glob(journalPath(cfg, "api", "prod") + ".cancelled-*")
+			archives, _ := filepath.Glob(journalPath(cfg, "api", "prod") + ".recovered-*")
 			if !wantFailure && len(archives) != 1 {
 				t.Fatalf("archives=%v", archives)
 			}

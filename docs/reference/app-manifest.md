@@ -157,12 +157,16 @@ between 0 and 1.
 Rollout uses consecutive time windows: `rollout.convergence_timeout` is the time allowed for the desired tasks to
 converge, then `rollout.monitor` is the observation window before the final readiness decision. The monitor window starts only after
 convergence and does not consume the convergence timeout. Both the expected image and all desired running tasks
-are required. The monitor window does not restart when tasks fail or recover. At its end, the service must have the expected
-image, all desired running tasks, and a completed update (or no update in progress); otherwise the rollout fails
-and triggers timeout recovery. Swarm owns container health checks and removes unhealthy tasks.
-On timeout, blue/green candidates are removed. In-place services are asked to roll back to their previous Swarm
+are required, including the expected image on the running tasks themselves. The monitor window does not restart
+when tasks fail or recover. Noops tracks the task identities present when monitoring starts. Missing or replaced
+tasks, loss of convergence, or new failed/rejected tasks make the rollout fail at the end of the window, even if
+Swarm restores the desired count. Historical failures present before monitoring are ignored. Swarm paused and
+rollback outcomes fail immediately. Swarm owns container health checks and removes unhealthy tasks; configure
+the monitor to cover startup grace and health-failure detection, since Running alone is not a health verdict.
+On monitor failure or timeout, blue/green candidates are removed. In-place services are asked to roll back to their previous Swarm
 specification; a first deployment without a previous specification is scaled to zero. Recovery command failures
-are reported with the deployment failure. A rollback request is asynchronous and does not confirm recovery.
+are reported with the deployment failure. Noops waits for in-place recovery before archiving the operation
+journal and releasing its lock. If recovery fails or times out, the journal remains for inspection.
 
 For development feedback loops, `noops deploy --quick <environment> <app>` temporarily uses `healthcheck.start_period`
 as the monitor window while retaining the manifest's `rollout.convergence_timeout`. It does not change the manifest; a
@@ -214,7 +218,7 @@ keeps each route owner isolated while nginx still loads one effective configurat
 Ctrl+C (SIGINT) or SIGTERM cancels deployment work before promotion. Noops keeps the operation lock while
 running recovery with a separate context, allowing up to one minute: unpromoted blue/green candidates are
 removed, in-place updates roll back, and first deployments are scaled to zero. In-place recovery is confirmed
-before the operation journal is archived as `operation.json.cancelled-*`, allowing the next deploy to proceed.
+before the operation journal is archived as `operation.json.recovered-*`, allowing the next deploy to proceed.
 If recovery fails or times out, the journal remains and the failure is reported.
 
 Once promotion begins, routing and deployment metadata finish together under a bounded one-minute context.

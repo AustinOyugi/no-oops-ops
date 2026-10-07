@@ -96,10 +96,10 @@ func (s *Service) recoverJournal(ctx context.Context, app, environment string) e
 	return fmt.Errorf("unfinished %s operation for %s/%s at stage %q; inspect the live stack and journal %q before retrying", journal.Kind, environment, app, journal.Stage, journalPath(s.config, app, environment))
 }
 
-// cleanupCancelledDeploy runs while the operation lock is held. Never discard
+// cleanupInterruptedDeploy runs while the operation lock is held. Never discard
 // the durable intent until Docker confirms recovery; promotion needs separate
 // reconciliation and must not have its serving stack removed.
-func (s *Service) cleanupCancelledDeploy(ctx context.Context, app, environment, service string, journal operationJournal) error {
+func (s *Service) cleanupInterruptedDeploy(ctx context.Context, app, environment, service string, journal operationJournal) error {
 	if journal.Stage != "started" && journal.Stage != "stack_deployed" {
 		return fmt.Errorf("promotion reached stage %q; retain journal for reconciliation", journal.Stage)
 	}
@@ -145,10 +145,10 @@ func (s *Service) cleanupCancelledDeploy(ctx context.Context, app, environment, 
 		}
 	}
 	path := journalPath(s.config, app, environment)
-	archive := path + ".cancelled-" + time.Now().UTC().Format("20060102-150405.000000000")
+	archive := path + ".recovered-" + time.Now().UTC().Format("20060102-150405.000000000")
 	if err := os.Rename(path, archive); err != nil {
-		return fmt.Errorf("archive cancelled deployment journal: %w", err)
+		return fmt.Errorf("archive recovered deployment journal: %w", err)
 	}
-	s.logger.InfoContext(ctx, "cancelled deployment recovered", "stack", journal.StackName, "journal_archive", archive)
+	s.logger.InfoContext(ctx, "interrupted deployment recovered", "stack", journal.StackName, "journal_archive", archive)
 	return nil
 }

@@ -39,6 +39,7 @@ type rolloutMonitorState struct {
 	monitor             time.Duration
 	converged           bool
 	monitorDeadline     time.Time
+	unstable            bool
 }
 
 func newRolloutMonitorState(now time.Time, convergenceTimeout, monitor time.Duration) rolloutMonitorState {
@@ -52,6 +53,9 @@ func newRolloutMonitorState(now time.Time, convergenceTimeout, monitor time.Dura
 // timed out, whether the service is currently being monitored, whether the
 // monitor window completed, and whether this observation first converged.
 func (r *rolloutMonitorState) observe(now time.Time, converged bool) (timedOut, monitoring, completed, justConverged bool) {
+	if r.converged && !converged {
+		r.unstable = true
+	}
 	if !r.converged {
 		if !now.Before(r.convergenceDeadline) {
 			return true, false, false, false
@@ -67,7 +71,7 @@ func (r *rolloutMonitorState) observe(now time.Time, converged bool) (timedOut, 
 	// The configured monitor is a single observation window. At its end,
 	// missing tasks or an unfinished update fail instead of extending the wait.
 	if !now.Before(r.monitorDeadline) {
-		if !converged {
+		if !converged || r.unstable {
 			return true, false, false, false
 		}
 		return false, true, true, justConverged
@@ -182,6 +186,8 @@ func (s *Service) waitForSwarmConvergence(
 	initialMonitor time.Duration,
 ) (SwarmOutcome, int, error) {
 	monitorState := newRolloutMonitorState(time.Now(), timeout, initialMonitor)
+	var taskMonitor taskMonitor
+	var instabilityReason string
 	var lastProgress swarmProgress
 	hasLastProgress := false
 
@@ -228,7 +234,7 @@ func (s *Service) waitForSwarmConvergence(
 			return SwarmOutcomeRollbackPaused, 0, s.convergenceError(ctx, serviceName, SwarmOutcomeRollbackPaused, message)
 		}
 
-		runningTasks, err := s.runningTaskCount(observationCtx, serviceName)
+		tasks, err := s.rolloutTasks(observationCtx, serviceName)
 		cancel()
 		if err != nil {
 			if ctx.Err() == nil && !time.Now().Before(monitorState.deadline()) {
@@ -236,8 +242,22 @@ func (s *Service) waitForSwarmConvergence(
 			}
 			return "", 0, err
 		}
+		runningIDs := tasks.runningIDs(expectedImage)
+		runningTasks := len(runningIDs)
 		converged := swarmConverged(state, image, expectedImage, runningTasks, desiredTasks)
+		if monitorState.converged {
+			if reason := taskMonitor.observe(tasks, runningIDs); reason != "" {
+				monitorState.unstable = true
+				if instabilityReason == "" {
+					instabilityReason = reason
+					s.logger.WarnContext(ctx, "Swarm tasks unstable during monitor", "service", serviceName, "reason", reason)
+				}
+			}
+		}
 		timedOut, monitoring, completed, justConverged := monitorState.observe(time.Now(), converged)
+		if justConverged {
+			taskMonitor = newTaskMonitor(tasks, runningIDs)
+		}
 		progressIndicator.Update(state, runningTasks, desiredTasks, monitoring)
 
 		if justConverged && !progressIndicator.active {
@@ -259,6 +279,12 @@ func (s *Service) waitForSwarmConvergence(
 
 		if timedOut {
 			progressIndicator.Stop()
+			if monitorState.unstable {
+				if instabilityReason == "" {
+					instabilityReason = "service lost convergence during monitoring"
+				}
+				return SwarmOutcomeFailed, runningTasks, s.convergenceError(ctx, serviceName, SwarmOutcomeFailed, instabilityReason)
+			}
 			s.logger.WarnContext(ctx, "Swarm convergence timed out", "service", serviceName, "running_tasks", runningTasks, "desired_tasks", desiredTasks, "timeout", timeout.String())
 			return SwarmOutcomeTimedOut, runningTasks, s.convergenceError(ctx, serviceName, SwarmOutcomeTimedOut, fmt.Sprintf("service did not converge within %s or remain stable for %s", timeout, initialMonitor))
 		}
@@ -269,6 +295,70 @@ func (s *Service) waitForSwarmConvergence(
 		case <-time.After(swarmObservationInterval):
 		}
 	}
+}
+
+type rolloutTask struct{ id, desired, current, image string }
+type rolloutTasks []rolloutTask
+
+func (s *Service) rolloutTasks(ctx context.Context, service string) (rolloutTasks, error) {
+	result, err := s.runner.Run(ctx, "docker", []string{"service", "ps", "--no-trunc", "--format", "{{.ID}}|{{.DesiredState}}|{{.CurrentState}}|{{.Image}}", service}, command.RunOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("inspect rollout tasks: %w", err)
+	}
+	var tasks rolloutTasks
+	for _, line := range strings.Split(strings.TrimSpace(string(result.Output)), "\n") {
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "|", 4)
+		if len(parts) != 4 || parts[0] == "" {
+			return nil, fmt.Errorf("invalid rollout task observation %q", line)
+		}
+		tasks = append(tasks, rolloutTask{parts[0], parts[1], parts[2], parts[3]})
+	}
+	return tasks, nil
+}
+
+func (tasks rolloutTasks) runningIDs(image string) map[string]bool {
+	ids := map[string]bool{}
+	for _, task := range tasks {
+		if strings.EqualFold(task.desired, "running") && strings.HasPrefix(task.current, "Running") && imageMatches(task.image, image) {
+			ids[task.id] = true
+		}
+	}
+	return ids
+}
+
+type taskMonitor struct{ initial, history map[string]bool }
+
+func newTaskMonitor(tasks rolloutTasks, running map[string]bool) taskMonitor {
+	history := map[string]bool{}
+	for _, task := range tasks {
+		history[task.id] = true
+	}
+	return taskMonitor{running, history}
+}
+func (m taskMonitor) observe(tasks rolloutTasks, running map[string]bool) string {
+	for id := range m.initial {
+		if !running[id] {
+			return fmt.Sprintf("monitored task %s stopped or was replaced", id)
+		}
+	}
+	for id := range running {
+		if !m.initial[id] {
+			return fmt.Sprintf("replacement task %s appeared during monitoring", id)
+		}
+	}
+	for _, task := range tasks {
+		if !m.history[task.id] && (strings.HasPrefix(task.current, "Failed") || strings.HasPrefix(task.current, "Rejected") || strings.HasPrefix(task.current, "Shutdown")) {
+			return fmt.Sprintf("new task %s failed during monitoring: %s", task.id, task.current)
+		}
+	}
+	return ""
+}
+
+func imageMatches(image, expected string) bool {
+	return image == expected || strings.HasPrefix(image, expected+"@")
 }
 
 func (s *Service) serviceUpdateStatus(ctx context.Context, serviceName string) (string, string, string, error) {

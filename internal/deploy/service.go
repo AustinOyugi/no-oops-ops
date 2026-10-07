@@ -260,7 +260,7 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 			recoveryCtx, cancel := context.WithTimeout(context.WithoutCancel(deployCtx), time.Minute)
 			defer cancel()
 			s.logger.WarnContext(recoveryCtx, "deploy cancelled; recovering stack", "stack", deploymentStack)
-			if err := s.cleanupCancelledDeploy(recoveryCtx, m.Name, environment, deploymentSwarmService, journal); err != nil {
+			if err := s.cleanupInterruptedDeploy(recoveryCtx, m.Name, environment, deploymentSwarmService, journal); err != nil {
 				operationErr = fmt.Errorf("%w; cancellation recovery failed (journal retained): %v", operationErr, err)
 			}
 		}
@@ -298,10 +298,15 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		monitor,
 	)
 	if err != nil {
-		if outcome == SwarmOutcomeTimedOut && !blueGreen {
-			if recoveryErr := s.stopTimedOutRollout(ctx, deploymentSwarmService); recoveryErr != nil {
-				err = fmt.Errorf("%w; stop timed-out rollout: %v", err, recoveryErr)
+		recovered := false
+		if (outcome == SwarmOutcomeTimedOut || outcome == SwarmOutcomeFailed) && ctx.Err() == nil {
+			recoveryCtx, cancelRecovery := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
+			if recoveryErr := s.cleanupInterruptedDeploy(recoveryCtx, m.Name, environment, deploymentSwarmService, journal); recoveryErr != nil {
+				err = fmt.Errorf("%w; recover failed rollout (journal retained): %v", err, recoveryErr)
+			} else {
+				recovered = true
 			}
+			cancelRecovery()
 		}
 		if outcome == "" {
 			outcome = SwarmOutcomeFailed
@@ -320,6 +325,9 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		}
 		if _, saveErr := s.deployments.Save(s.config, failure); saveErr != nil {
 			err = fmt.Errorf("%w; record deployment outcome: %v", err, saveErr)
+		}
+		if recovered {
+			return Result{}, err
 		}
 		return Result{}, s.cleanupFailedCandidate(ctx, blueGreen, deploymentStack, err)
 	}
