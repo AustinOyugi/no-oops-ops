@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
@@ -66,7 +68,7 @@ func (s *Service) recoverJournal(ctx context.Context, app, environment string) e
 	if err != nil || !exists {
 		return err
 	}
-	if journal.Kind == "deploy" && journal.BlueGreen && journal.Stage != "ingress_reconciled" && journal.StackName != "" {
+	if journal.Kind == "deploy" && journal.BlueGreen && (journal.Stage == "started" || journal.Stage == "stack_deployed") && journal.StackName != "" {
 		if err := s.removeStack(ctx, journal.StackName); err != nil {
 			return fmt.Errorf("recover interrupted blue/green deploy: %w", err)
 		}
@@ -92,4 +94,61 @@ func (s *Service) recoverJournal(ctx context.Context, app, environment string) e
 		}
 	}
 	return fmt.Errorf("unfinished %s operation for %s/%s at stage %q; inspect the live stack and journal %q before retrying", journal.Kind, environment, app, journal.Stage, journalPath(s.config, app, environment))
+}
+
+// cleanupCancelledDeploy runs while the operation lock is held. Never discard
+// the durable intent until Docker confirms recovery; promotion needs separate
+// reconciliation and must not have its serving stack removed.
+func (s *Service) cleanupCancelledDeploy(ctx context.Context, app, environment, service string, journal operationJournal) error {
+	if journal.Stage != "started" && journal.Stage != "stack_deployed" {
+		return fmt.Errorf("promotion reached stage %q; retain journal for reconciliation", journal.Stage)
+	}
+	if journal.BlueGreen {
+		if err := s.removeStack(ctx, journal.StackName); err != nil {
+			return err
+		}
+	} else {
+		// A cancelled stack deploy can have reached Docker even if its subprocess
+		// did not return success. Inspect the stack before deciding it is absent.
+		result, err := s.runner.Run(ctx, "docker", []string{"stack", "ls", "--format", "{{.Name}}"}, command.RunOptions{})
+		if err != nil {
+			return err
+		}
+		exists := false
+		for _, name := range strings.Fields(string(result.Output)) {
+			if name == journal.StackName {
+				exists = true
+			}
+		}
+		if exists {
+			if err := s.stopTimedOutRollout(ctx, service); err != nil {
+				return err
+			}
+			for {
+				result, err := s.runner.Run(ctx, "docker", []string{"service", "inspect", "--format", "{{if .UpdateStatus}}{{.UpdateStatus.State}}{{end}}|{{.Spec.Mode.Replicated.Replicas}}", service}, command.RunOptions{})
+				if err != nil {
+					return err
+				}
+				status, replicas, _ := parseServiceUpdateStatus(string(result.Output))
+				if status == "rollback_completed" || ((status == "" || status == "completed") && replicas == "0") {
+					break
+				}
+				if status == "paused" || status == "rollback_paused" {
+					return fmt.Errorf("cancellation recovery paused: %s", status)
+				}
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(swarmObservationInterval):
+				}
+			}
+		}
+	}
+	path := journalPath(s.config, app, environment)
+	archive := path + ".cancelled-" + time.Now().UTC().Format("20060102-150405.000000000")
+	if err := os.Rename(path, archive); err != nil {
+		return fmt.Errorf("archive cancelled deployment journal: %w", err)
+	}
+	s.logger.InfoContext(ctx, "cancelled deployment recovered", "stack", journal.StackName, "journal_archive", archive)
+	return nil
 }

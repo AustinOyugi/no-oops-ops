@@ -253,7 +253,17 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		return Result{}, err
 	}
 	completed := false
+	promotionStarted := false
+	deployCtx := ctx
 	defer func() {
+		if !completed && deployCtx.Err() != nil && !promotionStarted {
+			recoveryCtx, cancel := context.WithTimeout(context.WithoutCancel(deployCtx), time.Minute)
+			defer cancel()
+			s.logger.WarnContext(recoveryCtx, "deploy cancelled; recovering stack", "stack", deploymentStack)
+			if err := s.cleanupCancelledDeploy(recoveryCtx, m.Name, environment, deploymentSwarmService, journal); err != nil {
+				operationErr = fmt.Errorf("%w; cancellation recovery failed (journal retained): %v", operationErr, err)
+			}
+		}
 		if completed {
 			if err := clearJournal(s.config, m.Name, environment); err != nil {
 				s.logger.ErrorContext(ctx, "clear completed operation journal", "error", err)
@@ -314,6 +324,15 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		return Result{}, s.cleanupFailedCandidate(ctx, blueGreen, deploymentStack, err)
 	}
 
+	// Cancellation before promotion recovers the candidate. Once promotion
+	// starts, finish routing and metadata together under a bounded context.
+	if err := ctx.Err(); err != nil {
+		return Result{}, err
+	}
+	promotionCtx, finishPromotion := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
+	defer finishPromotion()
+	ctx = promotionCtx
+	promotionStarted = true
 	report("ready")
 	if m.Expose.Enabled {
 		if err := s.ingress.EnsureNetwork(ctx, network); err != nil {

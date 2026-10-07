@@ -208,3 +208,16 @@ receives `/health`.
 
 Nginx keeps generated external routes in one file per domain and internal routes in one file per environment/app. This
 keeps each route owner isolated while nginx still loads one effective configuration.
+
+### Cancelling a deployment
+
+Ctrl+C (SIGINT) or SIGTERM cancels deployment work before promotion. Noops keeps the operation lock while
+running recovery with a separate context, allowing up to one minute: unpromoted blue/green candidates are
+removed, in-place updates roll back, and first deployments are scaled to zero. In-place recovery is confirmed
+before the operation journal is archived as `operation.json.cancelled-*`, allowing the next deploy to proceed.
+If recovery fails or times out, the journal remains and the failure is reported.
+
+Once promotion begins, routing and deployment metadata finish together under a bounded one-minute context.
+Cancellation during this step waits for that work to finish. Failed promotion retains its journal for inspection.
+SIGKILL, power loss, or a wrapper that does not forward signals cannot run graceful cleanup; the durable journal
+continues to protect interrupted work on the next deploy.

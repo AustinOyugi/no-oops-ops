@@ -93,3 +93,57 @@ func TestJournalRoundTripAndClear(t *testing.T) {
 		t.Fatalf("journal remains: exists=%t err=%v", exists, err)
 	}
 }
+
+func TestCleanupCancelledDeploy(t *testing.T) {
+	for _, tc := range []struct {
+		name                      string
+		blueGreen, previous, fail bool
+		stage                     string
+	}{
+		{name: "candidate", blueGreen: true, stage: "stack_deployed"},
+		{name: "rollback", previous: true, stage: "stack_deployed"},
+		{name: "first deployment", stage: "stack_deployed"},
+		{name: "cancelled during stack deploy", stage: "started"},
+		{name: "cleanup failure", fail: true, stage: "stack_deployed"},
+		{name: "promoted candidate retained", blueGreen: true, stage: "ingress_reconciled"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			script := "#!/bin/sh\ncase \"$1 $2\" in\n'stack ls') echo prod-api;;\n'stack rm') exit 0;;\n'service inspect') case \"$4\" in\n*PreviousSpec*) echo false;;\n*) echo 'completed|0';;\nesac;;\n'service scale'|'service update') exit 0;;\n*) exit 1;;\nesac\n"
+			if tc.previous {
+				script = strings.ReplaceAll(script, "echo false", "echo true")
+				script = strings.ReplaceAll(script, "completed|0", "rollback_completed|1")
+			}
+			if tc.fail {
+				script = "#!/bin/sh\nexit 1\n"
+			}
+			if err := os.WriteFile(filepath.Join(dir, "docker"), []byte(script), 0700); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+			cfg := config.Config{StateDir: t.TempDir()}
+			journal := operationJournal{Kind: "deploy", Stage: tc.stage, StackName: "prod-api", BlueGreen: tc.blueGreen}
+			if err := saveJournal(cfg, "api", "prod", journal); err != nil {
+				t.Fatal(err)
+			}
+			s := NewService(slog.New(slog.NewTextHandler(io.Discard, nil)), cfg)
+			parent, cancel := context.WithCancel(context.Background())
+			cancel()
+			recovery, finish := context.WithTimeout(context.WithoutCancel(parent), time.Second)
+			defer finish()
+			err := s.cleanupCancelledDeploy(recovery, "api", "prod", "prod-api_prod-api", journal)
+			wantFailure := tc.fail || tc.stage == "ingress_reconciled"
+			if (err != nil) != wantFailure {
+				t.Fatalf("cleanup error=%v", err)
+			}
+			_, exists, loadErr := loadJournal(cfg, "api", "prod")
+			if loadErr != nil || exists != wantFailure {
+				t.Fatalf("journal exists=%t err=%v", exists, loadErr)
+			}
+			archives, _ := filepath.Glob(journalPath(cfg, "api", "prod") + ".cancelled-*")
+			if !wantFailure && len(archives) != 1 {
+				t.Fatalf("archives=%v", archives)
+			}
+		})
+	}
+}
