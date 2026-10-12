@@ -129,7 +129,8 @@ validated by a temporary Swarm job on the ingress networks before the serving st
 include the Nginx diagnostic and leave the running stack in place.
 
 Subsequent route changes validate a complete candidate configuration inside the running ingress container, then replace
-`nginx/nginx.conf` atomically. Automatic reloads therefore see a complete configuration. Legacy generated snippets remain
+`nginx/nginx.conf` atomically. Automatic reloads therefore see a complete configuration. Legacy generated snippets
+remain
 on disk for migration compatibility but are superseded by the managed configuration after the first route update.
 Additional user-owned top-level `.conf` files remain included. Failed route changes restore the previous configuration
 and saved routes, including failures during certificate issuance.

@@ -155,7 +155,8 @@ application needs a longer or shorter Swarm monitoring window. `max_failure_rati
 between 0 and 1.
 
 Rollout uses consecutive time windows: `rollout.convergence_timeout` is the time allowed for the desired tasks to
-converge, then `rollout.monitor` is the observation window before the final readiness decision. The monitor window starts only after
+converge, then `rollout.monitor` is the observation window before the final readiness decision. The monitor window
+starts only after
 convergence and does not consume the convergence timeout. Both the expected image and all desired running tasks
 are required, including the expected image on the running tasks themselves. The monitor window does not restart
 when tasks fail or recover. Noops tracks the task identities present when monitoring starts. Missing or replaced
@@ -163,7 +164,8 @@ tasks, loss of convergence, or new failed/rejected tasks make the rollout fail a
 Swarm restores the desired count. Historical failures present before monitoring are ignored. Swarm paused and
 rollback outcomes fail immediately. Swarm owns container health checks and removes unhealthy tasks; configure
 the monitor to cover startup grace and health-failure detection, since Running alone is not a health verdict.
-On monitor failure or timeout, blue/green candidates are removed. In-place services are asked to roll back to their previous Swarm
+On monitor failure or timeout, blue/green candidates are removed. In-place services are asked to roll back to their
+previous Swarm
 specification; a first deployment without a previous specification is scaled to zero. Recovery command failures
 are reported with the deployment failure. Noops waits for in-place recovery before archiving the operation
 journal and releasing its lock. If recovery fails or times out, the journal remains for inspection.

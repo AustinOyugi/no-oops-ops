@@ -1,6 +1,7 @@
 # No Oops Ops
 
-No Oops Ops is a self-hosted terminal dashboard and CLI for repeatable Docker Swarm deployments. It fetches application source from Git when
+No Oops Ops is a self-hosted terminal dashboard and CLI for repeatable Docker Swarm deployments. It fetches application
+source from Git when
 configured, builds Compose services in isolated one-shot Swarm tasks, snapshots image-only services into an internal
 registry, and deploys immutable releases with Docker Stack. It also records deployment history and manages
 environment-scoped Swarm secrets.
@@ -78,7 +79,10 @@ The equivalent CLI workflow is:
 install → secret set (when needed) → release → release list → deploy → rollback or remove
 ```
 
-`settings.state.environments` can give each environment its own runtime store while sharing the same app catalog. Use `--environment dev` for `init`, `install`, and `ui`; lifecycle commands select the store from their positional environment. `--state-dir` overrides the configured path. See [Separate installation stores](docs/reference/configuration.md#separate-installation-stores).
+`settings.state.environments` can give each environment its own runtime store while sharing the same app catalog. Use
+`--environment dev` for `init`, `install`, and `ui`; lifecycle commands select the store from their positional
+environment. `--state-dir` overrides the configured path.
+See [Separate installation stores](docs/reference/configuration.md#separate-installation-stores).
 
 `apps.yml` maps stable app names to ordinary Compose-shaped `app.yml` files. Add `x-noops` only for No Oops behavior;
 standard Compose and Swarm fields remain the application's source of truth. Lifecycle commands require
