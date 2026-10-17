@@ -50,7 +50,7 @@ func NewRootCommand(ctx context.Context) *cobra.Command {
 	root.PersistentFlags().StringVar(&rt.stateDir, "state-dir", "", "Runtime store directory (config, state and data); relative to the workspace")
 	root.PersistentFlags().StringVarP(&rt.environment, "environment", "e", "", "Environment installation to use (defaults to NOOPS_DEFAULT_ENV)")
 	root.AddCommand(
-		newVersionCommand(), newInitCommand(&rt), newUpgradeCommand(ctx, &rt), newInstallCommand(ctx, &rt),
+		newConfigCommand(&rt), newVersionCommand(), newInitCommand(&rt), newUpgradeCommand(ctx, &rt), newInstallCommand(ctx, &rt),
 		newUninstallCommand(ctx, &rt), newDoctorCommand(ctx, &rt), newStatusCommand(ctx, &rt),
 		newReleaseCommand(ctx, &rt), newDeployCommand(ctx, &rt), newRollbackCommand(ctx, &rt),
 		newRemoveCommand(ctx, &rt), newSecretCommand(ctx, &rt), newCertificateCommand(ctx, &rt),

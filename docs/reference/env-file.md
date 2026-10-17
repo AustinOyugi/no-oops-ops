@@ -100,3 +100,40 @@ alongside the secret-backed key:
       - key: DATABASE_URL
         from_secret: DATABASE_URL_SECRET
 ```
+
+## Reusable configs
+
+Install shared environment files (database, cache, mail, or any other category):
+
+```sh
+noops --workspace /srv/apps config install database ./database.env.yml
+noops --workspace /srv/apps config upgrade database ./database.env.yml
+```
+
+Install creates `/srv/apps/configs/database.yml`; upgrade replaces an existing
+installation atomically. Install refuses to overwrite an existing config, and
+upgrade requires it to exist. These commands only manage local files; redeploy
+consuming services to apply an upgrade (release again for build-time values).
+Configs use the same `sections` / `items` schema as service env files, including
+`values` per environment and `from_secret` references.
+
+Select files relative to the service manifest, or use absolute paths:
+
+```yaml
+services:
+  api:
+    image: example/api:latest
+    x-noops:
+      env:
+        configs:
+          - ../configs/database.yml
+          - ../configs/cache.yml
+        file: api.env.yml
+```
+
+Configs merge in listed order; later files win. The service's `env.file` always
+wins over shared configs. Overrides replace the entire item by key, including
+secret references and environment-specific values. `env.file` is optional when
+only shared configs are needed. The same merged inputs feed runtime deployment,
+build env files, and explicitly allowed build secrets. Existing secret allow-list
+and delivery rules still apply; store credentials as managed secrets.

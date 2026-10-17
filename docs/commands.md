@@ -173,3 +173,13 @@ on a managed service. The selected row supplies the environment. Tasks and task
 details stay hidden while logs stream, with the same pause and stop controls as
 service logs. Membership is discovered when streaming starts; restart the stream
 after deploying new services or switching blue/green stacks to include them.
+
+### Shared configs
+
+- `noops config install <name> <file>` installs an environment config as
+  `<workspace>/configs/<name>.yml`.
+- `noops config upgrade <name> <file>` replaces an installed config. Redeploy
+  consumers to apply it.
+
+Select configs with `services.<service>.x-noops.env.configs`; see the
+[environment file reference](reference/env-file.md#reusable-configs).

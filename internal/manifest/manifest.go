@@ -240,6 +240,7 @@ func (m Manifest) ForEnvironment(environment string) Manifest {
 }
 
 type Env struct {
+	Configs []string    `yaml:"configs"`
 	File    string      `yaml:"file"`
 	Build   *EnvBuild   `yaml:"build"`
 	Secrets *EnvSecrets `yaml:"secrets"`

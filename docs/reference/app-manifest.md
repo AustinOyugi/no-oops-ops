@@ -83,6 +83,7 @@ the environment passed to `noops deploy`.
 | `services.<name>.x-noops.build.no-cache`        | No              | `false` | Passes `--no-cache` to Docker. Use for cache-warming builds whose mounted-cache side effects must run every release.                                             |
 | `services.<name>.x-noops.deploy`                | No              | `true`  | Set to `false` for a release-only service. `release --all` still builds it, while deploy, rollback, and remove skip it.                                          |
 
+| `services.<name>.x-noops.env.configs` | No | `[]` | Ordered reusable environment config file paths, relative to the manifest. Later configs win; `env.file` overrides every config. |
 | `services.<name>.x-noops.env.file`              | No | — | Environment YAML file, relative to the manifest. Omit
 `x-noops.env` entirely when the service has no environment values or secret bindings. |
 | `services.<name>.x-noops.env.build.file`        | No | — | Relative dotenv file to generate in the temporary build

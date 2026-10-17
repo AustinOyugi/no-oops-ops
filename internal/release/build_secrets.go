@@ -3,7 +3,6 @@ package release
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/environment"
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
@@ -20,11 +19,7 @@ func (s *Service) buildSecretBindings(ctx context.Context, manifestPath string, 
 	if m.Env.Build == nil || len(m.Env.Build.Secrets) == 0 {
 		return nil, nil
 	}
-	if m.Env.File == "" {
-		return nil, fmt.Errorf("env.build.secrets requires env.file entries backed by from_secret")
-	}
-
-	file, err := environment.Load(filepath.Join(filepath.Dir(manifestPath), m.Env.File))
+	file, err := environment.LoadLayers(manifestPath, m.Env.Configs, m.Env.File)
 	if err != nil {
 		return nil, err
 	}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
+	envconfig "github.com/AustinOyugi/no-oops-ops/internal/environment"
 	"github.com/AustinOyugi/no-oops-ops/internal/ingress"
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
@@ -93,7 +94,7 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 	}
 
 	envFilePath := resolveEnvFilePath(absPath, m.Env.File)
-	envFile, err := LoadOptionalEnvFile(envFilePath)
+	envFile, err := envconfig.LoadLayers(absPath, m.Env.Configs, m.Env.File)
 	if err != nil {
 		return Result{}, err
 	}
