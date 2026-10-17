@@ -35,6 +35,7 @@ go.work.sum
 !/docs/getting-started.md
 !/docs/concepts.md
 !/docs/commands.md
+!/docs/tui.md
 !/docs/troubleshooting.md
 !/docs/limitations.md
 !/docs/reference/
