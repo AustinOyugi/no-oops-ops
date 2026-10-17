@@ -30,7 +30,7 @@ services:
 ```
 
 Lifecycle operations target an app alias from the workspace `apps.yml` and a service explicitly:
-`noops release <env> api`, `noops deploy <env> api`, or an explicit `--service api` / `--all`. A service selector can be
+`noops -e <env> release api`, `noops -e <env> deploy api`, or an explicit `--service api` / `--all`. A service selector can be
 omitted when the manifest has exactly one service. `--all` uses a stable
 dependency order from `x-noops.depends_on` and stops at the first failure. Compose `depends_on` is preserved, but is not
 a Swarm readiness guarantee; applications must retry dependencies at runtime. The earlier top-level `name`, `image`, and
@@ -171,7 +171,7 @@ specification; a first deployment without a previous specification is scaled to 
 are reported with the deployment failure. Noops waits for in-place recovery before archiving the operation
 journal and releasing its lock. If recovery fails or times out, the journal remains for inspection.
 
-For development feedback loops, `noops deploy --quick <environment> <app>` temporarily uses `healthcheck.start_period`
+For development feedback loops, `noops -e <environment> deploy --quick <app>` temporarily uses `healthcheck.start_period`
 as the monitor window while retaining the manifest's `rollout.convergence_timeout`. It does not change the manifest; a
 later normal deploy uses the configured monitor again.
 

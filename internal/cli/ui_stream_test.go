@@ -11,6 +11,7 @@ import (
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/tui"
+	"github.com/AustinOyugi/no-oops-ops/internal/workspace"
 )
 
 func TestStreamingCapturesOutputAndFailure(t *testing.T) {
@@ -37,12 +38,12 @@ func TestStreamingRouting(t *testing.T) {
 		args []string
 		want bool
 	}{
-		{[]string{"logs", "prod"}, true}, {[]string{"logs", "prod", "shop", "--service", "api"}, true}, {[]string{"status"}, true}, {[]string{"release", "prod", "shop"}, true},
-		{[]string{"secret", "set", "prod", "TOKEN"}, false}, {[]string{"secret", "list", "prod"}, true},
+		{[]string{"logs"}, true}, {[]string{"logs", "shop", "--service", "api"}, true}, {[]string{"status"}, true}, {[]string{"release", "shop"}, true},
+		{[]string{"secret", "set", "TOKEN"}, false}, {[]string{"secret", "list"}, true},
 		{[]string{"upgrade", "--to", "latest"}, false}, {[]string{"upgrade", "--check"}, true},
-		{[]string{"install"}, false}, {[]string{"deploy", "prod", "shop"}, false},
+		{[]string{"install"}, false}, {[]string{"deploy", "shop"}, false},
 	} {
-		args := append([]string{"--workspace", "missing"}, item.args...)
+		args := append([]string{"--workspace", "missing", "--environment", "prod"}, item.args...)
 		if got := canStreamUIAction(config.Config{Workspace: "missing"}, tui.Action{Args: args}); got != item.want {
 			t.Errorf("%v: %v", item.args, got)
 		}
@@ -77,5 +78,32 @@ func TestStreamingCancellationAllowsCleanup(t *testing.T) {
 	}
 	if _, err := os.Stat(cleaned); err != nil {
 		t.Fatalf("child cleanup bypassed: %v", err)
+	}
+}
+
+func TestStreamingDeploymentUsesFlagEnvironmentForTLS(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Initialize(root, config.Version); err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]string{
+		"apps.yml":    "version: " + config.Version + "\napps:\n  shop:\n    manifest: compose.yml\n",
+		"compose.yml": "services:\n  api:\n    image: nginx:alpine\n    x-noops:\n      service: {internal_port: 80}\n      ingress:\n        environments:\n          prod: {domain: api.example.com, tls: true}\n",
+	}
+	for name, data := range files {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, test := range []struct {
+		environment string
+		want        bool
+	}{{"prod", false}, {"dev", true}} {
+		for _, command := range [][]string{{"deploy", "shop", "--service", "api"}, {"release", "shop", "--service", "api", "--deploy"}} {
+			args := append([]string{"--workspace", root, "--environment", test.environment}, command...)
+			if got := canStreamUIAction(config.Config{Workspace: root}, tui.Action{Args: args}); got != test.want {
+				t.Fatalf("%v stream=%v, want %v", args, got, test.want)
+			}
+		}
 	}
 }

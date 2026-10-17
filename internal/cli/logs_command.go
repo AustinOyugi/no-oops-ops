@@ -12,11 +12,14 @@ func newLogsCommand(ctx context.Context, rt *runtime) *cobra.Command {
 	var service string
 	options := deploy.LogOptions{}
 	cmd := &cobra.Command{
-		Use:   "logs <environment> [app]",
+		Use:   "logs [app]",
 		Short: "Stream an environment or deployed service's logs (Ctrl+C to stop)",
-		Args:  cobra.RangeArgs(1, 2),
+		Args:  cobra.MaximumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 1 && service != "" {
+			if len(args) == 2 {
+				args = args[1:]
+			}
+			if len(args) == 0 && service != "" {
 				return fmt.Errorf("--service requires an app; omit it to stream the environment")
 			}
 			if err := options.Validate(); err != nil {
@@ -26,10 +29,10 @@ func newLogsCommand(ctx context.Context, rt *runtime) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if len(args) == 1 {
-				return application.EnvironmentLogs(ctx, args[0], options, cmd.OutOrStdout(), cmd.ErrOrStderr())
+			if len(args) == 0 {
+				return application.EnvironmentLogs(ctx, rt.selectedEnvironment, options, cmd.OutOrStdout(), cmd.ErrOrStderr())
 			}
-			return application.Logs(ctx, target(args, targetFlags{service: service}), options, cmd.OutOrStdout(), cmd.ErrOrStderr())
+			return application.Logs(ctx, target(rt.selectedEnvironment, args, targetFlags{service: service}), options, cmd.OutOrStdout(), cmd.ErrOrStderr())
 		},
 	}
 	cmd.Flags().StringVar(&service, "service", "", "Service name (required for multi-service apps)")

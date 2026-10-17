@@ -34,13 +34,13 @@ func TestUIActionsResolveCatalogAlias(t *testing.T) {
 			deploy = action
 		}
 	}
-	if !environmentLogs.HideTasks || strings.Join(environmentLogs.Args, "|") != "--workspace|"+root+"|logs|prod" {
+	if !environmentLogs.HideTasks || strings.Join(environmentLogs.Args, "|") != "--workspace|"+root+"|--environment|prod|logs" {
 		t.Fatalf("wrong environment logs action: %+v", environmentLogs)
 	}
-	if !logs.HideTasks || strings.Join(logs.Args, "|") != "--workspace|"+root+"|logs|prod|shop|--service|api" {
+	if !logs.HideTasks || strings.Join(logs.Args, "|") != "--workspace|"+root+"|--environment|prod|logs|shop|--service|api" {
 		t.Fatalf("wrong logs action: %+v", logs)
 	}
-	if got := strings.Join(deploy.Args, "|"); got != "--workspace|"+root+"|deploy|prod|shop|--service|api" {
+	if got := strings.Join(deploy.Args, "|"); got != "--workspace|"+root+"|--environment|prod|deploy|shop|--service|api" {
 		t.Fatalf("wrong target: %s", got)
 	}
 	if _, err := uiActions(config.Config{Workspace: root}, tui.Row{Environment: "prod", App: "unknown"}); err == nil {
@@ -104,7 +104,7 @@ func TestDashboardChildrenRetainStateAndEnvironment(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := strings.Join(uiCommandArgs(action.Args), "|"); got != "deploy|prod|shop|--service|api" {
+		if got := strings.Join(uiCommandArgs(action.Args), "|"); got != "deploy|shop|--service|api" {
 			t.Fatalf("incorrect scoped target: %s", got)
 		}
 		values["environment"] = "dev"

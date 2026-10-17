@@ -27,7 +27,8 @@ noops --workspace /srv/noops/workspace --state-dir /srv/noops/prod ui
 `--environment` selects the installation mapping in
 `settings.state.environments`; `NOOPS_DEFAULT_ENV` supplies its default.
 `--state-dir` overrides the store path. Actions launched by the dashboard retain
-its workspace and selected store. When an environment is selected at startup,
+its workspace and selected store, and pass the form environment with
+`--environment` rather than a positional argument. When an environment is selected at startup,
 command forms reject a different environment; open another dashboard to operate
 that environment. See [Separate installation stores](reference/configuration.md#separate-installation-stores).
 

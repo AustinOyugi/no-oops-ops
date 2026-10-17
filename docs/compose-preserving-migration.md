@@ -84,10 +84,10 @@ One `app.yml` can declare multiple services. Lifecycle commands require an
 explicit target:
 
 ```text
-noops release <env> <app-alias> --service <name>
-noops deploy <env> <app-alias> --service <name>
-noops release <env> <app-alias> --all
-noops deploy <env> <app-alias> --all
+noops -e <env> release <app-alias> --service <name>
+noops -e <env> deploy <app-alias> --service <name>
+noops -e <env> release <app-alias> --all
+noops -e <env> deploy <app-alias> --all
 ```
 
 `<app-alias>` is the stable application name in the workspace `apps.yml`; it

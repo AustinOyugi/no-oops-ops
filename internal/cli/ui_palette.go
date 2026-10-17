@@ -43,8 +43,8 @@ func uiPalette(cfg config.Config, row *tui.Row) ([]tui.Command, error) {
 			for _, action := range actions {
 				if action.Label == "Release" {
 					args := uiCommandArgs(action.Args)
-					defaults["app"] = args[2]
-					defaults["service"] = args[4]
+					defaults["app"] = args[1]
+					defaults["service"] = args[3]
 				}
 			}
 		}
@@ -103,6 +103,9 @@ func uiPalette(cfg config.Config, row *tui.Row) ([]tui.Command, error) {
 			if cfg.Environment != "" && values["environment"] != "" && values["environment"] != cfg.Environment {
 				return tui.Action{}, fmt.Errorf("this dashboard uses environment %q", cfg.Environment)
 			}
+			if environment := strings.TrimSpace(values["environment"]); environment != "" && cfg.Environment == "" {
+				args = append(args, "--environment", environment)
+			}
 			args = append(args, spec.command...)
 			for _, key := range spec.required {
 				value := strings.TrimSpace(values[key])
@@ -112,7 +115,9 @@ func uiPalette(cfg config.Config, row *tui.Row) ([]tui.Command, error) {
 				if strings.HasPrefix(value, "-") {
 					return tui.Action{}, fmt.Errorf("%s cannot begin with a dash", key)
 				}
-				args = append(args, value)
+				if key != "environment" {
+					args = append(args, value)
+				}
 			}
 			if len(spec.required) > 1 && spec.required[1] == "app" {
 				if _, ok := apps.Apps[values["app"]]; !ok {

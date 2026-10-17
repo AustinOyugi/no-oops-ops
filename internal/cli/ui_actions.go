@@ -22,7 +22,10 @@ func uiActions(cfg config.Config, row tui.Row) ([]tui.Action, error) {
 	if row.Untracked || row.Environment == "platform" {
 		return actions, nil
 	}
-	actions = append(actions, tui.Action{Label: "Environment logs", Args: append(append([]string{}, base...), "logs", row.Environment), HideTasks: true})
+	targetConfig := cfg
+	targetConfig.Environment = row.Environment
+	base = runtimeCLIArgs(targetConfig)
+	actions = append(actions, tui.Action{Label: "Environment logs", Args: append(append([]string{}, base...), "logs"), HideTasks: true})
 	apps, err := catalog.Load(cfg.Workspace)
 	if err != nil {
 		return nil, err
@@ -69,7 +72,7 @@ func uiActions(cfg config.Config, row tui.Row) ([]tui.Action, error) {
 		}
 		args := append([]string{}, base...)
 		args = append(args, item.command...)
-		args = append(args, row.Environment, target.app, "--service", target.service)
+		args = append(args, target.app, "--service", target.service)
 		actions = append(actions, tui.Action{Label: item.label, Args: args, HideTasks: item.label == "Logs"})
 	}
 	return actions, nil

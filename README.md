@@ -25,7 +25,7 @@ noops init /srv/noops/example
 cd /srv/noops/example
 # Add the `redis` app alias and its manifest path to apps.yml.
 noops install
-noops secret set prod REDIS_PASSWORD
+noops -e prod secret set REDIS_PASSWORD
 noops ui
 # Press r, choose redis and prod, and enable Deploy after release.
 ```
@@ -37,7 +37,7 @@ format and the [`redis` example](examples/paas/apps/redis/app.yml) for a manifes
 If the app uses secrets, create them before deployment:
 
 ```bash
-noops secret set prod AUTH_SERVER_API_CLIENT_SECRET
+noops -e prod secret set AUTH_SERVER_API_CLIENT_SECRET
 ```
 
 The TUI is the preferred interface for daily operations: inspect services and tasks,
@@ -48,12 +48,12 @@ Tab to switch panes. See the [TUI guide](docs/tui.md) for all controls.
 Use the CLI for automation or as a fallback:
 
 ```bash
-noops release --deploy prod redis --service redis
-noops release --deploy --force prod redis --service redis # Overwrite an existing release tag
-noops release list prod redis --service redis
+noops -e prod release --deploy redis --service redis
+noops -e prod release --deploy --force redis --service redis # Overwrite an existing release tag
+noops -e prod release list redis --service redis
 noops status
-noops logs prod redis --service redis
-noops logs prod # Stream all deployed services in prod
+noops -e prod logs redis --service redis
+noops -e prod logs # Stream all deployed services in prod
 ```
 
 ## Documentation
@@ -80,8 +80,8 @@ install → secret set (when needed) → release → release list → deploy →
 ```
 
 `settings.state.environments` can give each environment its own runtime store while sharing the same app catalog. Use
-`--environment dev` for `init`, `install`, and `ui`; lifecycle commands select the store from their positional
-environment. `--state-dir` overrides the configured path.
+`-e dev` to select the environment for platform, dashboard, and lifecycle commands, or set
+`NOOPS_DEFAULT_ENV=dev`. Lifecycle, log, and secret commands require an environment selection. `--state-dir` overrides the configured path.
 See [Separate installation stores](docs/reference/configuration.md#separate-installation-stores).
 
 `apps.yml` maps stable app names to ordinary Compose-shaped `app.yml` files. Add `x-noops` only for No Oops behavior;

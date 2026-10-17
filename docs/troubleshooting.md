@@ -29,7 +29,7 @@ Save the Git token as a normal secret in the same environment as the release. En
 credential-store entry:
 
 ```bash
-noops secret set prod github-readonly
+noops -e prod secret set github-readonly
 ```
 
 For GitHub, use a fine-grained token restricted to the repository with Contents read access. Confirm the manifest's
@@ -47,8 +47,8 @@ available.
 Create it in the same environment and verify its name:
 
 ```bash
-noops secret list prod
-noops secret set prod DATABASE_URL
+noops -e prod secret list
+noops -e prod secret set DATABASE_URL
 ```
 
 The app manifest's `resolvable` value is the environment variable key; the environment file's `from_secret` value is the

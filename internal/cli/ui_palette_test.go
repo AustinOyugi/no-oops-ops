@@ -114,7 +114,7 @@ func TestPaletteTargetsFlagsAndSecrets(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(action.Args) != 6 {
+			if len(action.Args) != 7 {
 				t.Fatalf("secret argv: %v", action.Args)
 			}
 		}
@@ -150,7 +150,7 @@ func TestEnvironmentLogsPalette(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !action.HideTasks || !strings.HasSuffix(strings.Join(action.Args, " "), "logs prod") {
+		if !action.HideTasks || !strings.HasSuffix(strings.Join(action.Args, " "), "--environment prod logs") {
 			t.Fatalf("action: %+v", action)
 		}
 		return

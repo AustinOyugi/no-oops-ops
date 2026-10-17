@@ -38,7 +38,7 @@ func TestInitSelectsEnvironmentStoreAndExplicitOverride(t *testing.T) {
 	}
 }
 
-func TestLifecycleInfersStoreAndRejectsConflictingEnvironment(t *testing.T) {
+func TestLifecycleUsesSelectedEnvironmentStore(t *testing.T) {
 	workspaceRoot := t.TempDir()
 	if _, err := workspace.Initialize(workspaceRoot, config.Version); err != nil {
 		t.Fatal(err)
@@ -46,17 +46,12 @@ func TestLifecycleInfersStoreAndRejectsConflictingEnvironment(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(workspaceRoot, "apps.yml"), []byte("version: "+config.Version+"\nsettings:\n  state:\n    environments:\n      prod: .noops-prod\napps: {}\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	for _, command := range [][]string{{"secret", "list", "prod"}, {"release", "list", "prod", "api"}, {"logs", "prod"}} {
+	for _, command := range [][]string{{"secret", "list"}, {"release", "list", "api"}, {"logs"}} {
 		cmd := NewRootCommand(context.Background())
-		cmd.SetArgs(append([]string{"--workspace", workspaceRoot}, command...))
+		cmd.SetArgs(append([]string{"--workspace", workspaceRoot, "-e", "prod"}, command...))
 		if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), ".noops-prod") {
 			t.Fatalf("incorrect selected store: %v", err)
 		}
-	}
-	cmd := NewRootCommand(context.Background())
-	cmd.SetArgs([]string{"--environment", "dev", "deploy", "prod", "api"})
-	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "conflicts") {
-		t.Fatalf("cross-environment action accepted: %v", err)
 	}
 }
 
@@ -85,14 +80,14 @@ func TestDefaultEnvironmentAndExplicitOverride(t *testing.T) {
 	}
 }
 
-func TestPositionalEnvironmentOverridesDefault(t *testing.T) {
+func TestFlagEnvironmentOverridesDefaultForScopedCommand(t *testing.T) {
 	t.Setenv("NOOPS_DEFAULT_ENV", "dev")
 	workspaceRoot := t.TempDir()
 	if err := os.WriteFile(filepath.Join(workspaceRoot, "apps.yml"), []byte("version: "+config.Version+"\nsettings:\n  state:\n    environments:\n      prod: .noops-prod\napps: {}\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	cmd := NewRootCommand(context.Background())
-	cmd.SetArgs([]string{"--workspace", workspaceRoot, "secret", "list", "prod"})
+	cmd.SetArgs([]string{"--workspace", workspaceRoot, "secret", "list", "-e", "prod"})
 	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), ".noops-prod") {
 		t.Fatalf("default overrode explicit command environment: %v", err)
 	}
@@ -187,7 +182,7 @@ func TestRootCommandRendersReleaseHelp(t *testing.T) {
 	if err := root.Execute(); err != nil {
 		t.Fatalf("release help returned error: %v", err)
 	}
-	for _, want := range []string{"--all", "--service", "--deploy", "<environment> <app>"} {
+	for _, want := range []string{"--all", "--service", "--deploy", "<app>"} {
 		if !strings.Contains(output.String(), want) {
 			t.Errorf("release help = %q, want %q", output.String(), want)
 		}
@@ -196,7 +191,7 @@ func TestRootCommandRendersReleaseHelp(t *testing.T) {
 
 func TestTargetFlagsAreMutuallyExclusive(t *testing.T) {
 	root := NewRootCommand(context.Background())
-	root.SetArgs([]string{"release", "prod", "app", "--all", "--service", "api"})
+	root.SetArgs([]string{"-e", "prod", "release", "app", "--all", "--service", "api"})
 	if err := root.Execute(); err == nil {
 		t.Fatal("release with both selectors returned nil error")
 	}
@@ -210,7 +205,7 @@ func TestLogsHelp(t *testing.T) {
 	if err := root.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"<environment> [app]", "--service", "--follow", "--tail", "--since", "--timestamps"} {
+	for _, want := range []string{"logs [app]", "--service", "--follow", "--tail", "--since", "--timestamps"} {
 		if !strings.Contains(output.String(), want) {
 			t.Errorf("help missing %q", want)
 		}
@@ -219,7 +214,7 @@ func TestLogsHelp(t *testing.T) {
 
 func TestLogsRejectsInvalidTailBeforeLoadingWorkspace(t *testing.T) {
 	root := NewRootCommand(context.Background())
-	root.SetArgs([]string{"logs", "prod", "api", "--tail", "-1"})
+	root.SetArgs([]string{"-e", "prod", "logs", "api", "--tail", "-1"})
 	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "--tail must") {
 		t.Fatalf("error = %v", err)
 	}
@@ -227,8 +222,76 @@ func TestLogsRejectsInvalidTailBeforeLoadingWorkspace(t *testing.T) {
 
 func TestEnvironmentLogsRejectsServiceWithoutApp(t *testing.T) {
 	root := NewRootCommand(context.Background())
-	root.SetArgs([]string{"logs", "prod", "--service", "api"})
+	root.SetArgs([]string{"-e", "prod", "logs", "--service", "api"})
 	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "--service requires an app") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestEnvironmentRequiredForScopedCommands(t *testing.T) {
+	t.Setenv("NOOPS_DEFAULT_ENV", "")
+	for _, args := range [][]string{{"deploy", "nats"}, {"release", "nats"}, {"release", "list", "nats"}, {"rollback", "nats"}, {"remove", "nats"}, {"logs"}, {"logs", "nats"}, {"secret", "list"}, {"secret", "set", "TOKEN"}, {"secret", "delete", "TOKEN"}} {
+		cmd := NewRootCommand(context.Background())
+		cmd.SetArgs(args)
+		if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "-e / --environment or set NOOPS_DEFAULT_ENV") {
+			t.Fatalf("%v: %v", args, err)
+		}
+	}
+}
+
+func TestScopedCommandsResolveFlagAndDefault(t *testing.T) {
+	root := t.TempDir()
+	data := "version: " + config.Version + "\nsettings:\n  state:\n    environments:\n      dev: .noops-dev\n      prod: .noops-prod\n      canary: .noops-canary\napps: {}\n"
+	if err := os.WriteFile(filepath.Join(root, "apps.yml"), []byte(data), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		flags          []string
+		fallback, want string
+	}{
+		{nil, " dev ", "dev"}, {[]string{"-e", "prod"}, "dev", "prod"}, {[]string{"--environment", "canary"}, "", "canary"},
+	} {
+		t.Setenv("NOOPS_DEFAULT_ENV", test.fallback)
+		for _, args := range [][]string{{"deploy", "nats"}, {"release", "nats"}, {"release", "list", "nats"}, {"rollback", "nats"}, {"remove", "nats"}, {"logs"}, {"logs", "nats"}, {"secret", "list"}, {"secret", "set", "TOKEN"}, {"secret", "delete", "TOKEN"}} {
+			cmd := NewRootCommand(context.Background())
+			argv := append([]string{"--workspace", root}, test.flags...)
+			argv = append(argv, args...)
+			cmd.SetArgs(argv)
+			if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), ".noops-"+test.want) {
+				t.Fatalf("%v did not select %s: %v", argv, test.want, err)
+			}
+		}
+	}
+}
+
+func TestLegacyPositionalEnvironmentCompatibility(t *testing.T) {
+	t.Setenv("NOOPS_DEFAULT_ENV", "dev")
+	root := t.TempDir()
+	data := "version: " + config.Version + "\nsettings:\n  state:\n    environments:\n      prod: .noops-prod\napps: {}\n"
+	if err := os.WriteFile(filepath.Join(root, "apps.yml"), []byte(data), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"deploy", "prod", "nats"}, {"release", "prod", "nats"}, {"release", "list", "prod", "nats"}, {"rollback", "prod", "nats"}, {"remove", "prod", "nats"}, {"logs", "prod", "nats"}, {"secret", "list", "prod"}, {"secret", "set", "prod", "TOKEN"}, {"secret", "delete", "prod", "TOKEN"}, {"-e", "prod", "deploy", "prod", "nats"}} {
+		cmd := NewRootCommand(context.Background())
+		cmd.SetArgs(append([]string{"--workspace", root}, args...))
+		if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), ".noops-prod") {
+			t.Fatalf("legacy target %v: %v", args, err)
+		}
+	}
+	cmd := NewRootCommand(context.Background())
+	cmd.SetArgs([]string{"-e", "dev", "deploy", "prod", "nats"})
+	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "conflicts") {
+		t.Fatalf("conflicting environments accepted: %v", err)
+	}
+}
+
+func TestScopedCommandRejectsEmptyOverrideAndInvalidEnvironment(t *testing.T) {
+	t.Setenv("NOOPS_DEFAULT_ENV", "dev")
+	for _, environment := range []string{"", "../prod"} {
+		cmd := NewRootCommand(context.Background())
+		cmd.SetArgs([]string{"deploy", "nats", "-e", environment})
+		if err := cmd.Execute(); err == nil || (!strings.Contains(err.Error(), "environment is required") && !strings.Contains(err.Error(), "invalid environment")) {
+			t.Fatalf("environment %q: %v", environment, err)
+		}
 	}
 }

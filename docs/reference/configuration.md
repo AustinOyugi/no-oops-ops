@@ -53,9 +53,13 @@ noops install
 noops ui
 ```
 
-An explicit `-e`/`--environment` or a positional command environment overrides
-this default. An explicitly empty `-e ""` disables the environment default for
-that command. Lifecycle commands retain their existing positional arguments.
+An explicit `-e`/`--environment` overrides this default. Lifecycle, log, and
+secret commands require a selected environment. Legacy positional environments
+remain accepted for compatibility; they override `NOOPS_DEFAULT_ENV` and must
+agree with an explicit flag. Prefer `-e` for new commands.
+Without a flag or `NOOPS_DEFAULT_ENV`, they fail with an instruction to select
+one. An explicitly empty `-e ""` disables the default; commands requiring an
+environment then fail. No workspace setting supplies a default environment.
 
 ```sh
 noops -e dev init .
@@ -64,13 +68,13 @@ noops -e dev install
 noops -e prod ui
 ```
 
-Lifecycle and secret commands already name their environment and automatically
-use its configured store:
+Lifecycle, log, and secret commands use the selected environment for both their
+target and configured store:
 
 ```sh
-noops release prod lango --all
-noops secret set dev DATABASE_PASSWORD
-noops logs prod
+noops -e prod release lango --all
+noops -e dev secret set DATABASE_PASSWORD
+noops -e prod logs
 ```
 
 `--state-dir <path>` overrides the catalog selection for every command, including
@@ -85,9 +89,7 @@ noops --state-dir /srv/rolengi/dev/.noops --environment dev ui
 The selection order is: `--state-dir`, the environment mapping, `directory`, then
 `.noops`. A directory may contain `{environment}`; a command must select an
 environment before that template can be expanded. A selected uninitialized
-store produces an error and never falls back to another store. An explicit
-`--environment` must agree with any positional command environment. Dashboard
-child commands preserve the selected store and environment.
+store produces an error and never falls back to another store. Dashboard child commands preserve the selected store and environment.
 
 Existing state is not moved automatically. To preserve an installation when
 changing its path, move its complete store (`config.yml`, `state/`, and `data/`)

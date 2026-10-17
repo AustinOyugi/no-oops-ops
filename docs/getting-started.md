@@ -89,11 +89,11 @@ for platform operations and other commands. See the [TUI guide](tui.md).
 ### CLI fallback and automation
 
 ```bash
-noops release prod api --service api
-noops deploy prod api --service api
+noops -e prod release api --service api
+noops -e prod deploy api --service api
 
 # Or release and deploy the same immutable image in one command.
-noops release --deploy prod api --service api
+noops -e prod release --deploy api --service api
 ```
 
 `api` is an alias declared in the workspace `apps.yml`. Use
@@ -105,7 +105,7 @@ processing stops at the first failure.
 For apps that reference a Swarm secret, set it before deploying:
 
 ```bash
-noops secret set prod DATABASE_URL
+noops -e prod secret set DATABASE_URL
 ```
 
 For a private Git build source, create a fine-grained GitHub token with repository Contents read access and save only
@@ -114,7 +114,7 @@ the
 workspace or application manifest.
 
 ```bash
-noops secret set prod github-readonly
+noops -e prod secret set github-readonly
 ```
 
 Use that secret key from `x-noops.build.source.git.environments.<environment>.secret`; see the [manifest

@@ -39,9 +39,6 @@ func canStreamUIAction(cfg config.Config, action tui.Action) bool {
 				options.Environment = action.Args[i+1]
 			}
 		}
-		if options.Environment == "" && len(args) > 1 {
-			options.Environment = args[1]
-		}
 		current, err := config.LoadWithOptions(cfg.Workspace, options)
 		if err != nil {
 			return false
@@ -49,10 +46,10 @@ func canStreamUIAction(cfg config.Config, action tui.Action) bool {
 		if current.ACMEEmail != "" || current.NginxCloudflare {
 			return true
 		}
-		if len(args) < 3 {
+		if len(args) < 2 {
 			return false
 		}
-		environment, app := args[1], args[2]
+		environment, app := options.Environment, args[1]
 		path, err := catalog.Resolve(cfg.Workspace, app)
 		if err != nil {
 			return false

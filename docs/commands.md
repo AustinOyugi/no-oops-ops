@@ -3,12 +3,28 @@
 All commands accept `--state-dir <path>` to select the complete runtime store
 (`config.yml`, `state/`, and `data/`). `--environment <name>` (or `-e <name>`) selects the
 installation mapping from `settings.state.environments` for platform commands
-and the dashboard. Commands with a positional environment select that mapping
-automatically. See [Separate installation stores](reference/configuration.md#separate-installation-stores).
+and the dashboard. The same selection controls lifecycle, log, and secret targets. See [Separate installation stores](reference/configuration.md#separate-installation-stores).
 
 `NOOPS_DEFAULT_ENV` supplies an optional default for `-e`/`--environment`, so
 `export NOOPS_DEFAULT_ENV=dev` lets you run `noops install` and `noops ui` directly.
-Explicit flags and positional environments override it.
+An explicit `-e` / `--environment` overrides it. Release, deploy, rollback,
+remove, logs, and secret commands require one of these two sources; otherwise
+Noops reports how to select an environment. No workspace default is used.
+Use `noops -e dev deploy nats` for new commands. The earlier
+`noops deploy dev nats` syntax remains supported, as do positional environments
+for release, rollback, remove, secret commands, and service logs with an app.
+A positional environment overrides `NOOPS_DEFAULT_ENV`; if also supplied with
+`-e`, both explicit selections must agree.
+
+`logs` with one argument always treats it as an app under the new syntax.
+Use `noops -e dev logs` for environment-wide logs to avoid that ambiguity.
+
+```sh
+noops -e dev deploy nats
+export NOOPS_DEFAULT_ENV=dev
+noops deploy nats
+noops -e prod deploy nats # Override the environment variable
+```
 
 ```text
 noops
@@ -22,15 +38,15 @@ noops [--workspace <workspace>] uninstall [--purge]
 noops [--workspace <workspace>] doctor [--deploy-ready]
 noops [--workspace <workspace>] status
 noops [--workspace <workspace>] ui
-noops [--workspace <workspace>] logs <environment> [app] [--service <name>] [--tail <count|all>] [--since <timestamp|duration>] [--timestamps] [--follow=false]
-noops [--workspace <workspace>] release [--deploy] [--force] <environment> <app> [--service <name> | --all]
-noops [--workspace <workspace>] release list <environment> <app> [--service <name> | --all]
-noops [--workspace <workspace>] deploy [--quick] <environment> <app> [--service <name> | --all]
-noops [--workspace <workspace>] rollback <environment> <app> (--service <name> | --all)
-noops [--workspace <workspace>] remove <environment> <app> (--service <name> | --all)
-noops [--workspace <workspace>] secret set <environment> <key>
-noops [--workspace <workspace>] secret delete <environment> <key>
-noops [--workspace <workspace>] secret list <environment>
+noops [--workspace <workspace>] -e <environment> logs [app] [--service <name>] [--tail <count|all>] [--since <timestamp|duration>] [--timestamps] [--follow=false]
+noops [--workspace <workspace>] -e <environment> release [--deploy] [--force] <app> [--service <name> | --all]
+noops [--workspace <workspace>] -e <environment> release list <app> [--service <name> | --all]
+noops [--workspace <workspace>] -e <environment> deploy [--quick] <app> [--service <name> | --all]
+noops [--workspace <workspace>] -e <environment> rollback <app> (--service <name> | --all)
+noops [--workspace <workspace>] -e <environment> remove <app> (--service <name> | --all)
+noops [--workspace <workspace>] -e <environment> secret set <key>
+noops [--workspace <workspace>] -e <environment> secret delete <key>
+noops [--workspace <workspace>] -e <environment> secret list
 noops [--workspace <workspace>] certificate import <name> <certificate.pem> <private-key.pem>
 noops [--workspace <workspace>] cleanup [--apply] [--orphaned] [--keep <count>]
 ```
@@ -67,11 +83,11 @@ directories.
 
 | Command                                                                | Behavior                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 |------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `release [--deploy] [--force] <env> <app> [--service <name> \| --all]` | Builds selected services or snapshots image-only services, pushes immutable images, and records release metadata. `--force` (`-f`) allows overwriting an existing release tag and replaces its metadata after a successful push. `--deploy` then deploys the exact releases created by the command, excluding services with `x-noops.deploy: false`. When the manifest has exactly one service, omit service selection; multi-service manifests require `--service` or `--all`. Git-backed builds fetch into a temporary workspace and run the Dockerfile's build stages; no language runtime is installed on the host.                                                                                                                                                                                                |
-| `release list <env> <app> [--service <name> \| --all]`                 | Lists recorded releases for selected services, newest first. When the manifest has exactly one service, omit service selection.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `deploy [--quick] <env> <app> [--service <name> \| --all]`             | Deploys selected services using their latest recorded releases. If none exists, it creates one first. When the manifest has exactly one service, omit service selection; multi-service manifests require `--service` or `--all`. `--quick` uses the health-check start period as its monitor window. The normal rollout convergence timeout defaults to two minutes unless the manifest overrides it.                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `rollback <env> <app> (--service <name> \| --all)`                     | Redeploys each selected service's previous successful deployment, including pinned secret versions.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `remove <env> <app> (--service <name> \| --all)`                       | Removes selected app stacks and generated state. Named volumes and environment secrets are preserved.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `-e <env> release [--deploy] [--force] <app> [--service <name> \| --all]` | Builds selected services or snapshots image-only services, pushes immutable images, and records release metadata. `--force` (`-f`) allows overwriting an existing release tag and replaces its metadata after a successful push. `--deploy` then deploys the exact releases created by the command, excluding services with `x-noops.deploy: false`. When the manifest has exactly one service, omit service selection; multi-service manifests require `--service` or `--all`. Git-backed builds fetch into a temporary workspace and run the Dockerfile's build stages; no language runtime is installed on the host.                                                                                                                                                                                                |
+| `-e <env> release list <app> [--service <name> \| --all]`                 | Lists recorded releases for selected services, newest first. When the manifest has exactly one service, omit service selection.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `-e <env> deploy [--quick] <app> [--service <name> \| --all]`             | Deploys selected services using their latest recorded releases. If none exists, it creates one first. When the manifest has exactly one service, omit service selection; multi-service manifests require `--service` or `--all`. `--quick` uses the health-check start period as its monitor window. The normal rollout convergence timeout defaults to two minutes unless the manifest overrides it.                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `-e <env> rollback <app> (--service <name> \| --all)`                     | Redeploys each selected service's previous successful deployment, including pinned secret versions.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `-e <env> remove <app> (--service <name> \| --all)`                       | Removes selected app stacks and generated state. Named volumes and environment secrets are preserved.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `cleanup [--apply] [--orphaned] [--keep <count>]`                      | Plans retention cleanup across releases, deployments, registry images, and local image tags. Swarm service specs and non-terminal tasks protect their image references, including both sides of an active rollout. The registry is enumerated as an additional reconciliation source, so unrecorded images are also eligible only when no protected Swarm or retention digest reaches them. The default retains the three newest release and successful-deployment records. `--orphaned` removes stale No Oops history for environments whose recorded service is absent; it does not by itself make an image eligible for deletion. Dry-run is the default; `--apply` deletes selected manifests and metadata, then runs offline registry GC whenever it prunes cleanup state, allowing interrupted runs to converge. |
 
 ## Secret commands
@@ -79,8 +95,8 @@ directories.
 `secret set` reads a value from a hidden terminal prompt or standard input:
 
 ```bash
-printf '%s' "$DATABASE_URL" | noops secret set prod DATABASE_URL
-noops secret list prod
+printf '%s' "$DATABASE_URL" | noops -e prod secret set DATABASE_URL
+noops -e prod secret list
 ```
 
 Each update creates a versioned Swarm secret such as `noops_prod_DATABASE_URL_v2`. `secret list` shows metadata, not
@@ -108,7 +124,7 @@ locally. No Oops mounts the token read-only at `/run/secrets/git-token` in a sho
 removes that task. For GitHub, use a fine-grained personal access token with read access to the repository's contents.
 
 ```bash
-printf '%s' 'github_pat_YOUR_TOKEN' | noops secret set prod github-readonly
+printf '%s' 'github_pat_YOUR_TOKEN' | noops -e prod secret set github-readonly
 ```
 
 The configured secret key is referenced by `x-noops.build.source.git.environments.<environment>.secret`.
@@ -130,16 +146,16 @@ also applies to the operations launched from the dashboard.
 
 ## Service logs
 
-`noops logs prod redis` streams the deployed service's stdout and stderr, starting
+`noops -e prod logs redis` streams the deployed service's stdout and stderr, starting
 with the last 100 lines per task. Press Ctrl+C to stop. For multi-service apps,
 select a service with `--service`; single-service apps select it automatically.
 The command resolves the active service from successful deployment history, including
 blue/green stack names, and falls back to the standard stack name when no history exists.
 
 ```bash
-noops logs prod backend --service api
-noops logs prod backend --service api --tail 200 --since 10m --timestamps
-noops logs prod redis --follow=false --tail all
+noops -e prod logs backend --service api
+noops -e prod logs backend --service api --tail 200 --since 10m --timestamps
+noops -e prod logs redis --follow=false --tail all
 ```
 
 Logs come from `docker service logs` on the configured Docker Swarm manager.
@@ -155,7 +171,7 @@ logs, or `X` to stop and close the output pane. Tasks return when streaming ends
 
 ## Environment logs
 
-`noops logs prod` streams logs from every currently deployed Noops service in
+`noops -e prod logs` streams logs from every currently deployed Noops service in
 `prod`, across all apps. Each Docker log line keeps its service/task prefix.
 Services are discovered from the workspace catalog and deployment history,
 including blue/green names; other environments and untracked services are excluded.
@@ -163,9 +179,9 @@ Streams run concurrently, and a failure in one service is reported while the
 remaining services continue. Ctrl+C stops all streams.
 
 ```bash
-noops logs prod
-noops logs prod --since 10m --tail 200 --timestamps
-noops logs prod --follow=false --tail all
+noops -e prod logs
+noops -e prod logs --since 10m --tail 200 --timestamps
+noops -e prod logs --follow=false --tail all
 ```
 
 In `noops ui`, choose **Environment logs** from the `:` palette, or from `e`

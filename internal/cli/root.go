@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/workspace"
@@ -18,26 +17,13 @@ func NewRootCommand(ctx context.Context) *cobra.Command {
 		Short:        "No Oops Ops deployment CLI",
 		SilenceUsage: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			rt.selectedEnvironment = rt.environment
-			if !cmd.Flags().Changed("environment") {
-				rt.selectedEnvironment = strings.TrimSpace(os.Getenv("NOOPS_DEFAULT_ENV"))
+			var err error
+			rt.selectedEnvironment, err = config.SelectEnvironment(rt.environment, cmd.Flags().Changed("environment"), legacyEnvironment(cmd, args), os.Getenv("NOOPS_DEFAULT_ENV"))
+			if err != nil {
+				return err
 			}
-			if len(args) == 0 {
-				return nil
-			}
-			positional := false
-			switch cmd.Name() {
-			case "release", "deploy", "rollback", "remove", "logs":
-				positional = true
-			}
-			if parent := cmd.Parent(); parent != nil && (parent.Name() == "secret" || parent.Name() == "release") {
-				positional = true
-			}
-			if positional {
-				if rt.environment != "" && rt.environment != args[0] {
-					return fmt.Errorf("--environment %q conflicts with command environment %q", rt.environment, args[0])
-				}
-				rt.selectedEnvironment = args[0]
+			if requiresEnvironment(cmd) {
+				return config.RequireEnvironment(rt.selectedEnvironment)
 			}
 			return nil
 		},
@@ -48,7 +34,7 @@ func NewRootCommand(ctx context.Context) *cobra.Command {
 	root.Flags().BoolP("version", "v", false, "Print version information")
 	root.PersistentFlags().StringVar(&rt.workspace, "workspace", "", "Workspace directory")
 	root.PersistentFlags().StringVar(&rt.stateDir, "state-dir", "", "Runtime store directory (config, state and data); relative to the workspace")
-	root.PersistentFlags().StringVarP(&rt.environment, "environment", "e", "", "Environment installation to use (defaults to NOOPS_DEFAULT_ENV)")
+	root.PersistentFlags().StringVarP(&rt.environment, "environment", "e", "", "Target environment and installation (defaults to NOOPS_DEFAULT_ENV)")
 	root.AddCommand(
 		newConfigCommand(&rt), newVersionCommand(), newInitCommand(&rt), newUpgradeCommand(ctx, &rt), newInstallCommand(ctx, &rt),
 		newUninstallCommand(ctx, &rt), newDoctorCommand(ctx, &rt), newStatusCommand(ctx, &rt),
