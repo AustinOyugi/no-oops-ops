@@ -52,10 +52,11 @@ type Registry struct {
 }
 
 type Ingress struct {
-	Name       string `yaml:"name"`
-	HTTPPort   int    `yaml:"http_port"`
-	HTTPSPort  int    `yaml:"https_port"`
-	Cloudflare bool   `yaml:"cloudflare"`
+	Networks   []string `yaml:"networks"`
+	Name       string   `yaml:"name"`
+	HTTPPort   int      `yaml:"http_port"`
+	HTTPSPort  int      `yaml:"https_port"`
+	Cloudflare bool     `yaml:"cloudflare"`
 }
 
 type EnvironmentNets struct {

@@ -433,3 +433,49 @@ func TestInternalBlueGreenRoutePromotion(t *testing.T) {
 		t.Fatalf("remove: routes=%+v error=%v", routes, err)
 	}
 }
+
+type externalNetworkRunner struct{ calls [][]string }
+
+func (r *externalNetworkRunner) Run(_ context.Context, name string, args []string, _ command.RunOptions) (command.Result, error) {
+	r.calls = append(r.calls, append([]string{name}, args...))
+	if args[0] == "service" && args[1] == "inspect" {
+		return command.Result{Output: []byte(`[{"Target":"platform-id"}]`)}, nil
+	}
+	if args[0] == "network" && args[1] == "inspect" {
+		if args[3] == "{{.Name}}" {
+			return command.Result{Output: []byte("noops-platform")}, nil
+		}
+		return command.Result{Output: []byte("overlay|swarm")}, nil
+	}
+	return command.Result{}, nil
+}
+func TestEnsureNetworkAddsConfiguredExternalNetworksAndPreservesPlatform(t *testing.T) {
+	r := &externalNetworkRunner{}
+	s := &Service{logger: slog.Default(), config: config.Config{StateDir: t.TempDir(), NginxName: "noops-nginx", NginxNetworks: []string{"shared", "shared", "noops-platform"}}, runner: r}
+	if err := s.EnsureNetwork(context.Background(), "noops-prod"); err != nil {
+		t.Fatal(err)
+	}
+	var update string
+	for _, call := range r.calls {
+		if len(call) > 2 && call[1] == "service" && call[2] == "update" {
+			update = strings.Join(call, " ")
+		}
+	}
+	for _, network := range []string{"shared", "noops-prod"} {
+		if strings.Count(update, "name="+network+",alias=ingress.noops.internal") != 1 {
+			t.Fatalf("unexpected update: %s", update)
+		}
+	}
+	if strings.Contains(update, "name=noops-platform") {
+		t.Fatalf("reattached existing platform network: %s", update)
+	}
+	data, err := os.ReadFile(s.networksPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, network := range []string{"shared", "noops-prod", "noops-platform"} {
+		if !strings.Contains(string(data), `"`+network+`": true`) {
+			t.Fatalf("missing preserved network: %s", data)
+		}
+	}
+}

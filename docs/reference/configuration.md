@@ -120,6 +120,7 @@ settings:
       https_port: 443
       # Trust Cloudflare's client-IP header only from Cloudflare networks.
       cloudflare: true
+      networks: [shared-services, legacy-apps]
     networks:
       default: "noops-{environment}"
       environments:
@@ -143,6 +144,20 @@ in `dev` and `prod` have independent networks. The managed nginx ingress is a
 single shared public listener, but it joins an environment network only when it
 serves an exposed app in that environment. It does not make application
 networks reachable from one another.
+
+`platform.ingress.networks` lists additional external Swarm overlay networks for
+nginx. It always retains `platform.network.name` and its application environment
+networks. Run `noops install` after changing the list to attach networks immediately;
+ingress-managed app deployments also ensure the listed attachments. Missing
+networks are created, existing Swarm overlays are reused, and incompatible
+networks fail with an error. Duplicate entries do not create duplicate attachments.
+These shared networks persist independently of the nginx stack. Existing live
+attachments are preserved, so removing a name from this list does not detach it.
+
+Services on these networks can call
+`http://ingress.noops.internal/<environment>/<app>/...`. Nginx provides an HTTP
+gateway to all configured internal routes, rather than general network routing
+or isolation between environments.
 
 Use distinct domains or path prefixes for routes in different environments. A
 domain and path-prefix pair can have only one owner across the shared listener,

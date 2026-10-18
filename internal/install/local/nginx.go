@@ -183,6 +183,12 @@ func (h *Host) ingressNetworks(ctx context.Context) ([]string, error) {
 	for network := range liveNetworks {
 		networks[network] = true
 	}
+	for _, network := range h.nginxNetworks {
+		if err := ingressnet.EnsureOverlay(ctx, h.runner, network); err != nil {
+			return nil, err
+		}
+		networks[network] = true
+	}
 	var environmentNetworks []string
 	for network, attached := range networks {
 		if attached && network != h.networkName {

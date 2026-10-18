@@ -22,6 +22,7 @@ type Host struct {
 	registryPort     string
 	registryService  string
 	registryReady    bool
+	nginxNetworks    []string
 	nginxName        string
 	nginxHTTPPort    string
 	nginxHTTPSPort   string
@@ -39,7 +40,8 @@ func NewHost(
 	registryPort string,
 	nginxName string,
 	nginxHTTPPort string,
-	nginxHTTPSPort string) *Host {
+	nginxHTTPSPort string,
+	nginxNetworks ...string) *Host {
 	return &Host{
 		runner:          command.NewRunner(logger),
 		logger:          logger,
@@ -51,6 +53,7 @@ func NewHost(
 		registryPort:    registryPort,
 		registryService: registryName + "_registry",
 		nginxName:       nginxName,
+		nginxNetworks:   append([]string(nil), nginxNetworks...),
 		nginxHTTPPort:   nginxHTTPPort,
 		nginxHTTPSPort:  nginxHTTPSPort,
 		nginxService:    nginxName + "_nginx",

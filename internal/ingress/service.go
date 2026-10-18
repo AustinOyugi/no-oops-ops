@@ -76,14 +76,28 @@ func (s *Service) EnsureNetwork(ctx context.Context, network string) error {
 	if err != nil {
 		return err
 	}
-	if networks[network] {
-		return s.saveNetworks(networks)
+	for _, external := range s.config.NginxNetworks {
+		if err := ingressnet.EnsureOverlay(ctx, s.runner, external); err != nil {
+			return err
+		}
 	}
-	attachment := "name=" + network + ",alias=" + internalHost
-	if _, err := s.runner.Run(ctx, "docker", []string{"service", "update", "--network-add", attachment, service}, command.RunOptions{LogCommand: true}); err != nil {
-		return fmt.Errorf("attach ingress service %q to network %q: %w", service, network, err)
+	requested := append([]string{network}, s.config.NginxNetworks...)
+	args := []string{"service", "update"}
+	for _, target := range requested {
+		if networks[target] {
+			continue
+		}
+		attachment := "name=" + target + ",alias=" + internalHost
+		args = append(args, "--network-add", attachment)
+		networks[target] = true
 	}
-	networks[network] = true
+	if len(args) > 2 {
+		args = append(args, service)
+		if _, err := s.runner.Run(ctx, "docker", args, command.RunOptions{LogCommand: true}); err != nil {
+			return fmt.Errorf("attach ingress service %q to networks: %w", service, err)
+		}
+	}
+
 	return s.saveNetworks(networks)
 }
 

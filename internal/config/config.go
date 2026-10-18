@@ -32,6 +32,7 @@ type Config struct {
 	RegistryName string
 	RegistryPort string
 
+	NginxNetworks   []string
 	NginxName       string
 	NginxHTTPPort   string
 	NginxHTTPSPort  string
@@ -141,6 +142,7 @@ func LoadWithOptions(root string, options Options) (Config, error) {
 		RegistryName:              registryName,
 		RegistryPort:              registryPort,
 		NginxName:                 ingressName,
+		NginxNetworks:             append([]string(nil), platform.Ingress.Networks...),
 		NginxHTTPPort:             httpPort,
 		NginxHTTPSPort:            httpsPort,
 		NginxCloudflare:           platform.Ingress.Cloudflare,

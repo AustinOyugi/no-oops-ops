@@ -27,6 +27,7 @@ settings:
       http_port: 8080
       https_port: 8443
       cloudflare: true
+      networks: [shared-services, legacy-apps]
     networks:
       default: "noops-{environment}"
       environments:
@@ -45,6 +46,9 @@ apps: {}
 	}
 	if got, want := cfg.RegistryPort, "5100"; got != want {
 		t.Errorf("registry port = %q, want %q", got, want)
+	}
+	if len(cfg.NginxNetworks) != 2 || cfg.NginxNetworks[0] != "shared-services" || cfg.NginxNetworks[1] != "legacy-apps" {
+		t.Fatalf("ingress networks = %v", cfg.NginxNetworks)
 	}
 	if !cfg.NginxCloudflare {
 		t.Error("expected Cloudflare ingress support to be enabled")

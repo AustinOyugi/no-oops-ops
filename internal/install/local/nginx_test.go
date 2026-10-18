@@ -225,3 +225,46 @@ func TestWriteNginxStackPreservesLiveNetworksWithoutCache(t *testing.T) {
 		t.Fatalf("incorrect preserved networks: %s", stack)
 	}
 }
+
+type configuredNetworkRunner struct {
+	installedNetworkRunner
+	creates int
+}
+
+func (r *configuredNetworkRunner) Run(ctx context.Context, name string, args []string, opts command.RunOptions) (command.Result, error) {
+	if len(args) > 3 && args[0] == "network" && args[1] == "inspect" && args[3] == "{{.Driver}}|{{.Scope}}" {
+		if r.creates == 0 {
+			return command.Result{Output: []byte("network not found")}, errors.New("missing")
+		}
+		return command.Result{Output: []byte("overlay|swarm")}, nil
+	}
+	if len(args) > 1 && args[0] == "network" && args[1] == "create" {
+		r.creates++
+		return command.Result{}, nil
+	}
+	return r.installedNetworkRunner.Run(ctx, name, args, opts)
+}
+func TestWriteNginxStackAddsConfiguredExternalNetworks(t *testing.T) {
+	root := t.TempDir()
+	h := NewHost(slog.Default(), filepath.Join(root, "state"), filepath.Join(root, "data"), "test", "shared", "registry", "5000", "nginx", "80", "443", "bridge-services", "bridge-services", "shared")
+	r := &configuredNetworkRunner{installedNetworkRunner: installedNetworkRunner{live: true}}
+	h.runner = r
+	if err := h.WriteNginxStack(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(h.nginxStackPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, network := range []string{"shared", "bridge-services", "noops-live"} {
+		if strings.Count(string(data), `"`+network+`":`) != 2 {
+			t.Fatalf("missing or duplicate attachment/declaration for %s: %s", network, data)
+		}
+	}
+	if r.creates != 1 {
+		t.Fatalf("network creates = %d", r.creates)
+	}
+	if strings.Count(string(data), `- "ingress.noops.internal"`) != 3 {
+		t.Fatalf("missing aliases: %s", data)
+	}
+}

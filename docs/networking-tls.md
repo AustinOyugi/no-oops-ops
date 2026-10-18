@@ -52,6 +52,21 @@ switching the internal route. No public DNS or TLS configuration is required.
 The shared nginx listener also accepts this Host header from any client that can
 reach it; the internal hostname is not an access-control boundary.
 
+To make nginx reachable from additional external networks, set this in `apps.yml`:
+
+```yaml
+settings:
+  platform:
+    ingress:
+      networks: [shared-services, legacy-apps]
+```
+
+Run `noops install` to apply it. Nginx keeps its default platform and environment
+networks and joins each listed network with the `ingress.noops.internal` alias.
+Missing networks are created as Swarm overlays; existing incompatible networks
+are rejected. Callers on these networks can reach all configured internal routes.
+Existing attachments are preserved if names are later removed from the list.
+
 ## Let's Encrypt TLS
 
 Use the default TLS flow when the domain resolves directly to the Swarm manager and ports 80 and 443 are reachable from
