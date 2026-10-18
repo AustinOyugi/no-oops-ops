@@ -444,6 +444,9 @@ func updateRoute(routes []Route, environment string, m manifest.Manifest, upstre
 		ClientMaxBodySize: m.Expose.Proxy.ClientMaxBodySize,
 	}
 	for _, existing := range updated {
+		if route.Domain == "" {
+			continue
+		}
 		if existing.Domain == route.Domain && existing.PathPrefix == route.PathPrefix {
 			return nil, false, fmt.Errorf("ingress route %s%s is already owned by %s/%s", route.Domain, route.PathPrefix, existing.Environment, existing.App)
 		}
@@ -460,7 +463,10 @@ func updateRoute(routes []Route, environment string, m manifest.Manifest, upstre
 }
 
 func validateExposure(m manifest.Manifest) error {
-	if m.Expose.Domain == "" {
+	if err := m.Expose.ValidateInternalRoute(); err != nil {
+		return err
+	}
+	if m.Expose.Domain == "" && !m.Expose.InternalOnly() {
 		return fmt.Errorf("expose.domain is required when expose.enabled is true")
 	}
 	if strings.ContainsAny(m.Expose.Domain, " /\\?#{};\"") {

@@ -239,3 +239,44 @@ func TestLoadComposeShapedExamples(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadInternalBlueGreenIngress(t *testing.T) {
+	for _, route := range []string{
+		"ingress: {blue_green: true}",
+		"ingress: {environments: {prod: {blue_green: true}}}",
+		"expose: {blue_green: true}",
+	} {
+		t.Run(route, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "app.yml")
+			data := "services:\n  api:\n    image: repo/api:1\n    healthcheck: {test: [CMD, 'true']}\n    x-noops:\n      service: {internal_port: 8080}\n      " + route + "\n"
+			if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+				t.Fatal(err)
+			}
+			m, err := Load(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			e := m.ForEnvironment("prod").Expose
+			if !e.Enabled || !e.InternalOnly() || !e.BlueGreenEnabled() || e.PathPrefix != "/" {
+				t.Fatalf("unexpected internal route: %+v", e)
+			}
+		})
+	}
+}
+
+func TestLoadInternalBlueGreenRejectsPublicTLSAndMissingPort(t *testing.T) {
+	for _, settings := range []string{
+		"service: {internal_port: 8080}\n      ingress: {blue_green: true, tls: true}",
+		"service: {internal_port: 8080}\n      ingress: {environments: {prod: {blue_green: true, tls_certificate: origin}}}",
+		"ingress: {blue_green: true}",
+	} {
+		path := filepath.Join(t.TempDir(), "app.yml")
+		data := "services:\n  api:\n    image: repo/api:1\n    x-noops:\n      " + settings + "\n"
+		if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Load(path); err == nil {
+			t.Fatalf("accepted invalid settings: %s", settings)
+		}
+	}
+}

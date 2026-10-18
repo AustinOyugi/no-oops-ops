@@ -40,6 +40,39 @@ No Oops rejects `container_name` because Swarm schedules service tasks, rejects 
 services, and rejects plainly embedded credential-like environment values. Move such values to managed No Oops secrets.
 `x-noops.expose` remains accepted as a compatibility alias for `x-noops.ingress`.
 
+### Internal-only blue/green
+
+Set `blue_green: true` without a public hostname to enable the managed internal
+HTTP route and blue/green promotion:
+
+```yaml
+services:
+  api:
+    image: registry.example.test/api:1
+    healthcheck:
+      test: [CMD, curl, -f, http://localhost:8080/health]
+    x-noops:
+      service:
+        internal_port: 8080
+      ingress:
+        blue_green: true
+```
+
+Consumers on the environment network call
+`http://ingress.noops.internal/<environment>/api/...`. Noops strips the
+`/<environment>/api` prefix. It keeps the active route while the candidate
+converges and completes the configured monitor window, then promotes the
+candidate using the existing nginx handoff. The first deployment establishes the
+route; later deployments use blue/green. Named-volume restrictions still apply.
+Direct calls to the Swarm application service bypass this handoff.
+
+This also works inside `ingress.environments.<environment>`. Add `domain` or
+`domains` to serve a public route as well. Without a public hostname, `tls` and
+`tls_certificate` are rejected. No application port should be published.
+The internal hostname uses the shared nginx listener; it is a routing convention,
+not an access-control boundary against clients that can reach nginx and set the
+Host header.
+
 ### Environment-specific ingress
 
 Use `x-noops.ingress.environments` when one manifest is deployed to multiple

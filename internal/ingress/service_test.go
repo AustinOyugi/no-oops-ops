@@ -395,3 +395,41 @@ func TestReconcileRestoresAfterReloadFailure(t *testing.T) {
 		})
 	}
 }
+
+func TestInternalBlueGreenRoutePromotion(t *testing.T) {
+	bg := true
+	m := manifest.Manifest{Name: "api", Service: manifest.Service{InternalPort: 8080}, Expose: manifest.Expose{Enabled: true, BlueGreen: &bg, PathPrefix: "/"}}
+	routes, _, err := updateRoute(nil, "prod", m, "blue")
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := m
+	other.Name = "worker-api"
+	routes, _, err = updateRoute(routes, "prod", other, "other")
+	if err != nil {
+		t.Fatal(err)
+	}
+	routes, changed, err := updateRoute(routes, "prod", m, "green")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !changed || len(routes) != 2 {
+		t.Fatalf("unexpected promoted routes: %+v", routes)
+	}
+	for _, route := range routes {
+		if route.App == "api" && (route.Service != "green" || route.Domain != "" || route.TLS) {
+			t.Fatalf("bad promotion: %+v", route)
+		}
+	}
+	content, err := RenderConfig(routes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(content), "set $upstream blue;") || !strings.Contains(string(content), "set $upstream green;") || strings.Count(string(content), "server_name") != 2 {
+		t.Fatalf("unexpected config: %s", content)
+	}
+	routes, _, err = updateRoute(routes, "prod", manifest.Manifest{Name: "api"}, "")
+	if err != nil || len(routes) != 1 || routes[0].App != "worker-api" {
+		t.Fatalf("remove: routes=%+v error=%v", routes, err)
+	}
+}

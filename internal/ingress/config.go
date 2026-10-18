@@ -15,10 +15,12 @@ func RenderFiles(routes []Route) (map[string][]byte, error) {
 	files := make(map[string][]byte)
 	byDomain := make(map[string][]Route)
 	for _, route := range routes {
-		if route.Domain == "" || route.Service == "" || route.Port < 1 || route.Port > 65535 {
+		if route.Service == "" || route.Port < 1 || route.Port > 65535 {
 			return nil, fmt.Errorf("invalid ingress route for %s/%s", route.Environment, route.App)
 		}
-		byDomain[route.Domain] = append(byDomain[route.Domain], route)
+		if route.Domain != "" {
+			byDomain[route.Domain] = append(byDomain[route.Domain], route)
+		}
 	}
 	for domain, routesForDomain := range byDomain {
 		sort.Slice(routesForDomain, func(i, j int) bool { return len(routesForDomain[i].PathPrefix) > len(routesForDomain[j].PathPrefix) })
@@ -92,10 +94,12 @@ type internalRoute struct {
 func RenderConfig(routes []Route) ([]byte, error) {
 	byDomain := make(map[string][]Route)
 	for _, route := range routes {
-		if route.Domain == "" || route.Service == "" || route.Port < 1 || route.Port > 65535 {
+		if route.Service == "" || route.Port < 1 || route.Port > 65535 {
 			return nil, fmt.Errorf("invalid ingress route for %s/%s", route.Environment, route.App)
 		}
-		byDomain[route.Domain] = append(byDomain[route.Domain], route)
+		if route.Domain != "" {
+			byDomain[route.Domain] = append(byDomain[route.Domain], route)
+		}
 	}
 
 	domains := make([]string, 0, len(byDomain))

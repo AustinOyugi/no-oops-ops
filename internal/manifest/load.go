@@ -306,9 +306,9 @@ func normalizeIngress(ingress *Expose) {
 	if ingress.Domain == "" && len(ingress.Domains) > 0 {
 		ingress.Domain = ingress.Domains[0]
 	}
-	// Domains are an unambiguous request for a managed route, so the compact
-	// `ingress: {domains: [...]}` form is sufficient.
-	if ingress.Domain != "" {
+	// A hostname or explicit blue/green enables a managed route. Without a
+	// hostname, blue_green: true requests only the stable internal route.
+	if ingress.Domain != "" || (ingress.BlueGreen != nil && *ingress.BlueGreen) {
 		ingress.Enabled = true
 	}
 }

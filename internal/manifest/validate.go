@@ -100,11 +100,14 @@ func (m Manifest) Validate() error {
 		}
 	}
 
+	if err := m.Expose.ValidateInternalRoute(); err != nil {
+		return err
+	}
 	if m.Expose.Enabled {
-		if m.Expose.Domain == "" {
+		if m.Expose.Domain == "" && !m.Expose.InternalOnly() {
 			return fmt.Errorf("expose.domain is required when expose.enabled is true")
 		}
-		if !domainPattern.MatchString(m.Expose.Domain) {
+		if !m.Expose.InternalOnly() && !domainPattern.MatchString(m.Expose.Domain) {
 			return fmt.Errorf("expose.domain must be a valid hostname")
 		}
 		for _, domain := range m.Expose.Domains {
@@ -145,11 +148,14 @@ func anyIngressEnabled(environments map[string]Expose) bool {
 
 func validateIngressEnvironment(ingress Expose, environment string) error {
 	field := "ingress.environments." + environment
+	if err := ingress.ValidateInternalRoute(); err != nil {
+		return fmt.Errorf("%s: %w", field, err)
+	}
 	if ingress.Enabled {
-		if ingress.Domain == "" {
+		if ingress.Domain == "" && !ingress.InternalOnly() {
 			return fmt.Errorf("%s.domain is required when %s.enabled is true", field, field)
 		}
-		if !domainPattern.MatchString(ingress.Domain) {
+		if !ingress.InternalOnly() && !domainPattern.MatchString(ingress.Domain) {
 			return fmt.Errorf("%s.domain must be a valid hostname", field)
 		}
 		for _, domain := range ingress.Domains {
@@ -240,6 +246,19 @@ func (s *EnvSecrets) Validate() error {
 	case "env", "file":
 	default:
 		return fmt.Errorf("env.secrets.resolution must be \"env\" or \"file\", got %q", s.Resolution)
+	}
+	return nil
+}
+
+// InternalOnly reports whether an explicitly enabled blue/green route has no
+// public hostname. A hostname keeps the existing public ingress behavior.
+func (e Expose) InternalOnly() bool {
+	return e.BlueGreen != nil && *e.BlueGreen && e.Domain == "" && len(e.Domains) == 0
+}
+
+func (e Expose) ValidateInternalRoute() error {
+	if e.InternalOnly() && (e.TLS || e.TLSCertificate != "") {
+		return fmt.Errorf("internal-only ingress cannot use tls or tls_certificate without a public domain")
 	}
 	return nil
 }

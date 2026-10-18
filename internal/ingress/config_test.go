@@ -201,3 +201,13 @@ func TestCloudflareRealIPConfigTrustsOnlyCloudflareNetworks(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderInternalOnlyRouteFiles(t *testing.T) {
+	files, err := RenderFiles([]Route{{Environment: "prod", App: "api", Service: "green", Port: 8080}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 1 || !strings.Contains(string(files["internal/prod-api.conf"]), "set $upstream green;") {
+		t.Fatalf("unexpected files: %v", files)
+	}
+}

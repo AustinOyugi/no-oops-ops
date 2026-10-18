@@ -34,9 +34,23 @@ x-noops:
 ```
 
 `internal_port` is never published directly. Nginx forwards the route to the private Swarm service. Services can also
-reach an exposed app through `http://ingress.noops.internal/<environment>/<app>/...`. That internal address is
-available only to services on the same environment network as the selected route; it does not provide direct network
-access between environments.
+reach an ingress-managed app through `http://ingress.noops.internal/<environment>/<app>/...`.
+The hostname resolves through nginx's alias on each attached environment network.
+
+For blue/green through only that internal URL, omit the public hostname and set:
+
+```yaml
+x-noops:
+  service:
+    internal_port: 3000
+  ingress:
+    blue_green: true
+```
+
+Noops waits for the candidate to converge and complete its monitor window before
+switching the internal route. No public DNS or TLS configuration is required.
+The shared nginx listener also accepts this Host header from any client that can
+reach it; the internal hostname is not an access-control boundary.
 
 ## Let's Encrypt TLS
 
