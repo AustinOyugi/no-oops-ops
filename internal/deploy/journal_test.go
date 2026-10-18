@@ -15,16 +15,18 @@ import (
 
 func TestRecoverInPlaceJournalChecksLiveRollout(t *testing.T) {
 	for _, tc := range []struct {
-		name, status, stage   string
-		inspectFails, recover bool
+		name, status, stage                 string
+		inspectFails, recover, missingImage bool
 	}{
 		{name: "paused", status: "paused", stage: "stack_deployed", recover: true},
 		{name: "rollback paused", status: "rollback_paused", stage: "stack_deployed", recover: true},
 		{name: "rolled back", status: "rollback_completed", stage: "stack_deployed", recover: true},
 		{name: "updating", status: "updating", stage: "stack_deployed"},
 		{name: "rolling back", status: "rollback_started", stage: "stack_deployed"},
-		{name: "completed needs reconciliation", status: "completed", stage: "stack_deployed"},
-		{name: "unknown", stage: "stack_deployed"},
+		{name: "completed after ingress failure", status: "completed", stage: "stack_deployed", recover: true},
+		{name: "first deployment has no update status", stage: "stack_deployed", recover: true},
+		{name: "unknown", status: "unexpected", stage: "stack_deployed"},
+		{name: "missing image", stage: "stack_deployed", missingImage: true},
 		{name: "inspect fails", stage: "stack_deployed", inspectFails: true},
 		{name: "promotion uncertain", status: "paused", stage: "ingress_reconciled"},
 		{name: "started uncertain", status: "paused", stage: "started"},
@@ -32,6 +34,9 @@ func TestRecoverInPlaceJournalChecksLiveRollout(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			bin := t.TempDir()
 			script := "#!/bin/sh\n[ \"$1 $2\" = 'service inspect' ] || exit 2\n[ \"$5\" = 'prod-api_prod-api' ] || exit 3\nprintf '%s|test failure|image\\n' \"$TEST_ROLLOUT_STATUS\"\n"
+			if tc.missingImage {
+				script = strings.ReplaceAll(script, "|image", "|")
+			}
 			if tc.inspectFails {
 				script = "#!/bin/sh\nexit 1\n"
 			}

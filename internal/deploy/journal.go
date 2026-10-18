@@ -62,7 +62,7 @@ func clearJournal(cfg config.Config, app, environment string) error {
 }
 
 // recoverJournal removes an unpromoted blue/green candidate. In-place work
-// can be retried only when Swarm confirms a stopped rollout before promotion.
+// can be retried when Swarm confirms an idle or stopped rollout before promotion.
 func (s *Service) recoverJournal(ctx context.Context, app, environment string) error {
 	journal, exists, err := loadJournal(s.config, app, environment)
 	if err != nil || !exists {
@@ -76,12 +76,18 @@ func (s *Service) recoverJournal(ctx context.Context, app, environment string) e
 	}
 	if journal.Kind == "deploy" && !journal.BlueGreen && journal.Stage == "stack_deployed" && journal.StackName == stackName(environment, app) {
 		service := swarmServiceName(environment, app)
-		status, message, _, err := s.serviceUpdateStatus(ctx, service)
+		status, message, image, err := s.serviceUpdateStatus(ctx, service)
 		if err != nil {
 			return fmt.Errorf("inspect unfinished deploy for %s/%s: %w", environment, app, err)
 		}
 		switch status {
-		case "paused", "rollback_paused", "rollback_completed":
+		case "", "completed", "paused", "rollback_paused", "rollback_completed":
+			if image == "" {
+				return fmt.Errorf("inspect unfinished deploy for %s/%s: service image is missing; retain journal %q", environment, app, journalPath(s.config, app, environment))
+			}
+			// An idle in-place service can be deployed again after ingress failed.
+			// The retry uses the same service and repeats readiness and routing.
+
 			// Preserve the intent record for diagnosis without blocking the next
 			// attempt. This does not roll back or otherwise mutate the service.
 			path := journalPath(s.config, app, environment)
@@ -89,7 +95,7 @@ func (s *Service) recoverJournal(ctx context.Context, app, environment string) e
 			if err := os.Rename(path, archive); err != nil {
 				return fmt.Errorf("archive failed deployment journal: %w", err)
 			}
-			s.logger.WarnContext(ctx, "retrying stopped Swarm rollout", "service", service, "status", status, "reason", message, "journal_archive", archive)
+			s.logger.WarnContext(ctx, "retrying idle or stopped Swarm rollout", "service", service, "status", status, "reason", message, "journal_archive", archive)
 			return nil
 		}
 	}
