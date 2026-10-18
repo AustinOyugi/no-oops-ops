@@ -120,7 +120,9 @@ settings:
       https_port: 443
       # Trust Cloudflare's client-IP header only from Cloudflare networks.
       cloudflare: true
-      networks: [shared-services, legacy-apps]
+      networks:
+        prod: [shared-services, legacy-apps]
+        dev: [dev-services]
     networks:
       default: "noops-{environment}"
       environments:
@@ -145,9 +147,11 @@ single shared public listener, but it joins an environment network only when it
 serves an exposed app in that environment. It does not make application
 networks reachable from one another.
 
-`platform.ingress.networks` lists additional external Swarm overlay networks for
-nginx. It always retains `platform.network.name` and its application environment
-networks. Run `noops install` after changing the list to attach networks immediately;
+`platform.ingress.networks` maps environment names to lists of additional external
+Swarm overlay networks for nginx. Only the selected environment's list is applied;
+an unmapped environment or a command without an environment adds no extra networks.
+It always retains `platform.network.name` and its application environment networks.
+Run `noops -e prod install` after changing the prod list to attach networks immediately;
 ingress-managed app deployments also ensure the listed attachments. Missing
 networks are created, existing Swarm overlays are reused, and incompatible
 networks fail with an error. Duplicate entries do not create duplicate attachments.
@@ -157,7 +161,9 @@ attachments are preserved, so removing a name from this list does not detach it.
 Services on these networks can call
 `http://ingress.noops.internal/<environment>/<app>/...`. Nginx provides an HTTP
 gateway to all configured internal routes, rather than general network routing
-or isolation between environments.
+or isolation between environments. Because nginx is shared, it retains attachments
+from previously deployed environments; these lists select attachments, not route
+access permissions.
 
 Use distinct domains or path prefixes for routes in different environments. A
 domain and path-prefix pair can have only one owner across the shared listener,

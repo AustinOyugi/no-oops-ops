@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/workspace"
@@ -27,7 +28,9 @@ settings:
       http_port: 8080
       https_port: 8443
       cloudflare: true
-      networks: [shared-services, legacy-apps]
+      networks:
+        prod: [shared-services, legacy-apps]
+        dev: [dev-services]
     networks:
       default: "noops-{environment}"
       environments:
@@ -37,7 +40,7 @@ apps: {}
 	if err := os.WriteFile(filepath.Join(root, "apps.yml"), []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	cfg, err := Load(root)
+	cfg, err := LoadWithOptions(root, Options{Environment: "prod"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,6 +55,22 @@ apps: {}
 	}
 	if !cfg.NginxCloudflare {
 		t.Error("expected Cloudflare ingress support to be enabled")
+	}
+	for _, tc := range []struct {
+		environment string
+		want        []string
+	}{
+		{"dev", []string{"dev-services"}},
+		{"staging", nil},
+		{"", nil},
+	} {
+		selected, err := LoadWithOptions(root, Options{Environment: tc.environment})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(selected.NginxNetworks, tc.want) {
+			t.Fatalf("environment %q networks = %v, want %v", tc.environment, selected.NginxNetworks, tc.want)
+		}
 	}
 	if got, want := cfg.EnvironmentNetwork("prod"), "noops-production"; got != want {
 		t.Errorf("prod network = %q, want %q", got, want)

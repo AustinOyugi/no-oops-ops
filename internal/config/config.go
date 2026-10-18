@@ -142,7 +142,7 @@ func LoadWithOptions(root string, options Options) (Config, error) {
 		RegistryName:              registryName,
 		RegistryPort:              registryPort,
 		NginxName:                 ingressName,
-		NginxNetworks:             append([]string(nil), platform.Ingress.Networks...),
+		NginxNetworks:             append([]string(nil), platform.Ingress.Networks[options.Environment]...),
 		NginxHTTPPort:             httpPort,
 		NginxHTTPSPort:            httpsPort,
 		NginxCloudflare:           platform.Ingress.Cloudflare,

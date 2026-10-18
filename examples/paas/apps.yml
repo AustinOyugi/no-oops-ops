@@ -13,8 +13,10 @@ settings:
       name: noops-nginx
       http_port: 80
       https_port: 443
-      # Additional external overlays nginx should join (created if missing).
-      networks: []
+      # Additional external overlays per environment (created if missing).
+      networks:
+        dev: []
+        prod: []
     networks:
       default: "noops-{environment}"
       environments: { }

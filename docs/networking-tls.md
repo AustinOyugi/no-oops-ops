@@ -58,11 +58,14 @@ To make nginx reachable from additional external networks, set this in `apps.yml
 settings:
   platform:
     ingress:
-      networks: [shared-services, legacy-apps]
+      networks:
+        prod: [shared-services, legacy-apps]
+        dev: [dev-services]
 ```
 
-Run `noops install` to apply it. Nginx keeps its default platform and environment
-networks and joins each listed network with the `ingress.noops.internal` alias.
+Run `noops -e prod install` to apply the prod list. Commands without a selected
+environment and unmapped environments add no extra networks. Nginx keeps its default platform and environment
+networks and joins each network listed for the selected environment with the `ingress.noops.internal` alias.
 Missing networks are created as Swarm overlays; existing incompatible networks
 are rejected. Callers on these networks can reach all configured internal routes.
 Existing attachments are preserved if names are later removed from the list.
