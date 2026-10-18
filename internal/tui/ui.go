@@ -92,8 +92,10 @@ func newDashboard(ctx context.Context, query func(context.Context) ([]Row, error
 			return nil
 		case event.Key() == tcell.KeyTab:
 			if d.app.GetFocus() == d.services {
-				if d.tasksHidden && d.outputVisible {
-					d.app.SetFocus(d.output)
+				if !d.tasksVisible() {
+					if d.outputVisible {
+						d.app.SetFocus(d.output)
+					}
 				} else {
 					d.app.SetFocus(d.tasks)
 				}

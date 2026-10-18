@@ -191,8 +191,23 @@ func (d *dashboard) cancelStream(closeView bool) {
 	}
 }
 
+func (d *dashboard) tasksVisible() bool {
+	if d.tasksHidden && d.outputVisible {
+		return false
+	}
+	for _, rollout := range d.rollouts {
+		if !rollout.Finished {
+			return false
+		}
+	}
+	return true
+}
+
 // rebuildLayout keeps pane order consistent as output, logs, and rollouts change.
 func (d *dashboard) rebuildLayout() {
+	if !d.tasksVisible() && (d.app.GetFocus() == d.tasks || d.app.GetFocus() == d.detail) {
+		d.app.SetFocus(d.services)
+	}
 	serviceWeight, detailHeight := 1, 3
 	if d.outputVisible || d.rolloutVisible {
 		serviceWeight, detailHeight = 2, 2
@@ -201,7 +216,7 @@ func (d *dashboard) rebuildLayout() {
 	if d.rolloutVisible {
 		d.layout.AddItem(d.rolloutPane, 8, 0, false)
 	}
-	if !d.tasksHidden || !d.outputVisible {
+	if d.tasksVisible() {
 		d.layout.AddItem(d.tasks, 0, 1, false).AddItem(d.detail, detailHeight, 0, false)
 	}
 	if d.outputVisible {

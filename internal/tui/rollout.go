@@ -126,10 +126,8 @@ func (d *dashboard) updateRolloutPane() {
 		d.rolloutPane = tview.NewTextView().SetWrap(true)
 		d.rolloutPane.SetBorder(true).SetTitle(" Blue / green rollout ")
 	}
-	if !d.rolloutVisible {
-		d.rolloutVisible = true
-		d.rebuildLayout()
-	}
+	d.rolloutVisible = true
+	d.rebuildLayout()
 	selected := d.rollouts[0]
 	for _, p := range d.rollouts {
 		if p.OldService == d.selected || p.NewService == d.selected {

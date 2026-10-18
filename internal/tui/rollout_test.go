@@ -10,7 +10,51 @@ import (
 
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/deploy"
+	"github.com/gdamore/tcell/v2"
+	"github.com/rivo/tview"
 )
+
+func TestActiveRolloutHidesTasksAndRestoresThemWhenFinished(t *testing.T) {
+	d := newDashboard(context.Background(), nil, nil)
+	hasPane := func(p tview.Primitive) bool {
+		for i := 0; i < d.layout.GetItemCount(); i++ {
+			if d.layout.GetItem(i) == p {
+				return true
+			}
+		}
+		return false
+	}
+	d.app.SetFocus(d.tasks)
+	d.rollouts = []deploy.RolloutProgress{{App: "api", Stage: "waiting_readiness"}}
+	d.updateRolloutPane()
+	if hasPane(d.tasks) || hasPane(d.detail) || !hasPane(d.rolloutPane) {
+		t.Fatal("active rollout must replace tasks and detail with rollout progress")
+	}
+	if d.app.GetFocus() != d.services {
+		t.Fatal("focus remained on hidden tasks")
+	}
+	d.app.GetInputCapture()(tcell.NewEventKey(tcell.KeyTab, 0, tcell.ModNone))
+	if d.app.GetFocus() == d.tasks {
+		t.Fatal("Tab focused hidden tasks")
+	}
+	d.rollouts[0].Finished = true
+	d.rollouts[0].Stage = "completed"
+	d.updateRolloutPane()
+	if !hasPane(d.tasks) || !hasPane(d.detail) {
+		t.Fatal("finished rollout did not restore tasks")
+	}
+	// A different, still-active rollout continues to suppress the tasks panel.
+	d.rollouts = append(d.rollouts, deploy.RolloutProgress{App: "worker"})
+	d.updateRolloutPane()
+	if hasPane(d.tasks) {
+		t.Fatal("another active rollout restored tasks")
+	}
+	d.rollouts = nil
+	d.updateRolloutPane()
+	if !hasPane(d.tasks) || hasPane(d.rolloutPane) {
+		t.Fatal("clearing rollout did not restore normal layout")
+	}
+}
 
 func TestRolloutShowsActualIngressAndReplicaState(t *testing.T) {
 	p := deploy.RolloutProgress{App: "web", Environment: "prod", OldService: "old_app", NewService: "new_app", Stage: "promoting", Traffic: "unknown", UpdatedAt: time.Now()}

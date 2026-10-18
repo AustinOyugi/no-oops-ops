@@ -154,7 +154,11 @@ func TestLogsHideTasksUntilStreamStops(t *testing.T) {
 			d.app.SetAfterDrawFunc(func(tcell.Screen) {
 				if !stopped && strings.Contains(d.output.GetText(false), "live service log") {
 					stopped = true
-					go d.app.QueueUpdateDraw(func() { d.cancelStream(closeView) })
+					go d.app.QueueUpdateDraw(func() {
+						d.rollouts[0].Finished = true
+						d.updateRolloutPane()
+						d.cancelStream(closeView)
+					})
 				}
 				if !d.jobRunning {
 					select {
