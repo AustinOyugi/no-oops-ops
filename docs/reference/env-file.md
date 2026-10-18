@@ -114,26 +114,60 @@ Install creates `/srv/apps/configs/database.yml`; upgrade replaces an existing
 installation atomically. Install refuses to overwrite an existing config, and
 upgrade requires it to exist. These commands only manage local files; redeploy
 consuming services to apply an upgrade (release again for build-time values).
-Configs use the same `sections` / `items` schema as service env files, including
-`values` per environment and `from_secret` references.
-
-Select files relative to the service manifest, or use absolute paths:
+Configs use the same `sections` / `items` schema as service env files. Select
+individual keys in the service's env file using `from_config`:
 
 ```yaml
-services:
-  api:
-    image: example/api:latest
-    x-noops:
-      env:
-        configs:
-          - ../configs/database.yml
-          - ../configs/cache.yml
-        file: api.env.yml
+# apps/api/env.yml
+sections:
+  - name: database
+    items:
+      - key: DATABASE_HOST
+        from_config: ../../configs/database.yml
+      - key: DATABASE_PORT
+        from_config: ../../configs/database.yml
+        values:
+          dev: "5433"
+      - key: DATABASE_PASSWORD
+        from_secret: api-database-password
 ```
 
-Configs merge in listed order; later files win. The service's `env.file` always
-wins over shared configs. Overrides replace the entire item by key, including
-secret references and environment-specific values. `env.file` is optional when
-only shared configs are needed. The same merged inputs feed runtime deployment,
-build env files, and explicitly allowed build secrets. Existing secret allow-list
-and delivery rules still apply; store credentials as managed secrets.
+A scalar `from_config` selects the item with the same key from that file.
+Only explicitly referenced keys are included; other config items are never
+injected. Paths are relative to the env file containing the reference, including
+references inside another config. Absolute paths also work.
+
+To rename a config key, use the mapping form:
+
+```yaml
+- key: APP_DATABASE_HOST
+  from_config:
+    file: ../../configs/database.yml
+    key: DATABASE_HOST
+```
+
+Local `values.<environment>` entries override matching shared entries, keeping
+shared values for other environments. A local `value` replaces the shared
+default and all shared environment entries, so it applies everywhere unless a
+local `values.<environment>` entry overrides it. Explicit empty strings are
+valid overrides. Shared config files can reference other configs; missing files,
+missing or duplicate selected keys, and reference cycles fail before release or
+deployment. Even with a local override, the reference must be valid.
+
+The service manifest declares only its env file:
+
+```yaml
+x-noops:
+  env:
+    file: env.yml
+```
+
+Whole-file `x-noops.env.configs` imports are rejected with a migration error.
+Replace each imported key with a `from_config` item, and remove the manifest
+list. Config install/upgrade commands remain unchanged.
+
+Build env generation and runtime deployment use the same selected values.
+`from_secret` references selected through a config remain subject to the usual
+runtime/build secret allow-lists; unselected secrets never reach the service.
+Do not combine `from_config` and `from_secret` on the same item. To replace a
+shared secret reference, declare a local `from_secret` item instead.

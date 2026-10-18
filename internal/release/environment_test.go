@@ -33,7 +33,10 @@ func TestBuildEnvironmentValuesSharedConfig(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "db.yml"), []byte("sections:\n- items:\n  - {key: HOST, value: database}\n  - {key: TOKEN, from_secret: token}\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	values, err := buildEnvironmentValues(filepath.Join(dir, "app.yml"), manifest.Manifest{Env: manifest.Env{Configs: []string{"db.yml"}}}, "prod")
+	if err := os.WriteFile(filepath.Join(dir, "env.yml"), []byte("sections:\n- items:\n  - {key: HOST, from_config: db.yml}\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	values, err := buildEnvironmentValues(filepath.Join(dir, "app.yml"), manifest.Manifest{Env: manifest.Env{File: "env.yml"}}, "prod")
 	if err != nil {
 		t.Fatal(err)
 	}

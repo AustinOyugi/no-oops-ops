@@ -19,7 +19,7 @@ func (s *Service) buildSecretBindings(ctx context.Context, manifestPath string, 
 	if m.Env.Build == nil || len(m.Env.Build.Secrets) == 0 {
 		return nil, nil
 	}
-	file, err := environment.LoadLayers(manifestPath, m.Env.Configs, m.Env.File)
+	file, err := environment.LoadForManifest(manifestPath, m.Env.File)
 	if err != nil {
 		return nil, err
 	}

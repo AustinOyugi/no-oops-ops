@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -203,5 +204,12 @@ func TestExposeBlueGreenDefaultsToEnabled(t *testing.T) {
 	}
 	if (Expose{BlueGreen: boolPtr(false)}).BlueGreenEnabled() {
 		t.Fatal("explicit blue_green: false should disable blue-green")
+	}
+}
+
+func TestRejectsWholeFileConfigImports(t *testing.T) {
+	m := Manifest{Env: Env{Configs: []string{"database.yml"}}}
+	if err := m.Validate(); err == nil || !strings.Contains(err.Error(), "from_config") {
+		t.Fatalf("migration error: %v", err)
 	}
 }

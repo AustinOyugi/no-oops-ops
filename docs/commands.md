@@ -197,5 +197,5 @@ after deploying new services or switching blue/green stacks to include them.
 - `noops config upgrade <name> <file>` replaces an installed config. Redeploy
   consumers to apply it.
 
-Select configs with `services.<service>.x-noops.env.configs`; see the
+Select individual config keys with `from_config` in the service env file; see the
 [environment file reference](reference/env-file.md#reusable-configs).

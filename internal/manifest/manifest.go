@@ -240,6 +240,7 @@ func (m Manifest) ForEnvironment(environment string) Manifest {
 }
 
 type Env struct {
+	// Configs is retained only to reject obsolete whole-file imports with a migration error.
 	Configs []string    `yaml:"configs"`
 	File    string      `yaml:"file"`
 	Build   *EnvBuild   `yaml:"build"`

@@ -17,6 +17,9 @@ var (
 )
 
 func (m Manifest) Validate() error {
+	if len(m.Env.Configs) > 0 {
+		return fmt.Errorf("x-noops.env.configs is no longer supported; select individual keys with from_config in env.file")
+	}
 	if m.Name == "" {
 		return fmt.Errorf("manifest name is required")
 	}

@@ -125,7 +125,7 @@ func (s *Service) buildPulledImage(ctx context.Context, targetImage, sourceImage
 // secrets are injected by Swarm when the service starts and must never become
 // Docker build arguments or image layers.
 func buildEnvironmentValues(manifestPath string, m manifest.Manifest, target string) (map[string]string, error) {
-	file, err := environment.LoadLayers(manifestPath, m.Env.Configs, m.Env.File)
+	file, err := environment.LoadForManifest(manifestPath, m.Env.File)
 	if err != nil {
 		return nil, err
 	}
