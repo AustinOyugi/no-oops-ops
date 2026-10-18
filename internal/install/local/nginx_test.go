@@ -71,6 +71,9 @@ func TestWriteNginxStackPreservesInstalledRoutesAndNetworks(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	if err := os.MkdirAll(h.nginxACMEWebroot(), 0700); err != nil {
+		t.Fatal(err)
+	}
 	for i := 0; i < 2; i++ {
 		if err := h.WriteNginxStack(context.Background()); err != nil {
 			t.Fatal(err)
@@ -78,6 +81,19 @@ func TestWriteNginxStackPreservesInstalledRoutesAndNetworks(t *testing.T) {
 	}
 	if _, err := os.Stat(h.nginxConfigPath()); !os.IsNotExist(err) {
 		t.Fatalf("legacy routes.conf recreated: %v", err)
+	}
+	for path, want := range map[string]os.FileMode{
+		h.nginxACMEWebroot():            0755,
+		h.nginxCertificateDir():         0700,
+		h.nginxImportedCertificateDir(): 0700,
+	} {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != want {
+			t.Errorf("directory %s permissions = %o, want %o", path, info.Mode().Perm(), want)
+		}
 	}
 	content, err := os.ReadFile(filepath.Join(h.nginxConfigDir(), "external.conf"))
 	if err != nil {

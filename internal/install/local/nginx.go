@@ -84,6 +84,12 @@ func (h *Host) WriteNginxStack(ctx context.Context) error {
 			return install.PrerequisiteError{Check: install.StepWriteNginxStack, Err: fmt.Errorf("create nginx certificate directory %q: %w", certificatePath, err)}
 		}
 	}
+	// Challenge tokens are public HTTP content. Nginx workers must traverse
+	// the bind-mounted webroot even when an older install created it as 0700.
+	// Keep certificate directories private.
+	if err := os.Chmod(h.nginxACMEWebroot(), 0o755); err != nil {
+		return install.PrerequisiteError{Check: install.StepWriteNginxStack, Err: fmt.Errorf("make ACME webroot readable by nginx: %w", err)}
+	}
 	defaultConfig, err := renderTemplate("nginx-default.conf.tmpl", defaultNginxConfig, nil)
 	if err != nil {
 		return err
