@@ -16,7 +16,7 @@ func TestBuildEnvironmentValuesIncludesOnlyOrdinaryValues(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	values, err := buildEnvironmentValues(manifestPath, manifest.Manifest{Env: manifest.Env{File: "env.yml"}}, "prod")
+	values, err := buildEnvironmentValues(manifestPath, manifest.Manifest{Env: manifest.Env{File: "env.yml"}}, "prod", dir)
 	if err != nil {
 		t.Fatalf("buildEnvironmentValues() error = %v", err)
 	}
@@ -36,11 +36,31 @@ func TestBuildEnvironmentValuesSharedConfig(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "env.yml"), []byte("sections:\n- items:\n  - {key: HOST, from_config: db.yml}\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	values, err := buildEnvironmentValues(filepath.Join(dir, "app.yml"), manifest.Manifest{Env: manifest.Env{File: "env.yml"}}, "prod")
+	values, err := buildEnvironmentValues(filepath.Join(dir, "app.yml"), manifest.Manifest{Env: manifest.Env{File: "env.yml"}}, "prod", dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if values["HOST"] != "database" || len(values) != 1 {
 		t.Fatalf("unexpected build values: %#v", values)
+	}
+}
+
+func TestBuildEnvironmentUsesInstalledAliasOutsideManifestTree(t *testing.T) {
+	root, dir := t.TempDir(), t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "configs"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "configs/database.yml"), []byte("sections:\n- items:\n  - {key: HOST, value: installed}\n  - {key: UNUSED, value: extra}\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "env.yml"), []byte("sections:\n- items:\n  - {key: HOST, from_config: database}\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	values, err := buildEnvironmentValues(filepath.Join(dir, "app.yml"), manifest.Manifest{Env: manifest.Env{File: "env.yml"}}, "prod", root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(values) != 1 || values["HOST"] != "installed" {
+		t.Fatalf("build values: %#v", values)
 	}
 }

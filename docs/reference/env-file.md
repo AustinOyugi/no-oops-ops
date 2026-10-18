@@ -123,26 +123,39 @@ sections:
   - name: database
     items:
       - key: DATABASE_HOST
-        from_config: ../../configs/database.yml
+        from_config: database
       - key: DATABASE_PORT
-        from_config: ../../configs/database.yml
+        from_config: database
         values:
           dev: "5433"
       - key: DATABASE_PASSWORD
         from_secret: api-database-password
 ```
 
-A scalar `from_config` selects the item with the same key from that file.
+The first argument to `config install` is the alias. Installing
+`noops config install database ./database.env.yml` makes `database` available to
+all services in the selected workspace. `config upgrade database <file>` replaces
+its contents while keeping the alias.
+
+A scalar `from_config` selects the item with the same key from that installed config.
 Only explicitly referenced keys are included; other config items are never
-injected. Paths are relative to the env file containing the reference, including
-references inside another config. Absolute paths also work.
+injected. Aliases resolve from `<workspace>/configs/<alias>.yml`, using `--workspace`
+(the current directory by default). Resolution is independent of the manifest
+location and `--state-dir`; separate workspaces can install different contents
+under the same alias. Missing aliases report how to install them. Aliases accept
+letters, digits, underscores and hyphens, starting with a letter or digit.
+Nested config references use the same selected workspace.
+
+Legacy file paths remain accepted in scalar references and the `{file: ..., key: ...}`
+mapping. They resolve relative to the referencing env/config file; new references
+should use aliases. A mapping must specify either `alias` or `file`, never both.
 
 To rename a config key, use the mapping form:
 
 ```yaml
 - key: APP_DATABASE_HOST
   from_config:
-    file: ../../configs/database.yml
+    alias: database
     key: DATABASE_HOST
 ```
 

@@ -9,22 +9,27 @@ import (
 )
 
 // ConfigRef selects one item from a reusable config, optionally renaming its key.
-// A scalar is shorthand for file; the environment item's key is the default.
+// A scalar is an installed alias (legacy file paths remain supported).
 type ConfigRef struct {
-	File string `yaml:"file"`
-	Key  string `yaml:"key,omitempty"`
+	Alias string `yaml:"alias,omitempty"`
+	File  string `yaml:"file"`
+	Key   string `yaml:"key,omitempty"`
 }
 
 func (r *ConfigRef) UnmarshalYAML(node *yaml.Node) error {
 	switch node.Kind {
 	case yaml.ScalarNode:
 		if node.Tag != "!!str" {
-			return fmt.Errorf("from_config must be a file path or a mapping with file and optional key")
+			return fmt.Errorf("from_config must be an alias or a mapping with alias and optional key")
 		}
-		r.File = node.Value
+		if configNamePattern.MatchString(node.Value) {
+			r.Alias = node.Value
+		} else {
+			r.File = node.Value
+		}
 	case yaml.MappingNode:
 		for n := 0; n+1 < len(node.Content); n += 2 {
-			if key := node.Content[n].Value; key != "file" && key != "key" {
+			if key := node.Content[n].Value; key != "alias" && key != "file" && key != "key" {
 				return fmt.Errorf("unknown from_config field %q", key)
 			}
 		}
@@ -33,16 +38,22 @@ func (r *ConfigRef) UnmarshalYAML(node *yaml.Node) error {
 			return err
 		}
 	default:
-		return fmt.Errorf("from_config must be a file path or a mapping with file and optional key")
+		return fmt.Errorf("from_config must be an alias or a mapping with alias and optional key")
 	}
-	if strings.TrimSpace(r.File) == "" {
-		return fmt.Errorf("from_config.file must not be empty")
+	if r.Alias != "" && r.File != "" {
+		return fmt.Errorf("from_config must select alias or file, not both")
+	}
+	if r.Alias != "" && !configNamePattern.MatchString(r.Alias) {
+		return fmt.Errorf("invalid config alias %q", r.Alias)
+	}
+	if strings.TrimSpace(r.File) == "" && r.Alias == "" {
+		return fmt.Errorf("from_config alias or file must not be empty")
 	}
 	return nil
 }
 
 // LoadForManifest loads the selected service env file relative to its manifest.
-func LoadForManifest(manifestPath, serviceFile string) (File, error) {
+func LoadForManifest(manifestPath, serviceFile string, workspace string) (File, error) {
 	if serviceFile == "" {
 		return File{}, nil
 	}
@@ -50,12 +61,13 @@ func LoadForManifest(manifestPath, serviceFile string) (File, error) {
 	if !filepath.IsAbs(serviceFile) {
 		serviceFile = filepath.Join(filepath.Dir(base), serviceFile)
 	}
-	return Load(serviceFile)
+	return LoadWithWorkspace(serviceFile, workspace)
 }
 
 type configLoader struct {
-	files    map[string]File
-	visiting map[string]bool
+	workspace string
+	files     map[string]File
+	visiting  map[string]bool
 }
 
 func newConfigLoader() *configLoader {
@@ -106,8 +118,8 @@ func (l *configLoader) resolve(path string, item Item) (Item, error) {
 		return Item{}, fmt.Errorf("from_config and from_secret cannot be combined")
 	}
 	ref := *item.FromConfig
-	if strings.TrimSpace(ref.File) == "" {
-		return Item{}, fmt.Errorf("from_config.file must not be empty")
+	if strings.TrimSpace(ref.File) == "" && ref.Alias == "" {
+		return Item{}, fmt.Errorf("from_config alias or file must not be empty")
 	}
 	if ref.Key == "" {
 		ref.Key = item.Key
@@ -116,7 +128,13 @@ func (l *configLoader) resolve(path string, item Item) (Item, error) {
 		return Item{}, fmt.Errorf("from_config requires a key")
 	}
 	target := ref.File
-	if !filepath.IsAbs(target) {
+	if ref.Alias != "" {
+		var err error
+		target, err = installedConfigPath(l.workspace, ref.Alias)
+		if err != nil {
+			return Item{}, err
+		}
+	} else if !filepath.IsAbs(target) {
 		target = filepath.Join(filepath.Dir(path), target)
 	}
 	target, err := filepath.Abs(target)
@@ -135,6 +153,9 @@ func (l *configLoader) resolve(path string, item Item) (Item, error) {
 	defer delete(l.visiting, id)
 	file, err := l.file(target)
 	if err != nil {
+		if ref.Alias != "" {
+			return Item{}, fmt.Errorf("config alias %q is not available; install it with noops config install %s <file>: %w", ref.Alias, ref.Alias, err)
+		}
 		return Item{}, fmt.Errorf("from_config %q: %w", ref.File, err)
 	}
 	var selected Item

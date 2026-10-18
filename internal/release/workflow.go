@@ -162,7 +162,7 @@ func buildContext(ctx context.Context, timeout string) (context.Context, context
 }
 
 func (s *Service) materializeBuildEnvironment(manifestPath string, m manifest.Manifest, environment, contextDir string) (func(), error) {
-	values, err := buildEnvironmentValues(manifestPath, m, environment)
+	values, err := buildEnvironmentValues(manifestPath, m, environment, s.config.Workspace)
 	if err != nil {
 		return nil, err
 	}

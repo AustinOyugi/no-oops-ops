@@ -192,10 +192,11 @@ after deploying new services or switching blue/green stacks to include them.
 
 ### Shared configs
 
-- `noops config install <name> <file>` installs an environment config as
-  `<workspace>/configs/<name>.yml`.
-- `noops config upgrade <name> <file>` replaces an installed config. Redeploy
+- `noops config install <alias> <file>` installs an environment config as
+  `<workspace>/configs/<alias>.yml`.
+- `noops config upgrade <alias> <file>` replaces an installed config. Redeploy
   consumers to apply it.
 
-Select individual config keys with `from_config` in the service env file; see the
+Select individual config keys by installed alias, e.g. `from_config: database`,
+in the service env file; see the
 [environment file reference](reference/env-file.md#reusable-configs).

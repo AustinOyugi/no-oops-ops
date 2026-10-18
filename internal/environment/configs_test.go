@@ -1,6 +1,7 @@
 package environment
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -88,14 +89,14 @@ func TestFromConfigNestedPaths(t *testing.T) {
 	writeEnvFixture(t, dir, "configs/base.yml", "sections:\n- items:\n  - {key: HOST, value: database}\n")
 	writeEnvFixture(t, dir, "configs/alias.yml", "sections:\n- items:\n  - {key: RENAMED, from_config: {file: base.yml, key: HOST}}\n")
 	writeEnvFixture(t, dir, "apps/api/env.yml", "sections:\n- items:\n  - {key: DB_HOST, from_config: {file: ../../configs/alias.yml, key: RENAMED}}\n")
-	file, err := LoadForManifest(filepath.Join(dir, "apps/api/app.yml")+"#api", "env.yml")
+	file, err := LoadForManifest(filepath.Join(dir, "apps/api/app.yml")+"#api", "env.yml", dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got := Resolve(file, "prod", nil).Values["DB_HOST"]; got != "database" {
 		t.Fatalf("value=%q", got)
 	}
-	file, err = LoadForManifest("unused", "")
+	file, err = LoadForManifest("unused", "", "")
 	if err != nil || len(file.Sections) != 0 {
 		t.Fatalf("optional file: %#v %v", file, err)
 	}
@@ -109,7 +110,7 @@ func TestFromConfigErrors(t *testing.T) {
 		{"cycle", "  - {key: HOST, from_config: env.yml}\n", `from_config: config.yml`, "cycle"},
 		{"conflicting sources", "  - {key: HOST, value: a}\n", "from_config: config.yml\n    from_secret: secret", "cannot be combined"},
 		{"empty path", "", `from_config: ""`, "must not be empty"},
-		{"invalid type", "", `from_config: [config.yml]`, "must be a file path"},
+		{"invalid type", "", `from_config: [config.yml]`, "must be an alias"},
 		{"unknown field", "", `from_config: {path: config.yml}`, "unknown from_config field"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -121,5 +122,79 @@ func TestFromConfigErrors(t *testing.T) {
 				t.Fatalf("error=%v, want %s", err, test.want)
 			}
 		})
+	}
+}
+
+func TestInstalledAliasesUseSelectedWorkspace(t *testing.T) {
+	envDir := t.TempDir()
+	source := writeEnvFixture(t, envDir, "source-with-different-name.yml", "sections:\n- items:\n  - {key: HOST, value: first}\n  - {key: EXTRA, value: unused}\n")
+	first, second := t.TempDir(), t.TempDir()
+	if _, err := Install(context.Background(), first, "database", source); err != nil {
+		t.Fatal(err)
+	}
+	other := writeEnvFixture(t, envDir, "second.yml", "sections:\n- items:\n  - {key: HOST, value: second}\n")
+	if _, err := Install(context.Background(), second, "database", other); err != nil {
+		t.Fatal(err)
+	}
+	path := writeEnvFixture(t, envDir, "env.yml", `sections:
+- items:
+  - {key: HOST, from_config: database}
+  - {key: APP_HOST, from_config: {alias: database, key: HOST}, values: {dev: local}}
+`)
+	for root, want := range map[string]string{first: "first", second: "second"} {
+		file, err := LoadWithWorkspace(path, root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := Resolve(file, "prod", nil).Values
+		if len(got) != 2 || got["HOST"] != want || got["APP_HOST"] != want {
+			t.Fatalf("workspace %s: %#v", root, got)
+		}
+		if Resolve(file, "dev", nil).Values["APP_HOST"] != "local" {
+			t.Fatal("alias override ignored")
+		}
+	}
+	if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "workspace is required") {
+		t.Fatalf("missing workspace: %v", err)
+	}
+	if _, err := LoadWithWorkspace(path, t.TempDir()); err == nil || !strings.Contains(err.Error(), "noops config install database") {
+		t.Fatalf("missing alias: %v", err)
+	}
+	if _, err := Upgrade(context.Background(), first, "database", other); err != nil {
+		t.Fatal(err)
+	}
+	file, err := LoadWithWorkspace(path, first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if Resolve(file, "prod", nil).Values["HOST"] != "second" {
+		t.Fatal("alias did not pick up upgraded config")
+	}
+}
+
+func TestNestedAliasAndCycle(t *testing.T) {
+	root := t.TempDir()
+	writeEnvFixture(t, root, "configs/database.yml", "sections:\n- items:\n  - {key: HOST, from_config: {alias: defaults, key: SERVER}}\n")
+	writeEnvFixture(t, root, "configs/defaults.yml", "sections:\n- items:\n  - {key: SERVER, value: database}\n")
+	path := writeEnvFixture(t, root, "apps/api/env.yml", "sections:\n- items:\n  - {key: HOST, from_config: database}\n")
+	file, err := LoadForManifest(filepath.Join(root, "apps/api/app.yml"), "env.yml", root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if Resolve(file, "prod", nil).Values["HOST"] != "database" {
+		t.Fatal("nested alias failed")
+	}
+	writeEnvFixture(t, root, "configs/defaults.yml", "sections:\n- items:\n  - {key: SERVER, from_config: {alias: database, key: HOST}}\n")
+	if _, err := LoadWithWorkspace(path, root); err == nil || !strings.Contains(err.Error(), "cycle") {
+		t.Fatalf("alias cycle: %v", err)
+	}
+}
+
+func TestInvalidAliasReferences(t *testing.T) {
+	for _, ref := range []string{`{alias: ../outside}`, `{alias: database, file: database.yml}`} {
+		path := writeEnvFixture(t, t.TempDir(), "env.yml", "sections:\n- items:\n  - key: HOST\n    from_config: "+ref+"\n")
+		if _, err := Load(path); err == nil {
+			t.Fatalf("invalid alias accepted: %s", ref)
+		}
 	}
 }

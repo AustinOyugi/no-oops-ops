@@ -24,10 +24,10 @@ func Upgrade(ctx context.Context, root, name, source string) (string, error) {
 }
 
 func storeConfig(ctx context.Context, root, name, source string, upgrade bool) (string, error) {
-	if !configNamePattern.MatchString(name) {
-		return "", fmt.Errorf("config name must contain only letters, digits, underscores and hyphens")
+	target, err := installedConfigPath(root, name)
+	if err != nil {
+		return "", err
 	}
-	target := filepath.Join(root, "configs", name+".yml")
 	unlock, err := state.AcquireLock(ctx, target+".lock")
 	if err != nil {
 		return "", err
@@ -55,4 +55,18 @@ func storeConfig(ctx context.Context, root, name, source string, upgrade bool) (
 		return "", err
 	}
 	return target, nil
+}
+
+func installedConfigPath(root, alias string) (string, error) {
+	if !configNamePattern.MatchString(alias) {
+		return "", fmt.Errorf("config alias must contain only letters, digits, underscores and hyphens")
+	}
+	if root == "" {
+		return "", fmt.Errorf("workspace is required to resolve config alias %q", alias)
+	}
+	path, err := filepath.Abs(filepath.Join(root, "configs", alias+".yml"))
+	if err != nil {
+		return "", err
+	}
+	return path, nil
 }

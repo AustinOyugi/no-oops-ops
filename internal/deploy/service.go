@@ -94,7 +94,7 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 	}
 
 	envFilePath := resolveEnvFilePath(absPath, m.Env.File)
-	envFile, err := envconfig.LoadForManifest(absPath, m.Env.File)
+	envFile, err := envconfig.LoadForManifest(absPath, m.Env.File, s.config.Workspace)
 	if err != nil {
 		return Result{}, err
 	}

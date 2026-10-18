@@ -10,7 +10,7 @@ import (
 func newConfigCommand(rt *runtime) *cobra.Command {
 	cmd := &cobra.Command{Use: "config", Short: "Manage reusable environment config files"}
 	for _, verb := range []string{"install", "upgrade"} {
-		cmd.AddCommand(&cobra.Command{Use: verb + " <name> <file>", Args: cobra.ExactArgs(2), RunE: func(cmd *cobra.Command, args []string) error {
+		cmd.AddCommand(&cobra.Command{Use: verb + " <alias> <file>", Args: cobra.ExactArgs(2), RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := rt.workspaceRoot()
 			if err != nil {
 				return err

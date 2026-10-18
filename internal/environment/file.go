@@ -43,7 +43,14 @@ type SecretRef struct {
 
 // Load resolves only the config keys explicitly selected by the environment file.
 func Load(path string) (File, error) {
-	return newConfigLoader().loadEnvironment(path)
+	return LoadWithWorkspace(path, "")
+}
+
+// LoadWithWorkspace resolves aliases from the selected workspace's configs directory.
+func LoadWithWorkspace(path, workspace string) (File, error) {
+	loader := newConfigLoader()
+	loader.workspace = workspace
+	return loader.loadEnvironment(path)
 }
 
 func readFile(path string) (File, error) {
