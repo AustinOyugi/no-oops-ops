@@ -14,6 +14,7 @@ import (
 )
 
 type Deployment struct {
+	ManifestPath   string          `json:"manifest_path,omitempty"`
 	App            string          `json:"app"`
 	CreatedAt      time.Time       `json:"created_at"`
 	Environment    string          `json:"environment"`

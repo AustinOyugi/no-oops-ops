@@ -20,6 +20,41 @@ type recordingRunner struct {
 	calls [][]string
 }
 
+func TestRenameTransfersRouteWithoutChangingOtherOwners(t *testing.T) {
+	for _, domain := range []string{"api.example.test", ""} {
+		t.Run(domain, func(t *testing.T) {
+			blueGreen := true
+			m := manifest.Manifest{
+				Name: "api", PreviousNames: []string{"old-api"},
+				Service: manifest.Service{InternalPort: 8080},
+				Expose:  manifest.Expose{Enabled: true, Domain: domain, PathPrefix: "/", BlueGreen: &blueGreen},
+			}
+			old := []Route{
+				{App: "old-api", Environment: "dev", Domain: domain, PathPrefix: "/", Service: "old-stack_app"},
+				{App: "old-api", Environment: "prod", Domain: "prod.example.test", Service: "prod-old_app"},
+				{App: "worker", Environment: "dev", Domain: "worker.example.test", Service: "worker_app"},
+			}
+			updated, changed, err := updateRoute(old, "dev", m, "candidate_app")
+			if err != nil || !changed || len(updated) != 3 {
+				t.Fatalf("routes=%+v changed=%v error=%v", updated, changed, err)
+			}
+			for _, route := range updated {
+				if route.Environment == "dev" && route.App == "old-api" {
+					t.Fatal("old owner remains")
+				}
+				if route.App == "api" && route.Service != "candidate_app" {
+					t.Fatal("candidate not promoted")
+				}
+			}
+			// Route preparation must not mutate the old routing snapshot; it is
+			// still needed if validation or nginx reload rejects the candidate.
+			if old[0].Service != "old-stack_app" {
+				t.Fatal("old route changed before promotion")
+			}
+		})
+	}
+}
+
 func (r *recordingRunner) Run(_ context.Context, name string, args []string, _ command.RunOptions) (command.Result, error) {
 	r.calls = append(r.calls, append([]string{name}, args...))
 	if len(args) > 1 && args[0] == "service" && args[1] == "inspect" {

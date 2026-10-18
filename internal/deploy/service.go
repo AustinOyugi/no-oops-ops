@@ -157,9 +157,19 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 	}
 	immutableImage := releaseMetadata.ImmutableImage()
 
+	retired, err := s.retiredDeployments(ctx, m, environment)
+	if err != nil {
+		return Result{}, err
+	}
+	for _, previous := range retired {
+		m.PreviousNames = append(m.PreviousNames, previous.App)
+	}
 	activeDeployment, err := s.deployments.Latest(s.config, m.Name, environment)
 	if err != nil {
 		return Result{}, err
+	}
+	if activeDeployment.StackName == "" && len(retired) > 0 {
+		activeDeployment = retired[0]
 	}
 	deploymentStack := stackName(environment, m.Name)
 	deploymentService := serviceName(environment, m.Name)
@@ -184,8 +194,8 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 
 	progress := RolloutProgress{App: m.Name, Environment: environment, OldService: activeDeployment.ServiceName, NewService: deploymentSwarmService, OldRelease: activeDeployment.ReleaseTag, NewRelease: releaseTag, Traffic: "old", StartedAt: time.Now().UTC()}
 	if progress.OldService == "" && activeDeployment.StackName != "" {
-		progress.OldService = activeDeployment.StackName + "_" + serviceName(environment, m.Name)
-		if activeDeployment.StackName != stackName(environment, m.Name) {
+		progress.OldService = activeDeployment.StackName + "_" + serviceName(environment, activeDeployment.App)
+		if activeDeployment.StackName != stackName(environment, activeDeployment.App) {
 			progress.OldService = activeDeployment.StackName + "_app"
 		}
 	}
@@ -313,6 +323,7 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 			outcome = SwarmOutcomeFailed
 		}
 		failure := Deployment{
+			ManifestPath:   m.Path,
 			App:            m.Name,
 			CreatedAt:      time.Now().UTC(),
 			Environment:    environment,
@@ -361,6 +372,7 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 	}
 
 	deployment := Deployment{
+		ManifestPath:   m.Path,
 		App:            m.Name,
 		CreatedAt:      time.Now().UTC(),
 		Environment:    environment,
@@ -390,6 +402,9 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 	// behind by earlier No Oops versions.
 	report("cleaning_old_stacks")
 	s.removeStaleAppStacks(ctx, environment, m.Name, deploymentStack)
+	for _, previous := range retired {
+		s.removeStaleAppStacks(ctx, environment, previous.App, deploymentStack)
+	}
 	progress.Finished = true
 	report("completed")
 

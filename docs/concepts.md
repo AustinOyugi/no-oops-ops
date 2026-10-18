@@ -49,6 +49,12 @@ Docker Swarm controls scheduling, health checks, task replacement, and automatic
 service's existing Compose deployment policy, waits for the configured result, and does not run a competing health
 controller. The default convergence timeout is two minutes and can be overridden with `rollout.convergence_timeout`.
 
+When a Compose service is renamed, Noops traces still-running stacks through their recorded deployment and release
+metadata. A retired service with the same Git source and image repository can be adopted automatically when that source
+is unique in the current catalog. Services still declared in any app, other environments, and ambiguous matches are
+never removed as a rename. The old stack remains running until the replacement passes verification and ingress promotion;
+cleanup also runs when the new name already has deployment history. No additional manifest configuration is required.
+
 For ingress-managed apps, No Oops Ops uses blue/green promotion by default after the first deployment: it creates a
 deployment-specific candidate service, waits for Docker Swarm to report its existing Docker health check as converged,
 then changes nginx to target the candidate before removing the previous active service. This happens even when the

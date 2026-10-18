@@ -7,6 +7,9 @@ import (
 )
 
 type Manifest struct {
+	// PreviousNames is inferred from retired stacks, never supplied by configuration.
+	PreviousNames []string `yaml:"-"`
+
 	Name                string            `yaml:"name"`
 	Source              Source            `yaml:"source"`
 	Image               Image             `yaml:"image"`

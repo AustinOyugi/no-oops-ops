@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -432,7 +433,7 @@ func (s *Service) reload(ctx context.Context) error {
 func updateRoute(routes []Route, environment string, m manifest.Manifest, upstreamService string) ([]Route, bool, error) {
 	updated := make([]Route, 0, len(routes)+1)
 	for _, route := range routes {
-		if route.Environment == environment && route.App == m.Name {
+		if route.Environment == environment && (route.App == m.Name || slices.Contains(m.PreviousNames, route.App)) {
 			continue
 		}
 		updated = append(updated, route)
