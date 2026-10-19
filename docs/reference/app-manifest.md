@@ -266,6 +266,13 @@ mode; set `x-noops.ingress.blue_green: false` to use an in-place Swarm update fo
 `x-noops.ingress.tls: true` to serve HTTPS. The domain's DNS A/AAAA record must resolve to the Swarm manager and allow
 inbound ports 80 and 443. With the default platform ingress, the first deployment makes the HTTP-01 challenge path
 available, obtains a Let's Encrypt certificate, and then enables the HTTPS virtual host with HTTP-to-HTTPS redirects.
+When `domains` lists multiple hostnames, No Oops requests one certificate whose
+Subject Alternative Names cover all names served by that virtual host, including
+aliases on other paths sharing the same primary domain. Every name must resolve
+to the manager and allow HTTP-01 validation. Existing certificates are checked for
+hostname coverage and validity; the next deployment reconciliation reissues a
+certificate missing a configured alias, even if it is not near expiry. HTTPS is
+enabled only once the certificate covers the configured hostnames.
 Subsequent certificate
 renewals reload nginx automatically and gracefully. The current renewal service mounts the Docker daemon socket to
 signal that reload;

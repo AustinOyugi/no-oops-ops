@@ -53,6 +53,9 @@ func safeFileName(value string) string {
 
 func renderTemplate(data configTemplateData, mode string) ([]byte, error) {
 	tpl, err := template.New("routes.conf.tmpl").Funcs(template.FuncMap{
+		"serverNames": func(domain string, routes []Route) string {
+			return strings.Join(certificateDomains(domain, routes), " ")
+		},
 		"tlsEnabled": func(routes []Route) bool { return len(routes) > 0 && routes[0].TLS },
 		"tlsCertificate": func(routes []Route) string {
 			if len(routes) == 0 {

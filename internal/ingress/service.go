@@ -332,8 +332,11 @@ func (s *Service) routesWithAvailableCertificates(routes []Route) []Route {
 				configured[i].TLS = err == nil
 				continue
 			}
-			_, err := os.Stat(filepath.Join(s.certificateDir(), "live", configured[i].Domain, "fullchain.pem"))
-			configured[i].TLS = err == nil
+			_, covers, err := certificateCoverage(
+				filepath.Join(s.certificateDir(), "live", configured[i].Domain, "fullchain.pem"),
+				certificateDomains(configured[i].Domain, routes),
+			)
+			configured[i].TLS = err == nil && covers
 		}
 	}
 	return configured
@@ -367,39 +370,59 @@ func (s *Service) validateCloudflareRoutes(routes []Route) error {
 }
 
 func (s *Service) issueMissingCertificates(ctx context.Context, routes []Route) (bool, error) {
-	issued := make(map[string]bool)
+	groups := make(map[string][]Route)
 	for _, route := range routes {
-		if !route.TLS || route.TLSCertificate != "" || issued[route.Domain] {
-			continue
+		if route.TLS && route.TLSCertificate == "" {
+			groups[route.Domain] = append(groups[route.Domain], route)
 		}
-		if strings.HasPrefix(route.Domain, "*.") {
-			return false, fmt.Errorf("wildcard ingress domain %q requires tls_certificate; ACME HTTP-01 cannot issue wildcard certificates", route.Domain)
+	}
+	// Validate every name before issuing any certificates, including aliases.
+	primaries := make([]string, 0, len(groups))
+	for primary, group := range groups {
+		primaries = append(primaries, primary)
+		for _, domain := range certificateDomains(primary, group) {
+			if strings.HasPrefix(domain, "*.") {
+				return false, fmt.Errorf("wildcard ingress domain %q requires tls_certificate; ACME HTTP-01 cannot issue wildcard certificates", domain)
+			}
 		}
-		if _, err := os.Stat(filepath.Join(s.certificateDir(), "live", route.Domain, "fullchain.pem")); err == nil {
+	}
+	sort.Strings(primaries)
+	issued := false
+	for _, primary := range primaries {
+		domains := certificateDomains(primary, groups[primary])
+		exists, covers, err := certificateCoverage(filepath.Join(s.certificateDir(), "live", primary, "fullchain.pem"), domains)
+		if err != nil {
+			return false, fmt.Errorf("inspect TLS certificate for %q: %w", primary, err)
+		}
+		if covers {
 			continue
-		} else if !os.IsNotExist(err) {
-			return false, fmt.Errorf("inspect TLS certificate for %q: %w", route.Domain, err)
 		}
 		if s.config.ACMEEmail == "" {
-			return false, fmt.Errorf("ACME email is required to issue a TLS certificate for %q", route.Domain)
+			return false, fmt.Errorf("ACME email is required to issue a TLS certificate for %q", primary)
 		}
 
-		s.logger.InfoContext(ctx, "issuing TLS certificate", "domain", route.Domain)
-		result, err := s.runner.Run(ctx, "docker", []string{
+		s.logger.InfoContext(ctx, "issuing TLS certificate", "domains", domains)
+		args := []string{
 			"run", "--rm",
 			"--volume", s.acmeWebroot() + ":/var/www/certbot",
 			"--volume", s.certificateDir() + ":/etc/letsencrypt",
 			"certbot/certbot:latest",
 			"certonly", "--webroot", "--webroot-path", "/var/www/certbot",
-			"--email", s.config.ACMEEmail, "--agree-tos", "--non-interactive", "--keep-until-expiring",
-			"--domains", route.Domain,
-		}, command.RunOptions{LogCommand: true})
-		if err != nil {
-			return false, fmt.Errorf("issue TLS certificate for %q: %w: %s", route.Domain, err, strings.TrimSpace(string(result.Output)))
+			"--email", s.config.ACMEEmail, "--agree-tos", "--non-interactive",
+			"--cert-name", primary, "--domains", strings.Join(domains, ","),
 		}
-		issued[route.Domain] = true
+		// An existing lineage may be valid for the primary but lack a new alias.
+		// Replace it immediately rather than waiting for Certbot's renewal window.
+		if exists {
+			args = append(args, "--force-renewal")
+		}
+		result, err := s.runner.Run(ctx, "docker", args, command.RunOptions{LogCommand: true})
+		if err != nil {
+			return false, fmt.Errorf("issue TLS certificate for %q: %w: %s", primary, err, strings.TrimSpace(string(result.Output)))
+		}
+		issued = true
 	}
-	return len(issued) > 0, nil
+	return issued, nil
 }
 
 func (s *Service) reload(ctx context.Context) error {
