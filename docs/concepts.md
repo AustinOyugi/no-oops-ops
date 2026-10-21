@@ -52,7 +52,8 @@ controller. The default convergence timeout is two minutes and can be overridden
 When a Compose service is renamed, Noops traces still-running stacks through their recorded deployment and release
 metadata. A retired service with the same Git source and image repository can be adopted automatically when that source
 is unique in the current catalog. Services still declared in any app, other environments, and ambiguous matches are
-never removed as a rename. The old stack remains running until the replacement passes verification and ingress promotion;
+never removed as a rename. The old stack remains running until the replacement passes verification and ingress
+promotion;
 cleanup also runs when the new name already has deployment history. No additional manifest configuration is required.
 
 For ingress-managed apps, No Oops Ops uses blue/green promotion by default after the first deployment: it creates a
@@ -95,6 +96,9 @@ No Oops Ops uses workspace-local state and persistent registry data below `.noop
 in [Configuration and generated state](reference/configuration.md). Deployments keep a durable operation journal while
 they transition Docker, ingress, and history. A restarted command automatically removes an unpromoted blue/green
 candidate. For an in-place operation at `stack_deployed`, a retry inspects the live Swarm update status.
-If it is idle (no update status), `completed`, `paused`, `rollback_paused`, or `rollback_completed`, noops archives the journal as
-`operation.json.failed-<timestamp>` and permits the new deployment. This lets an in-place deployment retry readiness and ingress reconciliation after nginx fails, without removing the app service. Active updates and other interrupted or already-promoted
+If it is idle (no update status), `completed`, `paused`, `rollback_paused`, or `rollback_completed`, noops archives the
+journal as
+`operation.json.failed-<timestamp>` and permits the new deployment. This lets an in-place deployment retry readiness and
+ingress reconciliation after nginx fails, without removing the app service. Active updates and other interrupted or
+already-promoted
 operations stop with the journal path so their live state is inspected rather than guessed at.

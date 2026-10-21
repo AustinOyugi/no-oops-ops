@@ -89,7 +89,8 @@ noops --state-dir /srv/rolengi/dev/.noops --environment dev ui
 The selection order is: `--state-dir`, the environment mapping, `directory`, then
 `.noops`. A directory may contain `{environment}`; a command must select an
 environment before that template can be expanded. A selected uninitialized
-store produces an error and never falls back to another store. Dashboard child commands preserve the selected store and environment.
+store produces an error and never falls back to another store. Dashboard child commands preserve the selected store and
+environment.
 
 Existing state is not moved automatically. To preserve an installation when
 changing its path, move its complete store (`config.yml`, `state/`, and `data/`)

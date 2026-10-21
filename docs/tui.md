@@ -181,13 +181,13 @@ blue/green service names; unrelated Swarm services are excluded.
 While logs stream, task and task-detail panes are hidden. Tab switches between
 services and output. With output focused:
 
-| Key | Action |
-|-----|--------|
-| `p` | Pause or resume automatic scrolling; collection continues |
-| Arrow / PageUp / PageDown | Scroll retained output |
-| `x` | Stop the stream and keep output open |
-| `X` (Shift+x) | Stop the stream and close output |
-| Escape | Return focus to services without stopping the stream |
+| Key                       | Action                                                    |
+|---------------------------|-----------------------------------------------------------|
+| `p`                       | Pause or resume automatic scrolling; collection continues |
+| Arrow / PageUp / PageDown | Scroll retained output                                    |
+| `x`                       | Stop the stream and keep output open                      |
+| `X` (Shift+x)             | Stop the stream and close output                          |
+| Escape                    | Return focus to services without stopping the stream      |
 
 Tasks return after the stream ends. Only one command or log stream runs at a
 time. Output retains the latest 256 KB and can be reopened with `o` until another

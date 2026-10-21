@@ -15,8 +15,8 @@ settings:
       https_port: 443
       # Additional external overlays per environment (created if missing).
       networks:
-        dev: []
-        prod: []
+        dev: [ ]
+        prod: [ ]
     networks:
       default: "noops-{environment}"
       environments: { }

@@ -30,7 +30,8 @@ services:
 ```
 
 Lifecycle operations target an app alias from the workspace `apps.yml` and a service explicitly:
-`noops -e <env> release api`, `noops -e <env> deploy api`, or an explicit `--service api` / `--all`. A service selector can be
+`noops -e <env> release api`, `noops -e <env> deploy api`, or an explicit `--service api` / `--all`. A service selector
+can be
 omitted when the manifest has exactly one service. `--all` uses a stable
 dependency order from `x-noops.depends_on` and stops at the first failure. Compose `depends_on` is preserved, but is not
 a Swarm readiness guarantee; applications must retry dependencies at runtime. The earlier top-level `name`, `image`, and
@@ -116,7 +117,8 @@ the environment passed to `noops deploy`.
 | `services.<name>.x-noops.build.no-cache`        | No              | `false` | Passes `--no-cache` to Docker. Use for cache-warming builds whose mounted-cache side effects must run every release.                                             |
 | `services.<name>.x-noops.deploy`                | No              | `true`  | Set to `false` for a release-only service. `release --all` still builds it, while deploy, rollback, and remove skip it.                                          |
 
-| `services.<name>.x-noops.env.file`              | No | — | Environment YAML file, relative to the manifest; individual items can select shared values with `from_config`. Omit
+| `services.<name>.x-noops.env.file`              | No | — | Environment YAML file, relative to the manifest; individual
+items can select shared values with `from_config`. Omit
 `x-noops.env` entirely when the service has no environment values or secret bindings. |
 | `services.<name>.x-noops.env.build.file`        | No | — | Relative dotenv file to generate in the temporary build
 context from ordinary environment values. |
@@ -203,7 +205,8 @@ specification; a first deployment without a previous specification is scaled to 
 are reported with the deployment failure. Noops waits for in-place recovery before archiving the operation
 journal and releasing its lock. If recovery fails or times out, the journal remains for inspection.
 
-For development feedback loops, `noops -e <environment> deploy --quick <app>` temporarily uses `healthcheck.start_period`
+For development feedback loops, `noops -e <environment> deploy --quick <app>` temporarily uses
+`healthcheck.start_period`
 as the monitor window while retaining the manifest's `rollout.convergence_timeout`. It does not change the manifest; a
 later normal deploy uses the configured monitor again.
 
