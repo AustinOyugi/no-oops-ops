@@ -14,6 +14,8 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 )
 
+var errIncompleteRenameCatalog = errors.New("incomplete catalog for rename detection")
+
 // retiredDeployments traces live stacks back to deployment and release records.
 // Image equality alone is not ownership: replicas of an application can share
 // both an image and a Git repository. Never adopt a currently declared service.
@@ -26,6 +28,12 @@ func (s *Service) retiredDeployments(ctx context.Context, m manifest.Manifest, e
 		return nil, err
 	}
 	declared, uniqueSource, err := s.declaredServices(m)
+	if errors.Is(err, errIncompleteRenameCatalog) {
+		// Without a complete inventory, an old identity may still be declared.
+		// Leave existing stacks alone and allow the requested deployment to proceed.
+		s.logger.WarnContext(ctx, "skipping automatic rename detection", "reason", err.Error())
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +119,7 @@ func (s *Service) declaredServices(m manifest.Manifest) (map[string]bool, bool, 
 	if s.config.Workspace != "" {
 		file, err := catalog.Load(s.config.Workspace)
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return nil, false, err
+			return nil, false, fmt.Errorf("%w: %w", errIncompleteRenameCatalog, err)
 		}
 		for _, app := range file.Apps {
 			paths[filepath.Clean(filepath.Join(s.config.Workspace, app.Manifest))] = true
@@ -122,6 +130,9 @@ func (s *Service) declaredServices(m manifest.Manifest) (map[string]bool, bool, 
 	for path := range paths {
 		names, err := manifest.Services(path)
 		if err != nil {
+			if path != m.Path {
+				return nil, false, fmt.Errorf("%w: %w", errIncompleteRenameCatalog, err)
+			}
 			return nil, false, err
 		}
 		for _, name := range names {
@@ -131,6 +142,9 @@ func (s *Service) declaredServices(m manifest.Manifest) (map[string]bool, bool, 
 			}
 			other, err := manifest.LoadService(path, name)
 			if err != nil {
+				if path != m.Path {
+					return nil, false, fmt.Errorf("%w: %w", errIncompleteRenameCatalog, err)
+				}
 				return nil, false, err
 			}
 			if m.Build.Source.Git != nil && other.Build.Source.Git != nil && other.Build.Source.Git.URL == m.Build.Source.Git.URL {

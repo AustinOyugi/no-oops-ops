@@ -33,6 +33,8 @@ func TestTraceRenamedStacks(t *testing.T) {
 		{name: "other image", image: "worker:old"},
 		{name: "old service still declared", otherService: "rolengi-dhibitisha-service"},
 		{name: "repository shared with worker", otherService: "worker"},
+		{name: "missing unrelated manifest"},
+		{name: "invalid unrelated manifest"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
@@ -49,6 +51,16 @@ func TestTraceRenamedStacks(t *testing.T) {
 			m, err := manifest.LoadService(path, "dhibitisha-service")
 			if err != nil {
 				t.Fatal(err)
+			}
+			if tc.name == "missing unrelated manifest" || tc.name == "invalid unrelated manifest" {
+				if err := os.WriteFile(filepath.Join(root, "apps.yml"), []byte("apps:\n  postgres:\n    manifest: ./postgres.yml\n"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				if tc.name == "invalid unrelated manifest" {
+					if err := os.WriteFile(filepath.Join(root, "postgres.yml"), []byte("services: ["), 0600); err != nil {
+						t.Fatal(err)
+					}
+				}
 			}
 			previous := Deployment{App: "rolengi-dhibitisha-service", Environment: "dev", StackName: "dev-rolengi-dhibitisha-service", ReleaseTag: "old", CreatedAt: time.Now()}
 			if tc.environment != "" {
