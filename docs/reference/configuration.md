@@ -121,9 +121,16 @@ settings:
       https_port: 443
       # Trust Cloudflare's client-IP header only from Cloudflare networks.
       cloudflare: true
-      networks:
-        prod: [shared-services, legacy-apps]
-        dev: [dev-services]
+      networks: []
+      environments:
+        prod:
+          networks: [shared-services, legacy-apps]
+        dev:
+          name: noops-ingress-dev
+          http_port: 8080
+          https_port: 8443
+          cloudflare: false
+          networks: [dev-services]
     networks:
       default: "noops-{environment}"
       environments:
@@ -143,14 +150,23 @@ without rebuilding the CLI.
 deployments use `platform.networks`: an explicit environment mapping wins, and
 otherwise `{environment}` in `default` is replaced by the selected environment.
 No Oops creates each environment's overlay network on demand, so applications
-in `dev` and `prod` have independent networks. The managed nginx ingress is a
-single shared public listener, but it joins an environment network only when it
+in `dev` and `prod` have independent networks. By default, managed nginx ingress uses a
+shared public listener. An ingress joins an environment network only when it
 serves an exposed app in that environment. It does not make application
 networks reachable from one another.
 
-`platform.ingress.networks` maps environment names to lists of additional external
-Swarm overlay networks for nginx. Only the selected environment's list is applied;
-an unmapped environment or a command without an environment adds no extra networks.
+`platform.ingress` defines shared defaults. `platform.ingress.environments.<environment>`
+overrides `name`, `http_port`, `https_port`, `cloudflare`, and `networks` for the
+selected `--environment` (`-e`). Omitted fields inherit shared values; an explicit
+`cloudflare: false` disables the shared setting. Network lists replace rather than
+append to the shared list, and `networks: []` clears additional networks. Without
+an environment, or for an unmapped environment, only shared defaults apply.
+Use distinct ingress names and non-conflicting published ports for separate
+ingresses on the same server, alongside separate state directories as shown above.
+
+`platform.ingress.networks` lists additional external Swarm overlay networks for
+nginx. The original environment-to-lists mapping is still supported for existing
+catalogs; `environments.<environment>.networks` takes precedence over that mapping.
 It always retains `platform.network.name` and its application environment networks.
 Run `noops -e prod install` after changing the prod list to attach networks immediately;
 ingress-managed app deployments also ensure the listed attachments. Missing

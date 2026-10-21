@@ -52,11 +52,72 @@ type Registry struct {
 }
 
 type Ingress struct {
-	Networks   map[string][]string `yaml:"networks"`
-	Name       string              `yaml:"name"`
-	HTTPPort   int                 `yaml:"http_port"`
-	HTTPSPort  int                 `yaml:"https_port"`
-	Cloudflare bool                `yaml:"cloudflare"`
+	Networks       []string                   `yaml:"networks"`
+	Name           string                     `yaml:"name"`
+	HTTPPort       int                        `yaml:"http_port"`
+	HTTPSPort      int                        `yaml:"https_port"`
+	Cloudflare     bool                       `yaml:"cloudflare"`
+	Environments   map[string]IngressOverride `yaml:"environments"`
+	legacyNetworks map[string][]string
+}
+
+// IngressOverride uses pointers where zero values must override shared settings.
+type IngressOverride struct {
+	Name       *string   `yaml:"name"`
+	HTTPPort   *int      `yaml:"http_port"`
+	HTTPSPort  *int      `yaml:"https_port"`
+	Cloudflare *bool     `yaml:"cloudflare"`
+	Networks   *[]string `yaml:"networks"`
+}
+
+// UnmarshalYAML also accepts the original environment-to-networks mapping.
+func (i *Ingress) UnmarshalYAML(node *yaml.Node) error {
+	var decoded struct {
+		Name         string                     `yaml:"name"`
+		HTTPPort     int                        `yaml:"http_port"`
+		HTTPSPort    int                        `yaml:"https_port"`
+		Cloudflare   bool                       `yaml:"cloudflare"`
+		Environments map[string]IngressOverride `yaml:"environments"`
+		Networks     yaml.Node                  `yaml:"networks"`
+	}
+	if err := node.Decode(&decoded); err != nil {
+		return err
+	}
+	*i = Ingress{Name: decoded.Name, HTTPPort: decoded.HTTPPort, HTTPSPort: decoded.HTTPSPort, Cloudflare: decoded.Cloudflare, Environments: decoded.Environments}
+	if decoded.Networks.Kind == yaml.MappingNode {
+		return decoded.Networks.Decode(&i.legacyNetworks)
+	}
+	if decoded.Networks.Kind != 0 {
+		return decoded.Networks.Decode(&i.Networks)
+	}
+	return nil
+}
+
+// ForEnvironment resolves shared defaults followed by environment overrides.
+func (i Ingress) ForEnvironment(environment string) Ingress {
+	if environment == "" {
+		return i
+	}
+	if networks, ok := i.legacyNetworks[environment]; ok {
+		i.Networks = networks
+	}
+	override := i.Environments[environment]
+	if override.Name != nil {
+		i.Name = *override.Name
+	}
+	if override.HTTPPort != nil {
+		i.HTTPPort = *override.HTTPPort
+	}
+	if override.HTTPSPort != nil {
+		i.HTTPSPort = *override.HTTPSPort
+	}
+	if override.Cloudflare != nil {
+		i.Cloudflare = *override.Cloudflare
+	}
+	if override.Networks != nil {
+		i.Networks = *override.Networks
+	}
+	return i
 }
 
 type EnvironmentNets struct {

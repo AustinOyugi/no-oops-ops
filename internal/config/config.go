@@ -120,12 +120,13 @@ func LoadWithOptions(root string, options Options) (Config, error) {
 		return Config{}, fmt.Errorf("app catalog %q uses version %q, but noops is version %q", paths.Root+"/apps.yml", apps.Version, Version)
 	}
 	platform := apps.Settings.Platform
+	ingress := platform.Ingress.ForEnvironment(options.Environment)
 	networkName := defaultString(platform.Network.Name, defaultNetworkName)
 	registryName := defaultString(platform.Registry.Name, defaultRegistryName)
 	registryPort := defaultInt(platform.Registry.Port, defaultRegistryPort)
-	ingressName := defaultString(platform.Ingress.Name, defaultNginxName)
-	httpPort := defaultInt(platform.Ingress.HTTPPort, defaultNginxHTTPPort)
-	httpsPort := defaultInt(platform.Ingress.HTTPSPort, defaultNginxHTTPSPort)
+	ingressName := defaultString(ingress.Name, defaultNginxName)
+	httpPort := defaultInt(ingress.HTTPPort, defaultNginxHTTPPort)
+	httpsPort := defaultInt(ingress.HTTPSPort, defaultNginxHTTPSPort)
 	environmentNetworkDefault := defaultString(platform.Networks.Default, "noops-{environment}")
 	return Config{
 		AppName:                   defaultAppName,
@@ -142,10 +143,10 @@ func LoadWithOptions(root string, options Options) (Config, error) {
 		RegistryName:              registryName,
 		RegistryPort:              registryPort,
 		NginxName:                 ingressName,
-		NginxNetworks:             append([]string(nil), platform.Ingress.Networks[options.Environment]...),
+		NginxNetworks:             append([]string(nil), ingress.Networks...),
 		NginxHTTPPort:             httpPort,
 		NginxHTTPSPort:            httpsPort,
-		NginxCloudflare:           platform.Ingress.Cloudflare,
+		NginxCloudflare:           ingress.Cloudflare,
 		ACMEEmail:                 file.ACMEEmail,
 		ConfigPath:                configPath,
 	}, nil

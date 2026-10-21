@@ -150,3 +150,55 @@ func TestStateDirectoryTemplateRequiresSafeEnvironment(t *testing.T) {
 		t.Fatalf("template: %q %v", got, err)
 	}
 }
+
+func TestIngressEnvironmentOverrides(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.Initialize(root, Version); err != nil {
+		t.Fatal(err)
+	}
+	content := `version: dev
+settings:
+  platform:
+    ingress:
+      name: shared-ingress
+      http_port: 80
+      https_port: 443
+      cloudflare: true
+      networks: [shared]
+      environments:
+        dev:
+          name: dev-ingress
+          http_port: 8080
+          https_port: 8443
+          cloudflare: false
+          networks: [dev-only]
+        local:
+          networks: []
+        prod: {}
+apps: {}
+`
+	if err := os.WriteFile(filepath.Join(root, "apps.yml"), []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		environment, name, httpPort, httpsPort string
+		cloudflare                             bool
+		networks                               []string
+	}{
+		{"dev", "dev-ingress", "8080", "8443", false, []string{"dev-only"}},
+		{"local", "shared-ingress", "80", "443", true, nil},
+		{"prod", "shared-ingress", "80", "443", true, []string{"shared"}},
+		{"unknown", "shared-ingress", "80", "443", true, []string{"shared"}},
+		{"", "shared-ingress", "80", "443", true, []string{"shared"}},
+	} {
+		t.Run("environment="+tc.environment, func(t *testing.T) {
+			cfg, err := LoadWithOptions(root, Options{Environment: tc.environment})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.NginxName != tc.name || cfg.NginxHTTPPort != tc.httpPort || cfg.NginxHTTPSPort != tc.httpsPort || cfg.NginxCloudflare != tc.cloudflare || !reflect.DeepEqual(cfg.NginxNetworks, tc.networks) {
+				t.Fatalf("resolved ingress: name=%s ports=%s/%s cloudflare=%v networks=%v", cfg.NginxName, cfg.NginxHTTPPort, cfg.NginxHTTPSPort, cfg.NginxCloudflare, cfg.NginxNetworks)
+			}
+		})
+	}
+}

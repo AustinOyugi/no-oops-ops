@@ -13,10 +13,16 @@ settings:
       name: noops-nginx
       http_port: 80
       https_port: 443
-      # Additional external overlays per environment (created if missing).
-      networks:
-        dev: [ ]
-        prod: [ ]
+      cloudflare: false
+      networks: []
+      environments:
+        dev:
+          name: noops-nginx-dev
+          http_port: 8080
+          https_port: 8443
+          networks: []
+        prod:
+          networks: []
     networks:
       default: "noops-{environment}"
       environments: { }
