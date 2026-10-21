@@ -81,7 +81,8 @@ install → secret set (when needed) → release → release list → deploy →
 
 `settings.state.environments` can give each environment its own runtime store while sharing the same app catalog. Use
 `-e dev` to select the environment for platform, dashboard, and lifecycle commands, or set
-`NOOPS_DEFAULT_ENV=dev`. Lifecycle, log, and secret commands require an environment selection. `--state-dir` overrides the configured path.
+`NOOPS_DEFAULT_ENV=dev`. Lifecycle, log, and secret commands require an environment selection. `--state-dir` overrides
+the configured path.
 See [Separate installation stores](docs/reference/configuration.md#separate-installation-stores).
 
 `apps.yml` maps stable app names to ordinary Compose-shaped `app.yml` files. Add `x-noops` only for No Oops behavior;
