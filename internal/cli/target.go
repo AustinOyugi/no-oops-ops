@@ -23,7 +23,7 @@ func target(environment string, args []string, flags targetFlags) app.Target {
 // requiresEnvironment identifies commands whose target is environment-scoped.
 func requiresEnvironment(cmd *cobra.Command) bool {
 	switch cmd.Name() {
-	case "deploy", "release", "rollback", "remove", "logs":
+	case "deploy", "release", "rollback", "remove", "logs", "ls", "ps":
 		return true
 	}
 	parent := cmd.Parent()

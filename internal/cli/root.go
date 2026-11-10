@@ -41,6 +41,7 @@ func NewRootCommand(ctx context.Context) *cobra.Command {
 		newReleaseCommand(ctx, &rt), newDeployCommand(ctx, &rt), newRollbackCommand(ctx, &rt),
 		newRemoveCommand(ctx, &rt), newSecretCommand(ctx, &rt), newCertificateCommand(ctx, &rt),
 		newCleanupCommand(ctx, &rt), newUICommand(ctx, &rt), newLogsCommand(ctx, &rt),
+		newListCommand(ctx, &rt), newPSCommand(ctx, &rt),
 	)
 	return root
 }

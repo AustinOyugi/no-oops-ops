@@ -9,7 +9,7 @@ See [Separate installation stores](reference/configuration.md#separate-installat
 `NOOPS_DEFAULT_ENV` supplies an optional default for `-e`/`--environment`, so
 `export NOOPS_DEFAULT_ENV=dev` lets you run `noops install` and `noops ui` directly.
 An explicit `-e` / `--environment` overrides it. Release, deploy, rollback,
-remove, logs, and secret commands require one of these two sources; otherwise
+remove, logs, `ls`, `ps`, and secret commands require one of these two sources; otherwise
 Noops reports how to select an environment. No workspace default is used.
 Use `noops -e dev deploy nats` for new commands. The earlier
 `noops deploy dev nats` syntax remains supported, as do positional environments
@@ -40,6 +40,8 @@ noops [--workspace <workspace>] doctor [--deploy-ready]
 noops [--workspace <workspace>] status
 noops [--workspace <workspace>] ui
 noops [--workspace <workspace>] -e <environment> logs [app] [--service <name>] [--tail <count|all>] [--since <timestamp|duration>] [--timestamps] [--follow=false]
+noops [--workspace <workspace>] -e <environment> ls
+noops [--workspace <workspace>] -e <environment> ps [service]
 noops [--workspace <workspace>] -e <environment> release [--deploy] [--force] <app> [--service <name> | --all]
 noops [--workspace <workspace>] -e <environment> release list <app> [--service <name> | --all]
 noops [--workspace <workspace>] -e <environment> deploy [--quick] <app> [--service <name> | --all]
@@ -81,6 +83,16 @@ upgrade, run `noops install` to reconcile managed platform services.
 directories.
 
 ## Application commands
+
+`ls` and `ps` are short environment-scoped views of No Oops-managed application services and tasks:
+
+```bash
+noops -e prod ls
+noops -e prod ps
+noops -e prod ps api
+```
+
+`ls` shows replica counts and state. `ps` shows current tasks first, followed by retained task history. An optional service may be its full Docker service name or a unique service name from its app manifest. If a service name is shared by multiple apps, pass the full Docker service name.
 
 | Command                                                                   | Behavior                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 |---------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
