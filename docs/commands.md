@@ -41,7 +41,7 @@ noops [--workspace <workspace>] status
 noops [--workspace <workspace>] ui
 noops [--workspace <workspace>] -e <environment> logs [app] [--service <name>] [--tail <count|all>] [--since <timestamp|duration>] [--timestamps] [--follow=false]
 noops [--workspace <workspace>] -e <environment> ls
-noops [--workspace <workspace>] -e <environment> ps [service]
+noops [--workspace <workspace>] -e <environment> ps [-a|--all] [service]
 noops [--workspace <workspace>] -e <environment> release [--deploy] [--force] <app> [--service <name> | --all]
 noops [--workspace <workspace>] -e <environment> release list <app> [--service <name> | --all]
 noops [--workspace <workspace>] -e <environment> deploy [--quick] <app> [--service <name> | --all]
@@ -84,15 +84,16 @@ directories.
 
 ## Application commands
 
-`ls` and `ps` are short environment-scoped views of No Oops-managed application services and tasks:
+`ls` and `ps` are short environment-scoped views of No Oops-managed application services and tasks. `ps` lists running tasks by default; pass `-a` to include stopped and historical tasks:
 
 ```bash
 noops -e prod ls
 noops -e prod ps
 noops -e prod ps api
+noops -e prod ps -a
 ```
 
-`ls` shows replica counts and state. `ps` shows current tasks first, followed by retained task history. An optional service may be its full Docker service name or a unique service name from its app manifest. If a service name is shared by multiple apps, pass the full Docker service name.
+`ls` shows replica counts and state. An optional service may be its full Docker service name or a unique service name from its app manifest. If a service name is shared by multiple apps, pass the full Docker service name.
 
 | Command                                                                   | Behavior                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 |---------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|

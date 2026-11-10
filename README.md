@@ -52,7 +52,7 @@ noops -e prod release --deploy redis --service redis
 noops -e prod release --deploy --force redis --service redis # Overwrite an existing release tag
 noops -e prod release list redis --service redis
 noops -e prod ls # List managed services
-noops -e prod ps # List their Swarm tasks
+noops -e prod ps # List running Swarm tasks
 noops status
 noops -e prod logs redis --service redis
 noops -e prod logs # Stream all deployed services in prod

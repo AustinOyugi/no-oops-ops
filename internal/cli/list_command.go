@@ -31,9 +31,10 @@ func newListCommand(ctx context.Context, rt *runtime) *cobra.Command {
 }
 
 func newPSCommand(ctx context.Context, rt *runtime) *cobra.Command {
-	return &cobra.Command{
+	var all bool
+	cmd := &cobra.Command{
 		Use:   "ps [service]",
-		Short: "List tasks for managed services in an environment",
+		Short: "List running tasks for managed services in an environment",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := rt.configuration()
@@ -51,9 +52,11 @@ func newPSCommand(ctx context.Context, rt *runtime) *cobra.Command {
 					return err
 				}
 			}
-			return printTasks(ctx, cmd.OutOrStdout(), services)
+			return printTasks(ctx, cmd.OutOrStdout(), services, all)
 		},
 	}
+	cmd.Flags().BoolVarP(&all, "all", "a", false, "Include stopped and historical tasks")
+	return cmd
 }
 
 func managedEnvironmentServices(rows []tui.Row, environment string) []tui.Row {
@@ -83,7 +86,7 @@ func printServices(output io.Writer, services []tui.Row) error {
 	return w.Flush()
 }
 
-func printTasks(ctx context.Context, output io.Writer, services []tui.Row) error {
+func printTasks(ctx context.Context, output io.Writer, services []tui.Row, all bool) error {
 	if len(services) == 0 {
 		_, err := fmt.Fprintln(output, "No managed services found.")
 		return err
@@ -99,6 +102,9 @@ func printTasks(ctx context.Context, output io.Writer, services []tui.Row) error
 			return err
 		}
 		for _, task := range tasks {
+			if !all && task.State != "running" {
+				continue
+			}
 			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", service.Service, task.ID, task.Node, task.State, task.Error); err != nil {
 				return err
 			}
@@ -106,7 +112,11 @@ func printTasks(ctx context.Context, output io.Writer, services []tui.Row) error
 		}
 	}
 	if count == 0 {
-		if _, err := fmt.Fprintln(w, "No tasks found."); err != nil {
+		message := "No running tasks found."
+		if all {
+			message = "No tasks found."
+		}
+		if _, err := fmt.Fprintln(w, message); err != nil {
 			return err
 		}
 	}
