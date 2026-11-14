@@ -107,3 +107,8 @@ func uptime(task Task, now time.Time) string {
 	}
 	return fmt.Sprintf("%ds", int(age/time.Second))
 }
+
+// TaskAge formats how long a running task has been running.
+func TaskAge(task Task, now time.Time) string {
+	return uptime(task, now)
+}

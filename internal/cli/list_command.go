@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/tui"
 	"github.com/spf13/cobra"
@@ -92,7 +93,7 @@ func printTasks(ctx context.Context, output io.Writer, services []tui.Row, all b
 		return err
 	}
 	w := tabwriter.NewWriter(output, 0, 4, 2, ' ', 0)
-	if _, err := fmt.Fprintln(w, "SERVICE\tTASK\tNODE\tSTATE\tERROR"); err != nil {
+	if _, err := fmt.Fprintln(w, "SERVICE\tTASK\tNODE\tSTATE\tAGE\tERROR"); err != nil {
 		return err
 	}
 	count := 0
@@ -105,7 +106,7 @@ func printTasks(ctx context.Context, output io.Writer, services []tui.Row, all b
 			if !all && task.State != "running" {
 				continue
 			}
-			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", service.Service, task.ID, task.Node, task.State, task.Error); err != nil {
+			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", service.Service, task.ID, task.Node, task.State, tui.TaskAge(task, time.Now()), task.Error); err != nil {
 				return err
 			}
 			count++
