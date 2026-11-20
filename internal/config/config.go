@@ -11,11 +11,13 @@ import (
 	"strings"
 
 	"github.com/AustinOyugi/no-oops-ops/internal/catalog"
+	"github.com/AustinOyugi/no-oops-ops/internal/storage"
 	"github.com/AustinOyugi/no-oops-ops/internal/workspace"
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
+	Storage          storage.Policy
 	AppName          string
 	Workspace        string
 	StateDir         string
@@ -119,6 +121,10 @@ func LoadWithOptions(root string, options Options) (Config, error) {
 	if apps.Version != Version {
 		return Config{}, fmt.Errorf("app catalog %q uses version %q, but noops is version %q", paths.Root+"/apps.yml", apps.Version, Version)
 	}
+	policy := apps.Settings.Storage.Defaults()
+	if err := policy.Validate(); err != nil {
+		return Config{}, err
+	}
 	platform := apps.Settings.Platform
 	ingress := platform.Ingress.ForEnvironment(options.Environment)
 	networkName := defaultString(platform.Network.Name, defaultNetworkName)
@@ -129,6 +135,7 @@ func LoadWithOptions(root string, options Options) (Config, error) {
 	httpsPort := defaultInt(ingress.HTTPSPort, defaultNginxHTTPSPort)
 	environmentNetworkDefault := defaultString(platform.Networks.Default, "noops-{environment}")
 	return Config{
+		Storage:                   policy,
 		AppName:                   defaultAppName,
 		Workspace:                 paths.Root,
 		StateDir:                  paths.StateDir,

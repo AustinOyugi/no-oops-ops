@@ -3,11 +3,13 @@ package local
 import (
 	"context"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
+	"github.com/AustinOyugi/no-oops-ops/internal/storage"
 	"log/slog"
 )
 
 type Host struct {
-	runner interface {
+	storage storage.Policy
+	runner  interface {
 		Run(context.Context, string, []string, command.RunOptions) (command.Result, error)
 	}
 	logger           *slog.Logger
@@ -59,3 +61,5 @@ func NewHost(
 		nginxService:    nginxName + "_nginx",
 	}
 }
+
+func (h *Host) SetStoragePolicy(p storage.Policy) { h.storage = p }

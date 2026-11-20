@@ -224,3 +224,7 @@ data.
 `apps/<app>/<environment>/rollout.json` contains best-effort blue/green display
 telemetry for the TUI. It is separate from the durable deployment recovery journal;
 missing display telemetry does not determine deployment success.
+
+## Storage safeguards
+
+`settings.storage` configures build free-space thresholds, unused build-cache retention, and generated-service log rotation. See [Storage safeguards and recovery](../storage-recovery.md) for defaults, host requirements and guarantees.

@@ -20,6 +20,7 @@ import (
 const DefaultKeep = 3
 
 type Options struct {
+	Host             bool
 	Apply            bool
 	Keep             int
 	Orphaned         bool
@@ -28,6 +29,8 @@ type Options struct {
 	ReleaseRetention bool
 }
 type Plan struct {
+	BuildCache                                                                      bool
+	Containers                                                                      []string
 	ReleasePaths, DeploymentPaths, StackPaths, Images, LocalImages, ProtectedImages []string
 	Protected                                                                       int
 }
@@ -46,6 +49,9 @@ func NewService(logger *slog.Logger, cfg config.Config) *Service {
 }
 
 func (s *Service) Run(ctx context.Context, options Options) (Plan, error) {
+	if options.Host {
+		return s.runHost(ctx, options)
+	}
 	if (options.App == "") != (options.Environment == "") {
 		return Plan{}, fmt.Errorf("cleanup app and environment must be supplied together")
 	}

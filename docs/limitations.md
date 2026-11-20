@@ -28,3 +28,5 @@
   measure HTTP traffic or implement percentage-based traffic shifting.
 - Cancellation requests cleanup of temporary build/fetch services, but daemon
   outages or forced process termination can leave workloads requiring manual removal.
+
+- Storage admission and monitoring are not filesystem quotas. Automatic startup ordering after Docker/host restarts is not implemented; `recover` controls only the startups it initiates. See [Storage safeguards and recovery](storage-recovery.md).

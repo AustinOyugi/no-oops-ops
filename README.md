@@ -68,6 +68,7 @@ noops -e prod logs # Stream all deployed services in prod
 - [Environment-file reference](docs/reference/env-file.md) — generated `.env` values and secret references
 - [Configuration and generated state](docs/reference/configuration.md)
 - [Networking and TLS](docs/networking-tls.md) — ingress ports, routing, Let's Encrypt, and Cloudflare Origin TLS
+- [Storage safeguards and recovery](docs/storage-recovery.md) — disk checks, safe host cleanup and controlled recovery
 - [Troubleshooting](docs/troubleshooting.md)
 - [Current limitations](docs/limitations.md)
 

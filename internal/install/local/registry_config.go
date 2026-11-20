@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"github.com/AustinOyugi/no-oops-ops/internal/storage"
 	"os"
 	"path/filepath"
 
@@ -98,6 +99,10 @@ func (h *Host) WriteRegistryStack(ctx context.Context) error {
 		}
 	}
 
+	rendered, err = storage.BoundLogs(rendered, h.storage)
+	if err != nil {
+		return err
+	}
 	rendered = append(rendered, '\n')
 
 	if err := state.WriteFile(path, rendered, installMetadataFileMode); err != nil {

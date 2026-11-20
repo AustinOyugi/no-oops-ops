@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"github.com/AustinOyugi/no-oops-ops/internal/storage"
 	"os"
 	"path/filepath"
 	"sort"
@@ -165,6 +166,10 @@ func (h *Host) WriteNginxStack(ctx context.Context) error {
 		return install.PrerequisiteError{Check: install.StepWriteNginxStack, Err: fmt.Errorf("render nginx stack: %w", err)}
 	}
 
+	rendered, err = storage.BoundLogs(rendered, h.storage)
+	if err != nil {
+		return err
+	}
 	if err := state.WriteFile(path, append(rendered, '\n'), installMetadataFileMode); err != nil {
 		return install.PrerequisiteError{Check: install.StepWriteNginxStack, Err: fmt.Errorf("write nginx stack %q: %w", path, err)}
 	}

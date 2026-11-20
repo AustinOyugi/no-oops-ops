@@ -383,6 +383,11 @@ func (s *Service) run(ctx context.Context, environment string, path string, opti
 		ServiceName:    deploymentSwarmService,
 		SecretBindings: secretBindings,
 	}
+	deployment.DeployedImage = deployedImage
+	deployment.RecoveryStack, err = s.snapshotRecovery(deployment, stackPath)
+	if err != nil {
+		return Result{}, fmt.Errorf("save recovery snapshot: %w", err)
+	}
 	deploymentPath, err := s.deployments.Save(s.config, deployment)
 	if err != nil {
 		return Result{}, err

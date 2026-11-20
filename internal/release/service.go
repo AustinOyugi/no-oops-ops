@@ -14,6 +14,7 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 	"github.com/AustinOyugi/no-oops-ops/internal/platform/command"
 	"github.com/AustinOyugi/no-oops-ops/internal/secret"
+	"github.com/AustinOyugi/no-oops-ops/internal/storage"
 	"github.com/AustinOyugi/no-oops-ops/internal/templateutil"
 )
 
@@ -85,6 +86,15 @@ func (s *Service) runLocked(ctx context.Context, environment string, path string
 	}
 	defer unlock()
 
+	if s.config.Storage.MinFreeBytes > 0 {
+		usage, err := storage.Inspect(ctx, s.runner)
+		if err != nil {
+			return Result{}, err
+		}
+		if err := storage.Check(s.config.Storage, usage, s.logger); err != nil {
+			return Result{}, err
+		}
+	}
 	if m.Image.ShouldBuild() {
 		return s.releaseBuild(ctx, environment, absPath, m, options)
 	}

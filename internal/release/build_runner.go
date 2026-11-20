@@ -35,6 +35,7 @@ func (s *Service) buildImageIsolated(ctx context.Context, image, dockerfile, con
 	}()
 
 	args := []string{"service", "create", "--detach", "--name", name, "--restart-condition", "none", "--constraint", "node.role==manager", "--mount", "type=bind,src=" + contextDir + ",dst=/work,readonly", "--mount", "type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock"}
+	args = append(args, s.config.Storage.LogArgs()...)
 	for _, secret := range secrets {
 		args = append(args, "--secret", "source="+secret.SwarmName+",target="+secret.ID+",mode=0400")
 	}

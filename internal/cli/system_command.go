@@ -39,11 +39,12 @@ func newStatusCommand(ctx context.Context, rt *runtime) *cobra.Command {
 }
 
 func newCleanupCommand(ctx context.Context, rt *runtime) *cobra.Command {
-	var apply, orphaned bool
+	var apply, orphaned, host bool
 	var keep int
 	cmd := newAppCommand(rt, "cleanup", cobra.NoArgs, func(application *app.App, _ []string) error {
-		return application.Cleanup(ctx, cleanup.Options{Apply: apply, Orphaned: orphaned, Keep: keep})
+		return application.Cleanup(ctx, cleanup.Options{Host: host, Apply: apply, Orphaned: orphaned, Keep: keep})
 	})
+	cmd.Flags().BoolVar(&host, "host", false, "Clean unused host cache, failed containers and unreferenced images; preserve volumes")
 	cmd.Flags().BoolVar(&apply, "apply", false, "Apply cleanup")
 	cmd.Flags().BoolVar(&orphaned, "orphaned", false, "Include orphaned app environments")
 	cmd.Flags().IntVar(&keep, "keep", cleanup.DefaultKeep, "Number of records to retain")

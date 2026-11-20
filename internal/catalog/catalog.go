@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/AustinOyugi/no-oops-ops/internal/storage"
 	"gopkg.in/yaml.v3"
 )
 
@@ -20,9 +21,10 @@ type App struct {
 }
 
 type Settings struct {
-	Platform Platform `yaml:"platform"`
-	Upgrade  Upgrade  `yaml:"upgrade"`
-	State    State    `yaml:"state"`
+	Storage  storage.Policy `yaml:"storage"`
+	Platform Platform       `yaml:"platform"`
+	Upgrade  Upgrade        `yaml:"upgrade"`
+	State    State          `yaml:"state"`
 }
 
 // State selects the runtime store without duplicating application manifests.

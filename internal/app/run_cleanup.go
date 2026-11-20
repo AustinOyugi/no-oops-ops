@@ -13,6 +13,12 @@ func (a *App) Cleanup(ctx context.Context, options cleanup.Options) error {
 	if err != nil {
 		return err
 	}
+	if plan.BuildCache {
+		a.logger.InfoContext(ctx, "cleanup unused build cache", "keep_bytes", a.config.Storage.BuildCacheBytes, "apply", options.Apply)
+	}
+	for _, id := range plan.Containers {
+		a.logger.InfoContext(ctx, "cleanup failed container candidate", "id", id)
+	}
 	for _, image := range plan.Images {
 		a.logger.InfoContext(ctx, "cleanup registry image candidate", "image", image)
 	}

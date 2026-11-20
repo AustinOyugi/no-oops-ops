@@ -83,9 +83,13 @@ func (s *Service) planOptions(live liveInventory, options Options) (Plan, error)
 			}
 			success := successfulDeployments(deployments)
 			for i, d := range success {
-				if !options.ReleaseRetention && !orphaned && i < keep {
+				if !orphaned && (i == 0 || (!options.ReleaseRetention && i < keep)) {
 					protected[imageKey(d.ReleaseImage)] = struct{}{}
 					protectedImages[d.ReleaseImage] = struct{}{}
+					if d.DeployedImage != "" {
+						protected[imageKey(d.DeployedImage)] = struct{}{}
+						protectedImages[d.DeployedImage] = struct{}{}
+					}
 				}
 			}
 			for _, item := range releases {

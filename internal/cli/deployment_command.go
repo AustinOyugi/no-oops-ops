@@ -34,3 +34,13 @@ func newRemoveCommand(ctx context.Context, rt *runtime) *cobra.Command {
 	addTargetFlags(cmd, &flags)
 	return cmd
 }
+
+func newRecoverCommand(ctx context.Context, rt *runtime) *cobra.Command {
+	var flags targetFlags
+	cmd := newAppCommand(rt, "recover <app>", cobra.RangeArgs(1, 2), func(application *app.App, args []string) error {
+		return application.Recover(ctx, target(rt.selectedEnvironment, args, flags))
+	})
+	cmd.Short = "Recover saved deployments serially after platform readiness"
+	addTargetFlags(cmd, &flags)
+	return cmd
+}

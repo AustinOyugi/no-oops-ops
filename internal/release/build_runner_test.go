@@ -93,7 +93,7 @@ esac
 	}()
 	deadline := time.Now().Add(5 * time.Second)
 	for {
-		if _, err := os.Stat(created); err == nil {
+		if content, err := os.ReadFile(created); err == nil && len(content) > 0 {
 			break
 		}
 		if time.Now().After(deadline) {

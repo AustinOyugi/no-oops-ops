@@ -14,6 +14,8 @@ import (
 )
 
 type Deployment struct {
+	DeployedImage  string          `json:"deployed_image,omitempty"`
+	RecoveryStack  string          `json:"recovery_stack,omitempty"`
 	ManifestPath   string          `json:"manifest_path,omitempty"`
 	App            string          `json:"app"`
 	CreatedAt      time.Time       `json:"created_at"`

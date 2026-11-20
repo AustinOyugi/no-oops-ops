@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"github.com/AustinOyugi/no-oops-ops/internal/storage"
 	"os"
 	"path/filepath"
 	"strings"
@@ -175,12 +176,18 @@ func (s *Service) buildWrappedImage(ctx context.Context, applicationImage, appli
 	}
 
 	image := wrappedImageRef(s.config, applicationImage, applicationName)
-	result, err := s.runner.Run(ctx, "docker", []string{"build", "-t", image, "-f", dockerfilePath, contextDir}, command.RunOptions{})
+	err = storage.Build(ctx, s.runner, s.config.Storage, s.logger, func(buildCtx context.Context) error {
+		result, err := s.runner.Run(buildCtx, "docker", []string{"build", "-t", image, "-f", dockerfilePath, contextDir}, command.RunOptions{})
+		if err != nil {
+			return fmt.Errorf("build %q: %w: %s", image, err, strings.TrimSpace(string(result.Output)))
+		}
+		return nil
+	})
 	if err != nil {
-		return "", fmt.Errorf("build %q: %w: %s", image, err, strings.TrimSpace(string(result.Output)))
+		return "", err
 	}
 
-	result, err = s.runner.Run(ctx, "docker", []string{"push", image}, command.RunOptions{})
+	result, err := s.runner.Run(ctx, "docker", []string{"push", image}, command.RunOptions{})
 	if err != nil {
 		return "", fmt.Errorf("push %q: %w: %s", image, err, strings.TrimSpace(string(result.Output)))
 	}

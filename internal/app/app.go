@@ -57,6 +57,7 @@ func New(cfg config.Config) (*App, error) {
 		cfg.NetworkName, cfg.RegistryName, cfg.RegistryPort,
 		cfg.NginxName, cfg.NginxHTTPPort, cfg.NginxHTTPSPort, cfg.NginxNetworks...)
 
+	localHost.SetStoragePolicy(cfg.Storage)
 	installer, err := install.New(logger, localHost)
 
 	if err != nil {

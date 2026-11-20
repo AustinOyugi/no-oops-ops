@@ -59,6 +59,9 @@ func (s *Service) checks(profile Profile) ([]checkDefinition, error) {
 		return nil, fmt.Errorf("unknown doctor profile %q", profile)
 	}
 
+	if s.config.Storage.MinFreeBytes > 0 {
+		deployReadinessChecks = append(deployReadinessChecks, checkDefinition{name: "docker_storage", requires: []string{"docker"}, skipMessage: "requires Docker", remediation: "Start Docker first", run: s.checkStorage})
+	}
 	return append(deployReadinessChecks, []checkDefinition{
 		{
 			name: "install_metadata",

@@ -157,7 +157,7 @@ func TestAutomaticRetentionKeepsThreeBuildsAndLiveImagesWithinScope(t *testing.T
 	}
 }
 
-func TestAutomaticRetentionDoesNotKeepExtraHistoricalDeployments(t *testing.T) {
+func TestAutomaticRetentionKeepsLastSuccessfulDeploymentWithoutLiveServices(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "apps", "api", "prod")
 	for _, sub := range []string{"releases", "deployments"} {
@@ -177,8 +177,8 @@ func TestAutomaticRetentionDoesNotKeepExtraHistoricalDeployments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(plan.ReleasePaths) != 3 || len(plan.DeploymentPaths) != 3 || len(plan.Images) != 3 {
-		t.Fatalf("old deployments expanded build retention: %#v", plan)
+	if len(plan.ReleasePaths) != 2 || len(plan.DeploymentPaths) != 2 || len(plan.Images) != 2 {
+		t.Fatalf("last successful deployment was not retained: %#v", plan)
 	}
 }
 

@@ -38,7 +38,7 @@ func NewRootCommand(ctx context.Context) *cobra.Command {
 	root.AddCommand(
 		newConfigCommand(&rt), newVersionCommand(), newInitCommand(&rt), newUpgradeCommand(ctx, &rt), newInstallCommand(ctx, &rt),
 		newUninstallCommand(ctx, &rt), newDoctorCommand(ctx, &rt), newStatusCommand(ctx, &rt),
-		newReleaseCommand(ctx, &rt), newDeployCommand(ctx, &rt), newRollbackCommand(ctx, &rt),
+		newRecoverCommand(ctx, &rt), newReleaseCommand(ctx, &rt), newDeployCommand(ctx, &rt), newRollbackCommand(ctx, &rt),
 		newRemoveCommand(ctx, &rt), newSecretCommand(ctx, &rt), newCertificateCommand(ctx, &rt),
 		newCleanupCommand(ctx, &rt), newUICommand(ctx, &rt), newLogsCommand(ctx, &rt),
 		newListCommand(ctx, &rt), newPSCommand(ctx, &rt),

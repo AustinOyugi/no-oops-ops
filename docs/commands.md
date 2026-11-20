@@ -214,3 +214,9 @@ after deploying new services or switching blue/green stacks to include them.
 Select individual config keys by installed alias, e.g. `from_config: database`,
 in the service env file; see the
 [environment file reference](reference/env-file.md#reusable-configs).
+
+## Host storage cleanup and recovery
+
+`noops cleanup --host` previews unused host cache, failed containers and unreferenced images; add `--apply` to remove them. Volumes are preserved.
+
+`noops -e prod recover <app> --all` starts platform infrastructure and replays the last successful deployments serially in dependency order. Use `--service <name>` for one service. `noops status` reports the last recovery attempt. This command does not enforce Swarm restart ordering automatically. See [Storage safeguards and recovery](storage-recovery.md).

@@ -61,6 +61,9 @@ func (s *Service) Run(ctx context.Context) (Result, error) {
 	s.addServiceComponent(ctx, &result, "nginx_service", result.Metadata.Nginx.ServiceName)
 	s.addServiceComponent(ctx, &result, "certbot_service", s.config.NginxName+"_certbot")
 
+	if err := s.addRecoveryComponents(&result); err != nil {
+		return Result{}, err
+	}
 	result.AddComponent("registry_config", componentStatusFromFile(result.Metadata.Registry.ConfigPath), result.Metadata.Registry.ConfigPath)
 	result.AddComponent("registry_stack", componentStatusFromFile(result.Metadata.Registry.StackPath), result.Metadata.Registry.StackPath)
 	result.AddComponent("nginx_stack", componentStatusFromFile(result.Metadata.Nginx.StackPath), result.Metadata.Nginx.StackPath)
@@ -108,4 +111,37 @@ func componentStatusFromFile(path string) ComponentStatus {
 	}
 
 	return ComponentStatusReady
+}
+
+// Recovery records describe the last recovery attempt, not continuous health.
+func (s *Service) addRecoveryComponents(result *Result) error {
+	paths, err := filepath.Glob(filepath.Join(s.config.StateDir, "apps", "*", "*", "recovery.json"))
+	if err != nil {
+		return err
+	}
+	for _, path := range paths {
+		if s.config.Environment != "" && filepath.Base(filepath.Dir(path)) != s.config.Environment {
+			continue
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		var progress struct {
+			App, Environment, Stage, Dependency, Error string
+			UpdatedAt                                  string `json:"updated_at"`
+		}
+		if err := json.Unmarshal(data, &progress); err != nil {
+			return fmt.Errorf("read recovery progress %s: %w", path, err)
+		}
+		status := ComponentStatusDegraded
+		if progress.Stage == "ready" {
+			status = ComponentStatusReady
+		}
+		if progress.Stage == "failed" {
+			status = ComponentStatusMissing
+		}
+		result.AddComponent("last_recovery/"+progress.Environment+"/"+progress.App, status, fmt.Sprintf("stage=%s dependency=%s updated_at=%s error=%s", progress.Stage, progress.Dependency, progress.UpdatedAt, progress.Error))
+	}
+	return nil
 }

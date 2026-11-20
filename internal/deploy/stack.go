@@ -8,6 +8,7 @@ import (
 	"github.com/AustinOyugi/no-oops-ops/internal/config"
 	"github.com/AustinOyugi/no-oops-ops/internal/manifest"
 	"github.com/AustinOyugi/no-oops-ops/internal/state"
+	"github.com/AustinOyugi/no-oops-ops/internal/storage"
 	"github.com/AustinOyugi/no-oops-ops/internal/templateutil"
 	"os"
 	"path/filepath"
@@ -170,6 +171,10 @@ func writeStackForService(cfg config.Config, environment string, m manifest.Mani
 		if err != nil {
 			return "", err
 		}
+		rendered, err = storage.BoundLogs(rendered, cfg.Storage)
+		if err != nil {
+			return "", err
+		}
 		if err := state.WriteFile(path, append(rendered, '\n'), stackFileMode); err != nil {
 			return "", fmt.Errorf("write stack file %q: %w", path, err)
 		}
@@ -219,6 +224,10 @@ func writeStackForService(cfg config.Config, environment string, m manifest.Mani
 		return "", err
 	}
 
+	rendered, err = storage.BoundLogs(rendered, cfg.Storage)
+	if err != nil {
+		return "", err
+	}
 	rendered = append(rendered, '\n')
 
 	if err := state.WriteFile(path, rendered, stackFileMode); err != nil {
